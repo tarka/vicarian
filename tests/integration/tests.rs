@@ -8,8 +8,12 @@ use wiremock::{
 
 use crate::util::{BACKEND_PORT, INSECURE_PORT, ProxyBuilder, TLS_PORT, mkcert_root, mock_server};
 
-// NOTE: We use unwrap rather than result here as it save the run
-// files on failure (in Proxy::drop()).
+// NOTE: We use unwrap rather than result here as we can save the run
+// files on failure (see Proxy::drop()).
+//
+// Tests run serially currently as we use the same port across runs
+// for simplicity. Once we have more tests we may need to look into
+// parallelising.
 
 #[tokio::test]
 #[serial]

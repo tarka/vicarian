@@ -56,6 +56,7 @@ impl ProxyBuilder {
             bail!("No config provided")
         }
 
+        // Force creation of the test certs.
         let _ = LazyLock::force(&certs::TEST_CERTS);
 
         let process = self.run_proxy().await?;
@@ -69,7 +70,6 @@ impl ProxyBuilder {
 
     async fn run_proxy(&self) -> Result<Child> {
         info!("Starting Test Proxy");
-        //let exe = env!("CARGO_BIN_EXE_vicarian");
         let exe = env!("CARGO_BIN_EXE_vicarian");
 
         let out_file = self.dir.path().join("stdout");

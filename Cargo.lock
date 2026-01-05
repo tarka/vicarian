@@ -4042,6 +4042,7 @@ dependencies = [
  "ctor",
  "dnsclient",
  "fastrand",
+ "fslock",
  "futures",
  "http",
  "http-serde",

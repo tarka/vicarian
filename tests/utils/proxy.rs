@@ -1,19 +1,15 @@
-#![allow(unused)]
 
 mod certs;
 
 use std::sync::LazyLock;
-use std::{sync::Arc};
 use std::thread::panicking;
 use std::time::Duration;
 
 use anyhow::{Result, anyhow, bail};
 use camino::Utf8PathBuf;
 use nix::{sys::signal::{Signal, kill}, unistd::Pid};
-use reqwest::{Certificate, blocking::Client, redirect};
 use tempfile::{TempDir, tempdir_in};
-use tokio::sync::{Notify, mpsc};
-use tokio::{fs::{File, copy, create_dir_all}, sync::mpsc::Receiver, task::JoinHandle};
+use tokio::{fs::{File, copy, create_dir_all}};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{Child, Command};
 use tracing_log::log::info;
@@ -30,9 +26,8 @@ pub struct ProxyBuilder {
 
 pub struct Proxy {
     pub dir: TempDir,
-    pub config: Utf8PathBuf,
+    pub _config: Utf8PathBuf,
     pub process: Child,
-    keep_files: bool,
 }
 
 impl ProxyBuilder {
@@ -62,9 +57,8 @@ impl ProxyBuilder {
         let process = self.run_proxy().await?;
         Ok(Proxy {
             dir: self.dir,
-            config: self.config.unwrap(),
+            _config: self.config.unwrap(),
             process,
-            keep_files: false,
         })
     }
 
@@ -109,11 +103,6 @@ impl Proxy {
         let pid = Pid::from_raw(self.process.id().unwrap().try_into().unwrap());
         kill(pid, Signal::SIGINT).unwrap();
         println!("Killed process {}", pid);
-    }
-
-    pub fn keep_files(&mut self) {
-        self.keep_files = true;
-        self.dir.disable_cleanup(true);
     }
 }
 

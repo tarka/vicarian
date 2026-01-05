@@ -1,5 +1,7 @@
 #![cfg(feature = "integration_tests")]
 
+#[path = "../utils/certs.rs"]
+mod certutils;
 #[path = "../utils/proxy.rs"]
 mod proxyutils;
 
@@ -11,12 +13,14 @@ use wiremock::{
 };
 
 use proxyutils::{
-    BACKEND_PORT, INSECURE_PORT, ProxyBuilder, TLS_PORT, mkcert_root, mock_server,
+    BACKEND_PORT, INSECURE_PORT, ProxyBuilder, TLS_PORT, mock_server,
 };
+
+use crate::certutils::TEST_CERTS;
 
 // NOTE: We use unwrap rather than result here as we can save the run
 // files on failure (see Proxy::drop()).
-//
+
 // Tests run serially currently as we use the same port across runs
 // for simplicity. Once we have more tests we may need to look into
 // parallelising.
@@ -50,7 +54,7 @@ async fn test_dns_override() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = mkcert_root().await.unwrap();
+    let root_cert = TEST_CERTS.caroot.cert.clone();
     let ready = Client::builder()
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
@@ -72,7 +76,7 @@ async fn test_mocked_backend() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = mkcert_root().await.unwrap();
+    let root_cert = TEST_CERTS.caroot.cert.clone();
 
     Mock::given(method("GET"))
         .and(path("/status"))

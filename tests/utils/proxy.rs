@@ -1,5 +1,8 @@
 #![allow(unused)]
 
+mod certs;
+
+use std::sync::LazyLock;
 use std::{sync::Arc};
 use std::thread::panicking;
 use std::time::Duration;
@@ -52,6 +55,9 @@ impl ProxyBuilder {
         if self.config.is_none() {
             bail!("No config provided")
         }
+
+        let _ = LazyLock::force(&certs::TEST_CERTS);
+
         let process = self.run_proxy().await?;
         Ok(Proxy {
             dir: self.dir,
@@ -118,14 +124,6 @@ impl Drop for Proxy {
         }
         self.child_cleanup();
     }
-}
-
-pub async fn mkcert_root() -> Result<Certificate> {
-    let home = std::env::var("HOME")?;
-    let certroot = Utf8PathBuf::from(home)
-        .join(".local/share/mkcert/rootCA.pem");
-    let pem = tokio::fs::read(certroot).await?;
-    Ok(reqwest::Certificate::from_pem(&pem)?)
 }
 
 pub async fn mock_server(port: u16) -> Result<MockServer> {

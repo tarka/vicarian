@@ -53,6 +53,7 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 zone-update = { version = "0.9.0", features = ["async"] }
 
 [features]
+default = ["integration_tests"]
 integration_tests = []
 
 [dev-dependencies]

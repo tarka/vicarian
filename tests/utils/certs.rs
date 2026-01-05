@@ -1,7 +1,8 @@
+#![allow(unused)]
 
-use std::{fs::{self, create_dir_all}};
+use std::{fs::{self, create_dir_all}, sync::LazyLock};
 
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
 use camino::{Utf8Path, Utf8PathBuf};
 use fslock::LockFile;
 use pingora_boringssl::{
@@ -9,7 +10,8 @@ use pingora_boringssl::{
     x509::X509,
 };
 use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, CertifiedIssuer, DistinguishedName, DnType, IsCa, Issuer, KeyPair, KeyUsagePurpose, PKCS_ECDSA_P256_SHA256
+    BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, Issuer, KeyPair,
+    KeyUsagePurpose, PKCS_ECDSA_P256_SHA256,
 };
 
 pub const CERT_BASE: &'static str = "target/certs";
@@ -20,12 +22,19 @@ fn lock_dir(dir: &Utf8Path) -> Result<LockFile> {
     Ok(LockFile::open(lockfile.as_os_str())?)
 }
 
-struct Ca {
-    cert: Certificate,
-    issuer: Issuer<'static, KeyPair>,
+pub struct CaCert {
+    pub issuer: Issuer<'static, KeyPair>,
+    pub cert: reqwest::Certificate,
 }
 
-fn gen_ca() -> Result<Ca> {
+pub struct LocalCert {
+    pub keyfile: Utf8PathBuf,
+    pub key: PKey<Private>,
+    pub certfile: Utf8PathBuf,
+    pub certs: Vec<X509>,
+}
+
+fn gen_ca() -> Result<CaCert> {
     let mut params = CertificateParams::default();
 
     params.distinguished_name = DistinguishedName::new();
@@ -38,26 +47,47 @@ fn gen_ca() -> Result<Ca> {
     params.key_usages.push(KeyUsagePurpose::CrlSign);
 
     let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256)?;
+    let key = key_pair.serialize_pem();
 
     let cert = params.self_signed(&key_pair)?;
     let issuer = Issuer::new(params, key_pair);
 
-    let ca = Ca {
-        cert, issuer,
+    let certdir = Utf8PathBuf::from(CERT_BASE);
+    let certfile = certdir.join("CA.crt");
+    let cakey = certdir.join("CA.key");
+
+    let certpem = cert.pem();
+
+    fs::write(&certfile, &certpem)?;
+    fs::write(&cakey, &key)?;
+
+    let reqcert = reqwest::Certificate::from_pem(certpem.as_bytes())?;
+
+    let cacert = CaCert {
+        cert: reqcert,
+        issuer,
     };
 
-    Ok(ca)
+    Ok(cacert)
 }
 
-fn load_ca(cafile: &Utf8Path, cakey: &Utf8Path) -> Result<Issuer<'static, KeyPair>> {
+fn load_ca(certfile: Utf8PathBuf, cakey: Utf8PathBuf) -> Result<CaCert> {
     let keypem = String::from_utf8(fs::read(&cakey)?)?;
     let key = KeyPair::from_pem(&keypem)?;
-    let capem = String::from_utf8(fs::read(&cafile)?)?;
+    let capem = String::from_utf8(fs::read(&certfile)?)?;
     let issuer = Issuer::from_ca_cert_pem(&capem, key)?;
-    Ok(issuer)
+
+    let reqcert = reqwest::Certificate::from_pem(capem.as_bytes())?;
+
+    let cacert = CaCert {
+        issuer,
+        cert: reqcert,
+    };
+
+    Ok(cacert)
 }
 
-fn get_root_ca() -> Result<Issuer<'static, KeyPair>> {
+fn get_root_ca() -> Result<CaCert> {
     let certdir = Utf8PathBuf::from(CERT_BASE);
     let cafile = certdir.join("CA.crt");
     let cakey = certdir.join("CA.key");
@@ -67,173 +97,101 @@ fn get_root_ca() -> Result<Issuer<'static, KeyPair>> {
 
     let issuer = if cafile.exists() && cakey.exists() {
         lock.unlock()?;
-
-        load_ca(&cafile, &cakey)?
-
+        load_ca(cafile, cakey)?
 
     } else {
         let ca = gen_ca()?;
-        let crt = ca.cert.pem();
-        let key = ca.issuer.key().serialize_pem();
-        fs::write(&cafile, &crt)?;
-        fs::write(&cakey, &key)?;
         lock.unlock()?;
 
-        ca.issuer
+        ca
     };
 
     Ok(issuer)
 }
 
-fn gen_cert(host: &str,
-            name: &str,
-            ca: &CertifiedIssuer<'static, KeyPair>)
-            -> Result<()>
+fn gen_cert(host: &str, ca: &CaCert) -> Result<()>
 {
     let base = Utf8PathBuf::try_from(CERT_BASE)?;
-    let keyfile = base.join(name).with_extension("key");
-    let certfile = base.join(name).with_extension("crt");
+    let keyfile = base.join(host).with_added_extension("key");
+    let certfile = base.join(host).with_added_extension("crt");
 
-    if ! (keyfile.exists() && certfile.exists()) {
-        let sans = vec![host.to_string()];
+    let sans = vec![host.to_string()];
 
-	let keypair = KeyPair::generate()?;
-	let mut params = CertificateParams::new(sans)?;
-        params.distinguished_name = DistinguishedName::new();
+    let keypair = KeyPair::generate()?;
+    let mut params = CertificateParams::new(sans)?;
+    params.distinguished_name = DistinguishedName::new();
 
-        //let cert = params.self_signed(&keypair)?;
-        let cert = params.signed_by(&keypair, &ca)?;
+    let cert = params.signed_by(&keypair, &ca.issuer)?;
 
-        let cert_pem = cert.pem();
-        let key_pem = keypair.serialize_pem();
+    let cert_pem = cert.pem();
+    let key_pem = keypair.serialize_pem();
 
-        std::fs::write(&keyfile, &key_pem)?;
-        std::fs::write(&certfile, &cert_pem)?;
-    }
+    std::fs::write(&keyfile, &key_pem)?;
+    std::fs::write(&certfile, &cert_pem)?;
 
     Ok(())
 }
 
-struct LocalCert {
-    keyfile: Utf8PathBuf,
-    key: PKey<Private>,
-    certfile: Utf8PathBuf,
-    certs: Vec<X509>,
+fn load_cert(keyfile: Utf8PathBuf, certfile: Utf8PathBuf) -> Result<LocalCert> {
+    let kdata = fs::read(&keyfile)
+        .context("Failed to load keyfile {keyfile}")?;
+    let cdata = fs::read(&certfile)
+        .context("Failed to load certfile {certfile}")?;
+
+    let key = PKey::private_key_from_pem(&kdata)?;
+    let certs = X509::stack_from_pem(&cdata)?;
+    if certs.is_empty() {
+        bail!("No certificates found in TLS .crt file");
+    }
+
+    let lc = LocalCert {
+            keyfile,
+            certfile,
+            key,
+            certs,
+        };
+
+    Ok(lc)
 }
 
-struct TestCerts {
-    pub root: CertifiedIssuer<'static, KeyPair>,
+fn get_cert(host: &str, ca: &CaCert) -> Result<LocalCert> {
+    let certdir = Utf8PathBuf::from(CERT_BASE);
+    let certfile = certdir.join(host).with_added_extension("crt");
+    let keyfile = certdir.join(host).with_added_extension("key");
+
+    let mut lock = lock_dir(&certdir)?;
+    lock.lock()?;
+
+    let localcert = if certfile.exists() && keyfile.exists() {
+        lock.unlock()?;
+        load_cert(keyfile, certfile)?
+
+    } else {
+        gen_cert(host, ca)?;
+        load_cert(keyfile, certfile)?
+
+    };
+
+    Ok(localcert)
+}
+
+pub struct TestCerts {
+    pub caroot: CaCert,
     pub www_example: LocalCert,
 }
 
-// impl TestCerts {
-//     pub fn new() -> Self {
-//     }
-// }
+pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());
 
+impl TestCerts {
+    fn new() -> Result<Self> {
+        create_dir_all(CERT_BASE)?;
 
+        let caroot = get_root_ca()?;
+        let www_example = get_cert("www.example.com", &caroot)?;
 
-// fn test_cert(key: &str, cert: &str, watch: bool) -> HostCertificate {
-//     let keyfile = Utf8PathBuf::from(key);
-//     let certfile = Utf8PathBuf::from(cert);
-//     HostCertificate::new(keyfile, certfile, watch)
-//         .expect("Failed to create test HostCertificate")
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// struct TestCerts {
-//     pub vicarian_ss1: Arc<HostCertificate>,
-//     pub vicarian_ss2: Arc<HostCertificate>,
-//     pub www_ss: Arc<HostCertificate>,
-// }
-
-// pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());
-
-
-// impl TestCerts {
-//     fn new() -> Result<Self> {
-//         create_dir_all(CERT_BASE)?;
-
-//         let vicarian_ss1 = {
-//             let not_before = time::OffsetDateTime::now_utc();
-//             let not_after = not_before.clone()
-//                 .checked_add(time::Duration::days(365)).unwrap();
-
-//             let host = "vicarian.example.com";
-//             let name = "snakeoil-1";
-
-//             gen_cert(host, name, true, not_before, not_after)?
-//         };
-
-//         let vicarian_ss2 = {
-//             let host = "vicarian.example.com";
-//             let name = "snakeoil-2";
-//             let not_before = time::OffsetDateTime::now_utc();
-//             let not_after = not_before.clone()
-//                 .checked_add(time::Duration::days(720)).unwrap();
-//             gen_cert(host, name, true, not_before, not_after)?
-//         };
-
-//         let www_ss = {
-//             let not_before = time::OffsetDateTime::now_utc();
-//             let not_after = not_before.clone()
-//                 .checked_add(time::Duration::days(720)).unwrap();
-//             let name = "www.example.com";
-//             gen_cert(name, name, false, not_before, not_after)?
-//         };
-
-//         Ok(Self {
-//             vicarian_ss1,
-//             vicarian_ss2,
-//             www_ss,
-//         })
-//     }
-// }
-
-// fn gen_cert(host: &str,
-//             name: &str,
-//             watch: bool,
-//             not_before: time::OffsetDateTime,
-//             not_after: time::OffsetDateTime)
-//             -> Result<Arc<HostCertificate>>
-// {
-//     let base = Utf8PathBuf::try_from(CERT_BASE)?;
-//     let keyfile = base.join(name).with_extension("key");
-//     let certfile = base.join(name).with_extension("crt");
-
-//     if ! (keyfile.exists() && certfile.exists()) {
-//         let sans = vec![host.to_string()];
-
-// 	let key = KeyPair::generate()?;
-// 	let mut params = CertificateParams::new(sans)?;
-//         params.distinguished_name = DistinguishedName::new();
-//         params.not_before = not_before;
-//         params.not_after = not_after;
-
-//         let cert = params.self_signed(&key)?;
-
-//         let cert_pem = cert.pem();
-//         let key_pem = key.serialize_pem();
-
-//         std::fs::write(&keyfile, &key_pem)?;
-//         std::fs::write(&certfile, &cert_pem)?;
-
-//     }
-
-//     let host_certificate = HostCertificate::new(keyfile, certfile, watch)?;
-
-//     Ok(Arc::new(host_certificate))
-// }
+        Ok(Self {
+            caroot,
+            www_example,
+        })
+    }
+}

@@ -15,6 +15,7 @@ use rcgen::{
 };
 
 pub const CERT_BASE: &'static str = "target/certs";
+pub const CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(CERT_BASE));
 
 fn lock_dir(dir: &Utf8Path) -> Result<LockFile> {
     let _ = create_dir_all(&dir); // Ignore errs
@@ -52,9 +53,8 @@ fn gen_ca() -> Result<CaCert> {
     let cert = params.self_signed(&key_pair)?;
     let issuer = Issuer::new(params, key_pair);
 
-    let certdir = Utf8PathBuf::from(CERT_BASE);
-    let certfile = certdir.join("CA.crt");
-    let cakey = certdir.join("CA.key");
+    let certfile = CERT_DIR.join("CA.crt");
+    let cakey = CERT_DIR.join("CA.key");
 
     let certpem = cert.pem();
 
@@ -88,11 +88,10 @@ fn load_ca(certfile: Utf8PathBuf, cakey: Utf8PathBuf) -> Result<CaCert> {
 }
 
 fn get_root_ca() -> Result<CaCert> {
-    let certdir = Utf8PathBuf::from(CERT_BASE);
-    let cafile = certdir.join("CA.crt");
-    let cakey = certdir.join("CA.key");
+    let cafile = CERT_DIR.join("CA.crt");
+    let cakey = CERT_DIR.join("CA.key");
 
-    let mut lock = lock_dir(&certdir)?;
+    let mut lock = lock_dir(&CERT_DIR)?;
     lock.lock()?;
 
     let issuer = if cafile.exists() && cakey.exists() {
@@ -102,7 +101,6 @@ fn get_root_ca() -> Result<CaCert> {
     } else {
         let ca = gen_ca()?;
         lock.unlock()?;
-
         ca
     };
 
@@ -111,9 +109,8 @@ fn get_root_ca() -> Result<CaCert> {
 
 fn gen_cert(host: &str, ca: &CaCert) -> Result<()>
 {
-    let base = Utf8PathBuf::try_from(CERT_BASE)?;
-    let keyfile = base.join(host).with_added_extension("key");
-    let certfile = base.join(host).with_added_extension("crt");
+    let keyfile = CERT_DIR.join(host).with_added_extension("key");
+    let certfile = CERT_DIR.join(host).with_added_extension("crt");
 
     let sans = vec![host.to_string()];
 
@@ -155,11 +152,10 @@ fn load_cert(keyfile: Utf8PathBuf, certfile: Utf8PathBuf) -> Result<LocalCert> {
 }
 
 fn get_cert(host: &str, ca: &CaCert) -> Result<LocalCert> {
-    let certdir = Utf8PathBuf::from(CERT_BASE);
-    let certfile = certdir.join(host).with_added_extension("crt");
-    let keyfile = certdir.join(host).with_added_extension("key");
+    let certfile = CERT_DIR.join(host).with_added_extension("crt");
+    let keyfile = CERT_DIR.join(host).with_added_extension("key");
 
-    let mut lock = lock_dir(&certdir)?;
+    let mut lock = lock_dir(&CERT_DIR)?;
     lock.lock()?;
 
     let localcert = if certfile.exists() && keyfile.exists() {
@@ -182,7 +178,7 @@ pub struct TestCerts {
 
 impl TestCerts {
     fn new() -> Result<Self> {
-        create_dir_all(CERT_BASE)?;
+        create_dir_all(&CERT_DIR.as_path())?;
 
         let caroot = get_root_ca()?;
         let www_example = get_cert("www.example.com", &caroot)?;
@@ -195,4 +191,3 @@ impl TestCerts {
 }
 
 pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());
-

@@ -26,7 +26,7 @@ use crate::{
     errors::VicarianError,
 };
 
-use certutils::CERT_BASE;
+use certutils::CERT_DIR;
 
 // NOTE: Some of this sort-of overlaps with the integration-test utils
 // in /tests/utils/certs.rs; may be worth merging at some point?
@@ -46,7 +46,7 @@ struct TestCerts {
 
 impl TestCerts {
     fn new() -> Result<Self> {
-        create_dir_all(CERT_BASE)?;
+        create_dir_all(CERT_DIR.as_path())?;
 
         let vicarian_ss1 = {
             let not_before = time::OffsetDateTime::now_utc();
@@ -91,9 +91,8 @@ fn gen_cert(host: &str,
             not_after: time::OffsetDateTime)
             -> Result<Arc<HostCertificate>>
 {
-    let base = Utf8PathBuf::try_from(CERT_BASE)?;
-    let keyfile = base.join(name).with_extension("key");
-    let certfile = base.join(name).with_extension("crt");
+    let keyfile = CERT_DIR.join(name).with_extension("key");
+    let certfile = CERT_DIR.join(name).with_extension("crt");
 
     if ! (keyfile.exists() && certfile.exists()) {
         let sans = vec![host.to_string()];

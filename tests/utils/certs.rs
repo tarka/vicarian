@@ -180,8 +180,6 @@ pub struct TestCerts {
     pub www_example: LocalCert,
 }
 
-pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());
-
 impl TestCerts {
     fn new() -> Result<Self> {
         create_dir_all(CERT_BASE)?;
@@ -195,3 +193,6 @@ impl TestCerts {
         })
     }
 }
+
+pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());
+

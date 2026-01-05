@@ -28,8 +28,9 @@ use crate::{
 
 use certutils::CERT_BASE;
 
+// NOTE: Some of this sort-of overlaps with the integration-test utils
+// in /tests/utils/certs.rs; may be worth merging at some point?
 
-// Common test utils
 fn test_cert(key: &str, cert: &str, watch: bool) -> HostCertificate {
     let keyfile = Utf8PathBuf::from(key);
     let certfile = Utf8PathBuf::from(cert);

@@ -1,7 +1,7 @@
 #![cfg(feature = "integration_tests")]
 
-#[path = "../utils/mod.rs"]
-mod util;
+#[path = "../utils/proxy.rs"]
+mod proxyutils;
 
 use reqwest::{Client, redirect};
 use serial_test::serial;
@@ -10,7 +10,7 @@ use wiremock::{
     matchers::{method, path},
 };
 
-use crate::util::proxy::{
+use proxyutils::{
     BACKEND_PORT, INSECURE_PORT, ProxyBuilder, TLS_PORT, mkcert_root, mock_server,
 };
 

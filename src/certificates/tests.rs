@@ -1,24 +1,33 @@
-use crate::{
-    RunContext,
-    certificates::{
-        store::CertStore,
-        watcher::{CertWatcher, RELOAD_GRACE},
-    },
-    config::Config,
-};
+#[path = "../../tests/utils/certs.rs"]
+mod certutils;
 
-use super::*;
 use std::{
-    fs::create_dir_all,
+    fs::{self, create_dir_all},
     io::Write,
-    sync::LazyLock
+    sync::{Arc, LazyLock},
 };
 
 use anyhow::Result;
 use boring::asn1::Asn1Time;
+use camino::{Utf8Path, Utf8PathBuf};
 use chrono::TimeZone;
 use rcgen::{CertificateParams, DistinguishedName, KeyPair};
 use tempfile::{NamedTempFile, tempdir};
+use tracing_log::log::info;
+
+use crate::{
+    RunContext,
+    certificates::{
+        HostCertificate, asn1time_to_datetime, load_certs,
+        store::CertStore,
+        watcher::{CertWatcher, RELOAD_GRACE},
+    },
+    config::Config,
+    errors::VicarianError,
+};
+
+use certutils::CERT_BASE;
+
 
 // Common test utils
 fn test_cert(key: &str, cert: &str, watch: bool) -> HostCertificate {
@@ -27,8 +36,6 @@ fn test_cert(key: &str, cert: &str, watch: bool) -> HostCertificate {
     HostCertificate::new(keyfile, certfile, watch)
         .expect("Failed to create test HostCertificate")
 }
-
-const CERT_BASE: &'static str = "target/certs";
 
 struct TestCerts {
     pub vicarian_ss1: Arc<HostCertificate>,
@@ -178,8 +185,8 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     let context = Arc::new(RunContext::new(crate::config::Config::default()));
 
     let so1 = TEST_CERTS.vicarian_ss1.clone();
-    fs::copy(&so1.keyfile, &key_path)?;
-    fs::copy(&so1.certfile, &cert_path)?;
+    tokio::fs::copy(&so1.keyfile, &key_path).await?;
+    tokio::fs::copy(&so1.certfile, &cert_path).await?;
 
     let hc = Arc::new(HostCertificate::new(key_path.clone(), cert_path.clone(), true)?);
     let certs = vec![hc.clone()];
@@ -202,8 +209,8 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     // Update the files
     println!("Updating cert files");
     let so2 = TEST_CERTS.vicarian_ss2.clone();
-    fs::copy(&so2.keyfile, &key_path)?;
-    fs::copy(&so2.certfile, &cert_path)?;
+    tokio::fs::copy(&so2.keyfile, &key_path).await?;
+    tokio::fs::copy(&so2.certfile, &cert_path).await?;
 
     // Wait for the watcher to process the event
     tokio::time::sleep(RELOAD_GRACE + std::time::Duration::from_millis(500)).await;
@@ -334,12 +341,12 @@ fn sanity_check_pending_filter() {
 
 #[test]
 fn test_asn1time_to_datetime() -> Result<()> {
-    let past = DateTime::parse_from_rfc3339("2023-01-01 00:00:00+00:00")? // Jan 1, 2023
+    let past = chrono::DateTime::parse_from_rfc3339("2023-01-01 00:00:00+00:00")? // Jan 1, 2023
         .timestamp();
     let asn1_time = Asn1Time::from_unix(past).expect("Failed to create ASN.1 time");
     let datetime = asn1time_to_datetime(&asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
-    let expected = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).single().expect("Invalid date");
+    let expected = chrono::Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).single().expect("Invalid date");
     assert_eq!(datetime, expected);
     Ok(())
 }
@@ -350,18 +357,18 @@ fn test_asn1time_to_datetime_epoch() {
     let asn1_time = Asn1Time::from_unix(0).expect("Failed to create ASN.1 time");
     let datetime = asn1time_to_datetime(&asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
-    let expected = Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).single().expect("Invalid date");
+    let expected = chrono::Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).single().expect("Invalid date");
     assert_eq!(datetime, expected);
 }
 
 #[test]
 fn test_asn1time_to_datetime_future() -> Result<()> {
-    let datetime = DateTime::parse_from_rfc3339("2038-01-19 03:14:07+00:00")? // Jan 1, 2023
+    let datetime = chrono::DateTime::parse_from_rfc3339("2038-01-19 03:14:07+00:00")? // Jan 1, 2023
         .timestamp();
     let asn1_time = Asn1Time::from_unix(datetime).expect("Failed to create ASN.1 time"); // Year 2038
     let datetime = asn1time_to_datetime(&asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
-    let expected = Utc.with_ymd_and_hms(2038, 1, 19, 3, 14, 7).single().expect("Invalid date");
+    let expected = chrono::Utc.with_ymd_and_hms(2038, 1, 19, 3, 14, 7).single().expect("Invalid date");
     assert_eq!(datetime, expected);
 
     Ok(())
@@ -370,6 +377,6 @@ fn test_asn1time_to_datetime_future() -> Result<()> {
 #[test]
 fn test_no_subject() {
     let _no_subject = test_cert("tests/data/certs/www.vicarian.no-subject.key",
-                               "tests/data/certs/www.vicarian.no-subject.crt",
-                               false);
+                                "tests/data/certs/www.vicarian.no-subject.crt",
+                                false);
 }

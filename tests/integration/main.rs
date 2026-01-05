@@ -1,4 +1,3 @@
-
 #![cfg(feature = "integration_tests")]
 
 #[path = "../utils/mod.rs"]
@@ -11,7 +10,9 @@ use wiremock::{
     matchers::{method, path},
 };
 
-use crate::util::{BACKEND_PORT, INSECURE_PORT, ProxyBuilder, TLS_PORT, mkcert_root, mock_server};
+use crate::util::proxy::{
+    BACKEND_PORT, INSECURE_PORT, ProxyBuilder, TLS_PORT, mkcert_root, mock_server,
+};
 
 // NOTE: We use unwrap rather than result here as we can save the run
 // files on failure (see Proxy::drop()).

@@ -20,7 +20,7 @@ use crate::certutils::TEST_CERTS;
 
 // NOTE: We use unwrap rather than result here as we can save the run
 // files on failure (see Proxy::drop()).
-
+//
 // Tests run serially currently as we use the same port across runs
 // for simplicity. Once we have more tests we may need to look into
 // parallelising.

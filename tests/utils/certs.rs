@@ -17,6 +17,29 @@ use rcgen::{
 pub const CERT_BASE: &'static str = "target/certs";
 pub const CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(CERT_BASE));
 
+pub struct TestCerts {
+    pub caroot: CaCert,
+    pub www_example: LocalCert,
+}
+
+impl TestCerts {
+    fn new() -> Result<Self> {
+        create_dir_all(&CERT_DIR.as_path())?;
+
+        let caroot = get_root_ca()?;
+        let www_example = get_cert("www.example.com", &caroot)?;
+        let test_example = get_cert("test.example.com", &caroot)?;
+
+        Ok(Self {
+            caroot,
+            www_example,
+        })
+    }
+}
+
+pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());
+
+
 fn lock_dir(dir: &Utf8Path) -> Result<LockFile> {
     let _ = create_dir_all(&dir); // Ignore errs
     let lockfile = dir.with_extension(".lock");
@@ -171,23 +194,3 @@ fn get_cert(host: &str, ca: &CaCert) -> Result<LocalCert> {
     Ok(localcert)
 }
 
-pub struct TestCerts {
-    pub caroot: CaCert,
-    pub www_example: LocalCert,
-}
-
-impl TestCerts {
-    fn new() -> Result<Self> {
-        create_dir_all(&CERT_DIR.as_path())?;
-
-        let caroot = get_root_ca()?;
-        let www_example = get_cert("www.example.com", &caroot)?;
-
-        Ok(Self {
-            caroot,
-            www_example,
-        })
-    }
-}
-
-pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());

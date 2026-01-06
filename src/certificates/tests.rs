@@ -38,13 +38,13 @@ fn test_cert(key: &str, cert: &str, watch: bool) -> HostCertificate {
         .expect("Failed to create test HostCertificate")
 }
 
-struct TestCerts {
+struct TestHostCerts {
     pub vicarian_ss1: Arc<HostCertificate>,
     pub vicarian_ss2: Arc<HostCertificate>,
     pub www_ss: Arc<HostCertificate>,
 }
 
-impl TestCerts {
+impl TestHostCerts {
     fn new() -> Result<Self> {
         create_dir_all(CERT_DIR.as_path())?;
 
@@ -118,7 +118,7 @@ fn gen_cert(host: &str,
     Ok(Arc::new(host_certificate))
 }
 
-static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().unwrap());
+static TEST_CERTS: LazyLock<TestHostCerts> = LazyLock::new(|| TestHostCerts::new().unwrap());
 
 #[test]
 fn test_load_certs_valid_pair() -> Result<()> {

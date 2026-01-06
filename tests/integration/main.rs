@@ -23,7 +23,8 @@ use crate::certutils::TEST_CERTS;
 //
 // Tests run serially currently as we use the same port across runs
 // for simplicity. Once we have more tests we may need to look into
-// parallelising.
+// parallelising. This is also configured for `nextest` under
+// $CRATE/.config/nextest.toml
 
 #[tokio::test]
 #[serial]

@@ -95,3 +95,53 @@ async fn test_mocked_backend() {
     assert_eq!(200, response.status().as_u16());
     assert!(response.text().await.unwrap().contains("OK"));
 }
+
+#[tokio::test]
+#[serial]
+async fn test_vhosts() {
+    let backend_server1 = mock_server(BACKEND_PORT).await.unwrap();
+    let backend_server2 = mock_server(BACKEND_PORT+1).await.unwrap();
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_vhosts")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = &TEST_CERTS.caroot.cert;
+
+    // www.example.com
+
+    Mock::given(method("GET"))
+        .and(path("/host"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("www"))
+        .mount(&backend_server1).await;
+
+    let www_response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert.clone())
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/host"))
+        .send().await.unwrap();
+
+    assert_eq!(200, www_response.status().as_u16());
+    assert!(www_response.text().await.unwrap().contains("www"));
+
+    // test.example.com
+
+    Mock::given(method("GET"))
+        .and(path("/host"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("test"))
+        .mount(&backend_server2).await;
+
+    let test_response = Client::builder()
+        .resolve("test.example.com", example_com)
+        .add_root_certificate(root_cert.clone())
+        .build().unwrap()
+        .get(format!("https://test.example.com:{TLS_PORT}/host"))
+        .send().await.unwrap();
+
+    assert_eq!(200, test_response.status().as_u16());
+    assert!(test_response.text().await.unwrap().contains("test"));
+}

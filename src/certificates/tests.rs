@@ -2,7 +2,7 @@
 mod certutils;
 
 use std::{
-    fs::{self, create_dir_all},
+    fs,
     io::Write,
     sync::{Arc, LazyLock},
 };
@@ -11,117 +11,53 @@ use anyhow::Result;
 use boring::asn1::Asn1Time;
 use camino::{Utf8Path, Utf8PathBuf};
 use chrono::TimeZone;
-use rcgen::{CertificateParams, DistinguishedName, KeyPair};
 use tempfile::{NamedTempFile, tempdir};
+use test_log::test;
 use tracing_log::log::info;
 
 use crate::{
-    RunContext,
     certificates::{
-        HostCertificate, asn1time_to_datetime, load_certs,
-        store::CertStore,
-        watcher::{CertWatcher, RELOAD_GRACE},
-    },
-    config::Config,
-    errors::VicarianError,
+        asn1time_to_datetime, load_certs, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}, HostCertificate
+    }, config::Config, errors::VicarianError, RunContext
 };
 
-use certutils::{CERT_DIR, TEST_CERTS};
+use certutils::TEST_CERTS;
 
 // NOTE: Some of this sort-of overlaps with the integration-test utils
 // in /tests/utils/certs.rs; may be worth merging at some point?
 
 struct TestHostCerts {
-    pub vicarian_ss1: Arc<HostCertificate>,
-    pub vicarian_ss2: Arc<HostCertificate>,
-    pub www_ss: Arc<HostCertificate>,
+    pub snakeoil_1: Arc<HostCertificate>,
+    pub snakeoil_2: Arc<HostCertificate>,
+    pub www_example: Arc<HostCertificate>,
 }
 
 impl TestHostCerts {
     fn new() -> Result<Self> {
-        create_dir_all(CERT_DIR.as_path())?;
-
-        let vicarian_ss1 = {
-            let not_before = time::OffsetDateTime::now_utc();
-            let not_after = not_before.clone()
-                .checked_add(time::Duration::days(365)).unwrap();
-
-            let host = "vicarian.example.com";
-            let name = "snakeoil-1";
-
-            gen_cert(host, name, true, not_before, not_after)?
-        };
-
-        let vicarian_ss2 = {
-            let host = "vicarian.example.com";
-            let name = "snakeoil-2";
-            let not_before = time::OffsetDateTime::now_utc();
-            let not_after = not_before.clone()
-                .checked_add(time::Duration::days(720)).unwrap();
-            gen_cert(host, name, true, not_before, not_after)?
-        };
-
-        let www_ss = {
-            let www = &TEST_CERTS.www_example;
-            Arc::new(HostCertificate::new(www.keyfile.clone(),
-                                          www.certfile.clone(),
-                                          false)?)
-        };
+        let snakeoil_1 = from_localcert(&TEST_CERTS.snakeoil_1, true)?;
+        let snakeoil_2 = from_localcert(&TEST_CERTS.snakeoil_2, true)?;
+        let www_example = from_localcert(&TEST_CERTS.www_example, false)?;
 
         Ok(Self {
-            vicarian_ss1,
-            vicarian_ss2,
-            www_ss,
+            snakeoil_1,
+            snakeoil_2,
+            www_example,
         })
     }
 }
 
-fn test_cert(key: &str, cert: &str, watch: bool) -> HostCertificate {
-    let keyfile = Utf8PathBuf::from(key);
-    let certfile = Utf8PathBuf::from(cert);
-    HostCertificate::new(keyfile, certfile, watch)
-        .expect("Failed to create test HostCertificate")
-}
-
-fn gen_cert(host: &str,
-            name: &str,
-            watch: bool,
-            not_before: time::OffsetDateTime,
-            not_after: time::OffsetDateTime)
-            -> Result<Arc<HostCertificate>>
-{
-    let keyfile = CERT_DIR.join(name).with_extension("key");
-    let certfile = CERT_DIR.join(name).with_extension("crt");
-
-    if ! (keyfile.exists() && certfile.exists()) {
-        let sans = vec![host.to_string()];
-
-	let key = KeyPair::generate()?;
-	let mut params = CertificateParams::new(sans)?;
-        params.distinguished_name = DistinguishedName::new();
-        params.not_before = not_before;
-        params.not_after = not_after;
-
-        let cert = params.self_signed(&key)?;
-
-        let cert_pem = cert.pem();
-        let key_pem = key.serialize_pem();
-
-        std::fs::write(&keyfile, &key_pem)?;
-        std::fs::write(&certfile, &cert_pem)?;
-
-    }
-
-    let host_certificate = HostCertificate::new(keyfile, certfile, watch)?;
-
-    Ok(Arc::new(host_certificate))
-}
-
 static TEST_HOST_CERTS: LazyLock<TestHostCerts> = LazyLock::new(|| TestHostCerts::new().unwrap());
+
+fn from_localcert(lc: &LocalCert, watch: bool) -> Result<Arc<HostCertificate>> {
+    let hc = HostCertificate::new(lc.keyfile.clone(),
+                                  lc.certfile.clone(),
+                                  watch)?;
+    Ok(Arc::new(hc))
+}
 
 #[test]
 fn test_load_certs_valid_pair() -> Result<()> {
-    let so = &TEST_HOST_CERTS.vicarian_ss1;
+    let so = &TEST_HOST_CERTS.snakeoil_1;
     let result = load_certs(&so.keyfile, &so.certfile);
     assert!(result.is_ok());
 
@@ -136,8 +72,8 @@ fn test_load_certs_valid_pair() -> Result<()> {
 
 #[test]
 fn test_load_certs_invalid_pair() -> Result<()> {
-    let so1 = TEST_HOST_CERTS.vicarian_ss1.clone();
-    let so2 = TEST_HOST_CERTS.vicarian_ss2.clone();
+    let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
+    let so2 = TEST_HOST_CERTS.snakeoil_2.clone();
     let key_path = &so1.keyfile;
     let other_cert_path = &so2.certfile;
 
@@ -164,7 +100,7 @@ fn test_load_certs_empty_cert_file() -> Result<()> {
     empty_cert_file.write_all(b"")?;
     let empty_cert_path = Utf8PathBuf::from(empty_cert_file.path().to_str().unwrap());
 
-    let so1 = TEST_HOST_CERTS.vicarian_ss1.clone();
+    let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
 
     let result = load_certs(&so1.keyfile, &empty_cert_path);
     assert!(result.is_err());
@@ -183,7 +119,7 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
 
     let context = Arc::new(RunContext::new(crate::config::Config::default()));
 
-    let so1 = TEST_HOST_CERTS.vicarian_ss1.clone();
+    let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
     tokio::fs::copy(&so1.keyfile, &key_path).await?;
     tokio::fs::copy(&so1.certfile, &cert_path).await?;
 
@@ -207,7 +143,7 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
 
     // Update the files
     println!("Updating cert files");
-    let so2 = TEST_HOST_CERTS.vicarian_ss2.clone();
+    let so2 = TEST_HOST_CERTS.snakeoil_2.clone();
     tokio::fs::copy(&so2.keyfile, &key_path).await?;
     tokio::fs::copy(&so2.certfile, &cert_path).await?;
 
@@ -229,7 +165,7 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
 
 #[test]
 fn test_by_host() {
-    let cert = TEST_HOST_CERTS.vicarian_ss1.clone();
+    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
     let certs = vec![cert.clone()];
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(certs, context).unwrap();
@@ -240,7 +176,7 @@ fn test_by_host() {
 
 #[test]
 fn test_by_file() {
-    let cert = TEST_HOST_CERTS.vicarian_ss1.clone();
+    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
     let certs = vec![cert.clone()];
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(certs, context).unwrap();
@@ -251,8 +187,8 @@ fn test_by_file() {
 
 #[test]
 fn test_watchlist() -> Result<()> {
-    let hc1 = TEST_HOST_CERTS.vicarian_ss1.clone();
-    let hc2 = TEST_HOST_CERTS.www_ss.clone();
+    let hc1 = TEST_HOST_CERTS.snakeoil_1.clone();
+    let hc2 = TEST_HOST_CERTS.www_example.clone();
 
     let context = Arc::new(RunContext::new(Config::default()));
     let certs = vec![hc1, hc2];
@@ -271,7 +207,7 @@ fn test_file_update_success() -> Result<()> {
     let temp_dir = tempdir()?;
     let key_path = temp_dir.path().join("test.key");
     let cert_path = temp_dir.path().join("test.crt");
-    let cert = TEST_HOST_CERTS.vicarian_ss1.clone();
+    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
     fs::copy(&cert.keyfile, &key_path)?;
     fs::copy(&cert.certfile, &cert_path)?;
 
@@ -283,21 +219,21 @@ fn test_file_update_success() -> Result<()> {
 
     // The original cert is snakeoil
     let first_cert = store.by_host(&original_host).unwrap();
-    assert_eq!("vicarian.example.com", first_cert.hostnames[0]);
+    assert_eq!("snakeoil.example.com", first_cert.hostnames[0]);
 
     // Now update the files to snakeoil-2
-    let cert = TEST_HOST_CERTS.vicarian_ss2.clone();
+    let cert = TEST_HOST_CERTS.snakeoil_2.clone();
     fs::copy(&cert.keyfile, &key_path)?;
     fs::copy(&cert.certfile, &cert_path)?;
     let newcert = Arc::new(HostCertificate::from(&first_cert)?);
 
     store.update(newcert)?;
 
-    let updated_cert_from_file = test_cert(
-        key_path.to_str().unwrap(),
-        cert_path.to_str().unwrap(),
+    let updated_cert_from_file = HostCertificate::new(
+        Utf8PathBuf::from_path_buf(key_path).unwrap(),
+        Utf8PathBuf::from_path_buf(cert_path).unwrap(),
         true
-    );
+    )?;
     let new_host = updated_cert_from_file.hostnames[0].clone();
 
     // The store should have updated the certificate.
@@ -374,8 +310,9 @@ fn test_asn1time_to_datetime_future() -> Result<()> {
 }
 
 #[test]
-fn test_no_subject() {
-    let _no_subject = test_cert("tests/data/certs/www.vicarian.no-subject.key",
-                                "tests/data/certs/www.vicarian.no-subject.crt",
-                                false);
+fn test_no_subject() -> Result<()> {
+    let _cert = HostCertificate::new(Utf8PathBuf::from("tests/data/certs/www.vicarian.no-subject.key"),
+                                     Utf8PathBuf::from("tests/data/certs/www.vicarian.no-subject.crt"),
+                                     false)?;
+    Ok(())
 }

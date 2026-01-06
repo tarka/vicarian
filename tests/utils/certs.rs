@@ -21,6 +21,8 @@ pub struct TestCerts {
     pub caroot: CaCert,
     pub www_example: LocalCert,
     pub test_example: LocalCert,
+    pub snakeoil_1: LocalCert,
+    pub snakeoil_2: LocalCert,
 }
 
 impl TestCerts {
@@ -28,13 +30,33 @@ impl TestCerts {
         create_dir_all(&CERT_DIR.as_path())?;
 
         let caroot = get_root_ca()?;
-        let www_example = get_cert("www.example.com", &caroot)?;
-        let test_example = get_cert("test.example.com", &caroot)?;
+        let www_example = get_default_cert("www.example.com", &caroot)?;
+        let test_example = get_default_cert("test.example.com", &caroot)?;
+
+        let snakeoil_1 = {
+            let not_before = time::OffsetDateTime::now_utc();
+            let not_after = not_before.clone()
+                .checked_add(time::Duration::days(365)).unwrap();
+            let host = "snakeoil.example.com";
+            let name = "snakeoil-1";
+            get_cert(host, name, Some(not_before), Some(not_after), &caroot)?
+        };
+        let snakeoil_2 = {
+            let host = "snakeoil.example.com";
+            let name = "snakeoil-2";
+            let not_before = time::OffsetDateTime::now_utc();
+            let not_after = not_before.clone()
+                .checked_add(time::Duration::days(720)).unwrap();
+            get_cert(host, name, Some(not_before), Some(not_after), &caroot)?
+        };
+
 
         Ok(Self {
             caroot,
             www_example,
             test_example,
+            snakeoil_1,
+            snakeoil_2,
         })
     }
 }
@@ -132,16 +154,31 @@ fn get_root_ca() -> Result<CaCert> {
     Ok(issuer)
 }
 
-fn gen_cert(host: &str, ca: &CaCert) -> Result<()>
+fn gen_default_cert(host: &str, ca: &CaCert) -> Result<()>
 {
-    let keyfile = CERT_DIR.join(host).with_added_extension("key");
-    let certfile = CERT_DIR.join(host).with_added_extension("crt");
+    gen_cert(host, host, None, None, ca)
+}
+
+fn gen_cert(host: &str,
+            name: &str,
+            not_before: Option<time::OffsetDateTime>,
+            not_after: Option<time::OffsetDateTime>,
+            ca: &CaCert,)
+            -> Result<()>
+{
+    let keyfile = CERT_DIR.join(name).with_added_extension("key");
+    let certfile = CERT_DIR.join(name).with_added_extension("crt");
 
     let sans = vec![host.to_string()];
-
     let keypair = KeyPair::generate()?;
     let mut params = CertificateParams::new(sans)?;
     params.distinguished_name = DistinguishedName::new();
+    if let Some(not_before) = not_before {
+        params.not_before = not_before;
+    }
+    if let Some(not_after) = not_after {
+        params.not_after = not_after;
+    }
 
     let cert = params.signed_by(&keypair, &ca.issuer)?;
 
@@ -150,6 +187,7 @@ fn gen_cert(host: &str, ca: &CaCert) -> Result<()>
 
     std::fs::write(&keyfile, &key_pem)?;
     std::fs::write(&certfile, &cert_pem)?;
+
 
     Ok(())
 }
@@ -176,9 +214,21 @@ fn load_cert(keyfile: Utf8PathBuf, certfile: Utf8PathBuf) -> Result<LocalCert> {
     Ok(lc)
 }
 
-fn get_cert(host: &str, ca: &CaCert) -> Result<LocalCert> {
-    let certfile = CERT_DIR.join(host).with_added_extension("crt");
-    let keyfile = CERT_DIR.join(host).with_added_extension("key");
+fn get_default_cert(host: &str, ca: &CaCert) -> Result<LocalCert>
+{
+    get_cert(host, host, None, None, ca)
+}
+
+
+fn get_cert(host: &str,
+            name: &str,
+            not_before: Option<time::OffsetDateTime>,
+            not_after: Option<time::OffsetDateTime>,
+            ca: &CaCert)
+            -> Result<LocalCert>
+{
+    let certfile = CERT_DIR.join(name).with_added_extension("crt");
+    let keyfile = CERT_DIR.join(name).with_added_extension("key");
 
     let mut lock = lock_dir(&CERT_DIR)?;
     lock.lock()?;
@@ -188,7 +238,7 @@ fn get_cert(host: &str, ca: &CaCert) -> Result<LocalCert> {
         load_cert(keyfile, certfile)?
 
     } else {
-        gen_cert(host, ca)?;
+        gen_cert(host, name, not_before, not_after, ca)?;
         load_cert(keyfile, certfile)?
 
     };

@@ -1,0 +1,7 @@
+[test-groups]
+serial-integration = { max-threads = 1 }
+
+# Mark all integration tests as running in series.
+[[profile.default.overrides]]
+filter = 'kind(test)'
+test-group = 'serial-integration'

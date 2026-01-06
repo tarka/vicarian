@@ -20,6 +20,7 @@ pub const CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(C
 pub struct TestCerts {
     pub caroot: CaCert,
     pub www_example: LocalCert,
+    pub test_example: LocalCert,
 }
 
 impl TestCerts {
@@ -33,6 +34,7 @@ impl TestCerts {
         Ok(Self {
             caroot,
             www_example,
+            test_example,
         })
     }
 }

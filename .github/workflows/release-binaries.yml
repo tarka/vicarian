@@ -52,9 +52,8 @@ jobs:
           echo '# This file is added to the environment by the systemd unit' > etc/vicarian/secrets
           chmod o-rwx etc/vicarian/secrets
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: vicarian

@@ -42,7 +42,7 @@ impl TlsAccept for CertHandler {
 
         if cert.certs.len() > 1 {
             for c in cert.certs[1..].iter() {
-                ssl.add_chain_cert(&c)
+                ssl.add_chain_cert(c)
                     .expect("Failed to add chain certificate");
             }
         }

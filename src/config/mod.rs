@@ -49,30 +49,22 @@ where
     Ok(cpath)
 }
 
-#[derive(Copy, Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AcmeProvider {
+    #[default]
     LetsEncrypt,
     // TODO:
-    // ZeroSsl,
-}
-impl Default for AcmeProvider {
-    fn default() -> Self {
-        Self::LetsEncrypt
-    }
+    ZeroSsl,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, IntoStaticStr)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, IntoStaticStr)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum AcmeProfile {
     ShortLived,
+    #[default]
     TlsServer,
-}
-impl Default for AcmeProfile {
-    fn default() -> Self {
-        Self::TlsServer
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -191,7 +183,7 @@ impl Config {
 
     pub fn from_file(file: &Utf8Path) -> Result<Self> {
         info!("Loading config {file}");
-        let key = std::fs::read_to_string(&file)
+        let key = std::fs::read_to_string(file)
             .context("Error loading config file {file}")?;
         let config = corn::from_str(&key)?;
         Ok(config)

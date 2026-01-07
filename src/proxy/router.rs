@@ -48,7 +48,7 @@ impl Router {
     }
 
     pub fn lookup(&self, path: &str) -> Option<Match<'_>> {
-        let (backend, matched) = self.tree.find(&path)?;
+        let (backend, matched) = self.tree.find(path)?;
         let rest = matched.params()[0].1.to_string();
         Some(Match {
             backend,

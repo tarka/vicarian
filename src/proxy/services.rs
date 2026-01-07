@@ -23,7 +23,7 @@ use crate::{
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
 const TOKEN_NOT_FOUND: &[u8] = "<html><body>ACME token not found in request path</body></html>".as_bytes();
-const ACME_HTTP01_PREFIX: &'static str = "/.well-known/acme-challenge/";
+const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 
 fn token_not_found() -> Response<Vec<u8>> {
     Response::builder()
@@ -230,8 +230,8 @@ impl ProxyHttp for Vicarian {
             .backend;
 
         if let Some(context) = &backend.context
-            && context != "" && context != "/"
-            && !backend.url.path().starts_with(context)
+            && ! context.is_empty() && context != "/"
+            && ! backend.url.path().starts_with(context)
         {
             debug!("Modifying {} for context {context}", upstream_request.uri);
             let upath = upstream_request.uri.path()
@@ -239,7 +239,7 @@ impl ProxyHttp for Vicarian {
                 .unwrap_or("/");
             let uquery = upstream_request.uri.query()
                 .map(|s| format!("?{s}"))
-                .unwrap_or(String::new());
+                .unwrap_or_default();
             let upq = format!("{upath}{uquery}");
             let uuri = Uri::builder()
                 .path_and_query(upq)
@@ -277,8 +277,8 @@ impl ProxyHttp for Vicarian {
             .backend;
 
         if let Some(context) = &backend.context
-            && context != "" && context != "/"
-            && !backend.url.path().starts_with(context)
+            && ! context.is_empty() && context != "/"
+            && ! backend.url.path().starts_with(context)
         {
             for headername in [LOCATION, REFRESH] {
                 let header_p = upstream_response.headers.get(&headername);

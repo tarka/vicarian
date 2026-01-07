@@ -71,6 +71,9 @@ time = { version = "0.3.44", features = ["macros"] }
 tokio = { version = "1.49.0", features = ["fs"] }
 wiremock = "0.6.5"
 
+[lints.clippy]
+unused_unit = "allow"
+
 [package.metadata.binstall]
 bin-dir = "{ name }-v{ version }-{ target }/bin/{ bin }{ binary-ext }"
 

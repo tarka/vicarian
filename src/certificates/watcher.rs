@@ -34,7 +34,7 @@ impl CertWatcher {
     }
 
     pub async fn watch(&mut self) -> Result<()> {
-        if self.certstore.watchlist().len() == 0 {
+        if self.certstore.watchlist().is_empty() {
             info!("No watchable certificates configured, not starting Watcher runtime.");
             return Ok(())
         }

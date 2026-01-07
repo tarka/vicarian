@@ -156,7 +156,7 @@ impl AcmeRuntime {
     }
 
     pub async fn run(&self) -> Result<()> {
-        if self.acme_hosts.len() == 0 {
+        if self.acme_hosts.is_empty() {
             info!("No ACME hosts configured, not starting ACME runtime.");
             return Ok(())
         }
@@ -180,8 +180,8 @@ impl AcmeRuntime {
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
             let next_secs = self.next_window_secs()
-                .map(|s| TimeDelta::new(s, 0))
-                .flatten();
+                .and_then(|s| TimeDelta::new(s, 0));
+
             let expiring_secs = if let Some(seconds) = next_secs {
                 let fuzzy = {
                     let rand = fastrand::i64(FUZZY_RANGE.0..FUZZY_RANGE.1);
@@ -218,7 +218,7 @@ impl AcmeRuntime {
     async fn renew_all_pending(&self) -> Result<()> {
         for ahost in self.pending() {
             info!("ACME host {} requires renewal, initiating...", ahost.fqdn);
-            self.renew_acme(&ahost).await?;
+            self.renew_acme(ahost).await?;
         }
         Ok(())
     }
@@ -257,8 +257,8 @@ impl AcmeRuntime {
         self.acme_hosts.iter()
             // Either None or expiring within window.
             // TODO: This could use renewal_info() in instant-acme.
-            .filter(|ah| ! self.certstore.by_host(&ah.fqdn)
-                    .is_some_and(|cert| ! cert.is_expiring_in_secs(ah.profile.exp_window_secs)))
+            .filter(|ah| self.certstore.by_host(&ah.fqdn)
+                    .is_none_or(|cert| cert.is_expiring_in_secs(ah.profile.exp_window_secs)))
             .collect()
     }
 
@@ -312,7 +312,7 @@ impl AcmeRuntime {
             //
             // TODO: We could process the post-provision checks and
             // set_ready() in parallel with futures/join_all.
-            self.provision_challenge(&acme_host, &challenge).await?;
+            self.provision_challenge(acme_host, &challenge).await?;
 
             info!("Setting challenge to ready");
             challenge.set_ready().await?;
@@ -457,8 +457,8 @@ impl AcmeRuntime {
     }
 
     fn to_txt_name(&self, acme_host: &AcmeHost, fqdn: &str) -> Result<String> {
-        let id = self.strip_domain(&acme_host, fqdn)?;
-        if id == "" {
+        let id = self.strip_domain(acme_host, fqdn)?;
+        if id.is_empty() {
             Ok("_acme-challenge".to_string())
         } else {
             Ok(format!("_acme-challenge.{id}"))
@@ -497,8 +497,8 @@ async fn wait_for_dns(txt_fqdn: &String) -> Result<()> {
 
     for _i in 0..30 {
         debug!("Lookup for {txt_fqdn}");
-        let txts = lookup.query_txt(&txt_fqdn).await?;
-        if txts.len() > 0 {
+        let txts = lookup.query_txt(txt_fqdn).await?;
+        if ! txts.is_empty() {
             info!("Found {txt_fqdn}");
             return Ok(());
         }

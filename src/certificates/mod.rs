@@ -56,8 +56,7 @@ impl HostCertificate {
         let (key, certs) = load_certs(&keyfile, &certfile)?;
 
         let subject_p = certs[0].subject_name().entries().next()
-            .map(|e| e.data().as_utf8().ok())
-            .flatten()
+            .and_then(|e| e.data().as_utf8().ok())
             .map(|os| os.to_string());
 
         let alts = certs[0].subject_alt_names();
@@ -111,7 +110,7 @@ fn asn1time_to_datetime(not_after: &Asn1TimeRef) -> Result<DateTime<Utc>> {
     // Calculate total seconds and convert to positive
     let total_seconds = -((time_diff.days as i64 * 86400) + time_diff.secs as i64);
 
-    let datetime = DateTime::<Utc>::from_timestamp(total_seconds as i64, 0)
+    let datetime = DateTime::<Utc>::from_timestamp(total_seconds, 0)
         .ok_or(anyhow!("Failed to create DateTime from timestamp"))?;
 
     Ok(datetime)
@@ -120,10 +119,6 @@ fn asn1time_to_datetime(not_after: &Asn1TimeRef) -> Result<DateTime<Utc>> {
 impl PartialEq<HostCertificate> for HostCertificate {
     fn eq(&self, other: &Self) -> bool {
         self.certs[0].signature().as_slice() == other.certs[0].signature().as_slice()
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 

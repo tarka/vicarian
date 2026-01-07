@@ -65,4 +65,4 @@ jobs:
           archive: $bin-$tag-${{ matrix.target }}
           leading-dir: true
           bin-leading-dir: bin
-          include: LICENSE,README.md,CONFIGURATION.md,etc
+          include: LICENSE,README.md,CONFIGURATION.md,etc,examples

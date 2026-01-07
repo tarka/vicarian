@@ -3,7 +3,7 @@ use std::{iter, sync::Arc};
 use async_trait::async_trait;
 use http::{
     HeaderValue, Response, StatusCode, Uri,
-    header::{self, LOCATION, REFRESH},
+    header::{self, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
     uri::{Builder, Scheme},
 };
 
@@ -24,6 +24,8 @@ use crate::{
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
 const TOKEN_NOT_FOUND: &[u8] = "<html><body>ACME token not found in request path</body></html>".as_bytes();
 const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
+
+const YEAR_IN_SECS: u64 = 31536000;
 
 fn token_not_found() -> Response<Vec<u8>> {
     Response::builder()
@@ -294,8 +296,13 @@ impl ProxyHttp for Vicarian {
             }
         }
 
+        let hsts = format!("max-age={YEAR_IN_SECS}; includeSubDomains");
+        upstream_response.insert_header(STRICT_TRANSPORT_SECURITY, hsts)?;
+
         let via = format!("{:?} Vicarian", session.req_header().version);
-        upstream_response.insert_header("Via", via)?;
+        upstream_response.insert_header(VIA, via)?;
+
+
 
         Ok(())
     }

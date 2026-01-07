@@ -5,7 +5,7 @@ mod certutils;
 #[path = "../utils/proxy.rs"]
 mod proxyutils;
 
-use reqwest::{Client, redirect};
+use reqwest::{Client, redirect, header::{VIA, STRICT_TRANSPORT_SECURITY}};
 use serial_test::serial;
 use wiremock::{
     Mock, ResponseTemplate,
@@ -166,3 +166,40 @@ async fn test_invalid_cert() {
 
     assert!(response.is_err());
 }
+
+#[tokio::test]
+#[serial]
+async fn test_https_headers() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.cert.clone();
+
+    Mock::given(method("GET"))
+        .and(path("/status"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("OK"))
+        .mount(&backend_server).await;
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+
+    let via = response.headers().get(VIA).unwrap()
+        .to_str().unwrap();
+    assert!(via.contains("Vicarian"));
+
+    let hsts = response.headers().get(STRICT_TRANSPORT_SECURITY).unwrap()
+        .to_str().unwrap();
+    assert_eq!("max-age=31536000; includeSubDomains", hsts);
+}
+

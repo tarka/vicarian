@@ -49,7 +49,11 @@ platforms is welcome.
   have hardcoded paths.
 - **Virtual hosts**: Hosting of multiple domains and domain aliases is
   supported, along with certificate generation for host aliases.
-- **Separated secrets**: ACME DNS requires
+- **Separated secrets**: ACME DNS requires DNS-provider secrets to be
+  configured. These can be placed in a separate secure file using systemd
+  [EnvironmentFile](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
+  and [corn](https://cornlang.dev) environment injection (see
+  [vicarian-dns01.corn](examples/vicarian-dns01.corn) for an example).
 
 ### To-dos
 

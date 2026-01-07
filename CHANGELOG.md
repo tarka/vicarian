@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13](https://github.com/tarka/vicarian/compare/v0.1.12...v0.1.13) - 2026-01-07
+
+### Other
+
+- Move to single-phase release-plz workflow.
+- Cleanups from clippy
+- Add test for invalid cert.
+- Dependency bump
+- Add test for vhosts.
+- Add note about nextest.
+- Move more of the test cert generation into the common certs module.
+- Use the CA root generated www.example.com cert in unit tests.
+- Add nextest config so integration tests are serial.
+- Rename unit and integration test wrappers for clarity.
+- Generate cert-dir pathbuf globally
+- Add note about cert utils in tests.
+- More cleanup.
+- Integration tests with unit tests for now.
+- Minor cleanup.
+- Finalise move to runtime generated certs.
+- Start of test CA generation
+- Start splitting test cert-generation code out.
+- Split proxy runner code into submodule.
+- Start moving common test code into its own module
+- Add some more notes to tests.
+- Intial backend mocking test with wiremock.
+- Convert to async.
+- Initial test using root cert override.
+- Move integration tests into a module for cleaner setup.
+- Save test files on panic/assert.
+- Initial working integration test.
+- Use builder pattern.
+- Start of integration tests.
+- Add dir-locals to gitignore.
+- Enable clippy in emacs/rustic/eglot.
+- Remove MSRV for now.
+- Tweaks to support cargo-binstall
+- Bump dependencies.
+- More docs tweaks
+- Documentation updates
+- Add deny_unknown_fields to config structures.
+- Simplify non-TLS setup by enabling on port being set or HTTP-01 ACME.
+- More error context.
+- Force enum string into lower case.
+- Add configurable ACME profiles.
+- Update config docs.
+- Merge branch 'vhosts'
+- Tidy up pingora error handling.
+- Dependency update
+
 ## [0.1.12](https://github.com/tarka/vicarian/compare/v0.1.11...v0.1.12) - 2025-12-23
 
 ### Other

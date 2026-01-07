@@ -102,7 +102,27 @@ Other notable non-features:
 
 Tarballs are available on the [Github release page](https://github.com/tarka/vicarian/releases). 
 These contain binaries, documentation, example configuration files, and an example
-systemd configuration.
+systemd configuration:
+
+```
+├── bin
+│   └── vicarian
+├── CONFIGURATION.md
+├── etc
+│   ├── systemd
+│   │   └── system
+│   │       └── vicarian.service
+│   └── vicarian
+│       ├── examples
+│       │   ├── vicarian-dns01.corn
+│       │   ├── vicarian-http01.corn
+│       │   └── vicarian-tls-files.corn
+│       ├── secrets
+│       └── vicarian.corn
+├── LICENSE
+└── README.md
+```
+
 
 ### Install from crates.io
 

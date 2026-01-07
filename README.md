@@ -65,6 +65,7 @@ platforms is welcome.
   workaround is to use e.g `python3 -m http-server --bind localhost 8080` to
   create a static backend. This is how [vicarian.org](https://vicarian.org/) and
   [haltcondition.net](https://haltcondition.net/) are served currently.)
+- Docker images.
 
 ### Possible Future Features
 
@@ -130,7 +131,9 @@ systemd configuration:
 cargo install vicarian
 ```
 
-The binary will be available at `~/.crates/bin/vicarian`.
+The binary will be available at
+`~/.crates/bin/vicarian`. [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)
+is also supported.
 
 ## Running
 

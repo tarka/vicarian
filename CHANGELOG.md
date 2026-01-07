@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notable changes
 
-- HSTS headers are now set automatically
+- HSTS headers are now set automatically.
+- The configuration examples are now shipped in the binary tarball.
 - The placeholder webpage is now in the repository.
 - Documentation updates.
 

@@ -12,7 +12,7 @@ Vicarian aims to have sensible defaults without additional configuration.
 
 [![Crates.io](https://img.shields.io/crates/v/vicarian)](https://crates.io/crates/vicarian)
 [![GitHub CI](https://github.com/tarka/vicarian/actions/workflows/tests.yml/badge.svg)](https://github.com/tarka/vicarian/actions)
-[![License](https://img.shields.io/crates/l/vicarian)](https://github.com/tarka/vicarian/blob/main/README.md#License)
+[![License](https://img.shields.io/crates/l/vicarian)](https://github.com/tarka/vicarian/blob/master/README.md#License)
 
 This software should be consider pre-alpha; the feature-set is
 [MVP](https://en.wikipedia.org/wiki/Minimum_viable_product) and is still in

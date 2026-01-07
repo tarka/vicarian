@@ -58,6 +58,7 @@ platforms is welcome.
 ### To-dos
 
 - Access & error logs
+- [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) support
 - Static file support. (Pingora itself doesn't support static-files. There are
   3rd-party crates that support this but they appear unmaintained at the moment;
   they will need to be evaluated. If you wish to serve a static website one
@@ -70,7 +71,6 @@ platforms is welcome.
 The following may be implemented at some point depending on interest and
 resources.
 
-- [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) support
 - TLS-ALPN-01 ACME support.
 - Other ACME providers (e.g. ZeroSSL)
 - Prometheus stats.

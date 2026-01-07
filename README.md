@@ -1,16 +1,25 @@
 # Vicarian
 
-Vicarian is a reverse proxy server with built-in ACME support. It is currently
-targeted at self-hosting and SOHO installations; in particular it supports
-provisioning TLS certificates behind-the-firewall via ACME DNS-01 and the
-[zone-update](https://github.com/tarka/zone-update/) library.
+Vicarian is a TLS-only (sort-of; see below) reverse proxy server with built-in
+ACME support. It is currently targeted at self-hosting and SOHO installations;
+in particular it supports provisioning TLS certificates behind-the-firewall via
+ACME DNS-01 and the [zone-update](https://github.com/tarka/zone-update/)
+library.
+
+Vicarian aims to have sensible defaults without additional configuration.
 
 ## Project Status
 
+[![Crates.io](https://img.shields.io/crates/v/vicarian)](https://crates.io/crates/vicarian)
+[![Docs.rs](https://docs.rs/vicarian/badge.svg)](https://docs.rs/vicarian)
+[![GitHub CI](https://github.com/tarka/vicarian/actions/workflows/tests.yml/badge.svg)](https://github.com/tarka/vicarian/actions)
+[![License](https://img.shields.io/crates/l/vicarian)](https://github.com/tarka/vicarian/blob/main/README.md#License)
+
 This software should be consider pre-alpha; the feature-set is
 [MVP](https://en.wikipedia.org/wiki/Minimum_viable_product) and is still in
-active development. It should not be considered production-ready and no
-warranty is expressed or implied.
+active development. It should not be considered production-ready and no warranty
+is expressed or implied. It is very-much a work-in-progress and virtually every
+part of it subject to change without notice.
 
 Only Linux is currently supported (x86_64 and Arm64). Testing for other
 platforms is welcome.
@@ -19,37 +28,61 @@ platforms is welcome.
 
 ### Current features
 
-- **Multiple HTTP and HTTPS backend**: Route traffic to multiple backend services based on URL
-  contexts
+- **TLS-only**: More accurately 'TLS-first'. Port-80/HTTP can be enabled, but
+  will always redirect to the configured TLS server.
+- **Native ACME Support**: Vicarian has first-class support for
+  ACME/LetsEncrypt, including DNS-01. LetEncrypt [certificate
+  profiles](https://letsencrypt.org/docs/profiles/) are supported; `tlsserver`
+  is the default.
+- **Multiple DNS-01 Providers**: Multiple DNS providers are supported for DNS-01
+  via the [zone-update](https://github.com/tarka/zone-update/)
+  sibling-project. See that project for a list of supported
+  providers. (Contributions of provider support are very welcome.)
+- **Dynamic Certificate Loading**: Where TLS certificates are maintained
+  externally Vicarian will dynamically reload certificates when they are
+  updated.
+- **Simple backend routing**: Traffic can be routed to multiple backend services
+  based on URL paths.
 - **Basic path rewriting**: This may work with some simple apps that don't
   support contexts natively, but is likely to fail with more complex apps that
   have hardcoded paths.
-- **Dynamic Certificate Loading**: Externally provided TLS certificates are
-  monitored and reloaded on update.
-- **ACME Support**: Automatic certificate issuance and renewal via ACME
-  protocol; both HTTP and DNS types are supported. 
-- **Multiple DNS Providers**: Multiple DNS providers for ACME are supported via
-  the [zone-update](https://github.com/tarka/zone-update/) project. See that
-  project for a list of supported providers.
 - **Virtual hosts**
 
-### Todos
+### To-dos
 
-- Automated functional/integration testing
-- Access logs
+- Access & error logs
+- Static file support. (Pingora itself doesn't support static-file
+  serving. There are 3rd-party crates that support this but they appear
+  unmaintained at the moment; they will need to be evaluated. If you wish to
+  serve a static website one workaround is to use e.g `python3 -m http-server
+  --bind localhost 8080` to create a static backend. This is how
+  [vicarian.org](https://vicarian.org/) and
+  [haltcondition.net](https://haltcondition.net/) are served currently.)
 
 ### Possible Future Features
 
 The following may be implemented at some point depending on interest and
 resources.
 
-- Static files.
+- [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) support
 - TLS-ALPN-01 ACME support.
+- Other ACME providers (e.g. ZeroSSL)
 - Prometheus stats.
 
 ### Probably-not features
 
-- Load-balancing, round-robin, etc.
+Vicarian is very opinionated and tries to do the correct thing by
+default. Ideally if a particular header or setting was usually required in say
+`nginx` then it should be the default. e.g. `X-Forwarded-For` and
+[HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security)
+are always set. Consequently there are no plans to add a large number of
+features and settings.
+
+Notable non-features:
+
+- Wildcard ACME certs; these are better generated externally and distributed to
+  multiple servers.
+- Load-balancing, round-robin, complex rewrite rules, etc.
 - Advanced connection tuning
 
 ## Installation
@@ -124,15 +157,18 @@ Let's Encrypt TLS would look like:
 }
 ```
 
-## Development
-
 ## Contributing
 
-At this point the most useful contributions would be to add additional DNS
-provider APIs to the [zone-update](https://github.com/tarka/zone-update/)
-project. However contributions to this project are welcome.
+Contributions, bug reports, fixes, etc. are welcome.
 
-## AI Contribution Policy
+Additionally, a useful contributions would be to add additional DNS provider
+APIs to the [zone-update](https://github.com/tarka/zone-update/) project.
+
+### Code of Conduct
+
+The project follows the Rust Code of Conduct; [this can be found online](https://www.rust-lang.org/conduct.html).
+
+### AI Contribution Policy
 
 LLM and related 'AI' technologies can be useful for software development, but
 best-practices on their usage are still evolving. For this reason this project

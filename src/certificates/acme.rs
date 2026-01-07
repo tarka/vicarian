@@ -45,7 +45,12 @@ static LE_PROFILES: phf::Map<&'static str, LeProfile> = phf_map! {
         name: "shortlived",
         _validity_days: 6,
         exp_window_secs: 4 * DAYS_TO_SECS,
-    }
+    },
+    "classic" => LeProfile {
+        name: "classic",
+        _validity_days: 90, // TODO: Will be reduced to 64-days in 2027
+        exp_window_secs: 30 * DAYS_TO_SECS,
+    },
 };
 
 

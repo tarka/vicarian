@@ -145,3 +145,24 @@ async fn test_vhosts() {
     assert_eq!(200, test_response.status().as_u16());
     assert!(test_response.text().await.unwrap().contains("test"));
 }
+
+
+#[tokio::test]
+#[serial]
+async fn test_invalid_cert() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.cert.clone();
+
+    let response = Client::builder()
+        .resolve("wrong.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://wrong.example.com:{TLS_PORT}/status"))
+        .send().await;
+
+    assert!(response.is_err());
+}

@@ -130,7 +130,9 @@ systemd configuration:
 cargo install vicarian
 ```
 
-The binary will be available at `~/.crates/bin/vicarian`.
+The binary will be available at
+`~/.crates/bin/vicarian`. [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)
+is also supported.
 
 ## Running
 

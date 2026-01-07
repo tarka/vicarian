@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.14](https://github.com/tarka/vicarian/compare/v0.1.13...v0.1.14) - 2026-01-07
 
+### Notable changes
+
+- HSTS headers are now set automatically
+- The placeholder webpage is now in the repository.
+- Documentation updates.
+
 ### Other
 
 - Move happy-eyeballs to todos

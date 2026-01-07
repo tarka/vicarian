@@ -1,17 +1,16 @@
 # Vicarian
 
-Vicarian is a TLS-only (sort-of; see below) reverse proxy server with built-in
-ACME support. It is currently targeted at self-hosting and SOHO installations;
-in particular it supports provisioning TLS certificates behind-the-firewall via
-ACME DNS-01 and the [zone-update](https://github.com/tarka/zone-update/)
-library.
+[Vicarian](https://vicarian.org/) is a TLS-only (sort-of; see features below)
+reverse proxy server with built-in ACME support. It is currently targeted at
+self-hosting and SOHO installations; in particular it supports provisioning TLS
+certificates behind-the-firewall via ACME DNS-01 and the
+[zone-update](https://github.com/tarka/zone-update/) library.
 
 Vicarian aims to have sensible defaults without additional configuration.
 
 ## Project Status
 
 [![Crates.io](https://img.shields.io/crates/v/vicarian)](https://crates.io/crates/vicarian)
-[![Docs.rs](https://docs.rs/vicarian/badge.svg)](https://docs.rs/vicarian)
 [![GitHub CI](https://github.com/tarka/vicarian/actions/workflows/tests.yml/badge.svg)](https://github.com/tarka/vicarian/actions)
 [![License](https://img.shields.io/crates/l/vicarian)](https://github.com/tarka/vicarian/blob/main/README.md#License)
 
@@ -29,7 +28,9 @@ platforms is welcome.
 ### Current features
 
 - **TLS-only**: More accurately 'TLS-first'. Port-80/HTTP can be enabled, but
-  will always redirect to the configured TLS server.
+  will always redirect to the configured TLS server. The exception to this is
+  when the HTTP-01 ACME is enabled; Vicarian will serve the challenge responses
+  in this case.
 - **Native ACME Support**: Vicarian has first-class support for
   ACME/LetsEncrypt, including DNS-01. LetEncrypt [certificate
   profiles](https://letsencrypt.org/docs/profiles/) are supported; `tlsserver`
@@ -46,17 +47,18 @@ platforms is welcome.
 - **Basic path rewriting**: This may work with some simple apps that don't
   support contexts natively, but is likely to fail with more complex apps that
   have hardcoded paths.
-- **Virtual hosts**
+- **Virtual hosts**: Hosting of multiple domains and domain aliases is
+  supported, along with certificate generation for host aliases.
+- **Separated secrets**: ACME DNS requires
 
 ### To-dos
 
 - Access & error logs
-- Static file support. (Pingora itself doesn't support static-file
-  serving. There are 3rd-party crates that support this but they appear
-  unmaintained at the moment; they will need to be evaluated. If you wish to
-  serve a static website one workaround is to use e.g `python3 -m http-server
-  --bind localhost 8080` to create a static backend. This is how
-  [vicarian.org](https://vicarian.org/) and
+- Static file support. (Pingora itself doesn't support static-files. There are
+  3rd-party crates that support this but they appear unmaintained at the moment;
+  they will need to be evaluated. If you wish to serve a static website one
+  workaround is to use e.g `python3 -m http-server --bind localhost 8080` to
+  create a static backend. This is how [vicarian.org](https://vicarian.org/) and
   [haltcondition.net](https://haltcondition.net/) are served currently.)
 
 ### Possible Future Features
@@ -68,17 +70,22 @@ resources.
 - TLS-ALPN-01 ACME support.
 - Other ACME providers (e.g. ZeroSSL)
 - Prometheus stats.
+- Basic [12-factor configuration](https://12factor.net/config)-style
+  configuration. This should be relatively easy due to
+  [corn's](https://cornlang.dev/) support for environment injection; however
+  there is a [known issue](https://github.com/corn-config/corn/issues/49)
+  limiting this currently.
 
 ### Probably-not features
 
-Vicarian is very opinionated and tries to do the correct thing by
-default. Ideally if a particular header or setting was usually required in say
+Vicarian is very opinionated and tries to do the sensible thing by
+default. Ideally if a particular header or setting was usually required by, say,
 `nginx` then it should be the default. e.g. `X-Forwarded-For` and
 [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security)
 are always set. Consequently there are no plans to add a large number of
 features and settings.
 
-Notable non-features:
+Other notable non-features:
 
 - Wildcard ACME certs; these are better generated externally and distributed to
   multiple servers.

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14](https://github.com/tarka/vicarian/compare/v0.1.13...v0.1.14) - 2026-01-07
+
+### Notable changes
+
+- HSTS headers are now set automatically.
+- The configuration examples are now shipped in the binary tarball.
+- The placeholder webpage is now in the repository.
+- Documentation updates.
+
+### Other
+
+- Move happy-eyeballs to todos
+- Add code of conduct.
+- Fix license link
+- Add HSTS header and test.
+- Note on secrets.
+- More readme
+- More readme updates.
+- Update some config fragments on the webpage.
+- Import generated website page from earlier experiment.
+- Ship the examples directory with the tarball.
+
 ## [0.1.13](https://github.com/tarka/vicarian/compare/v0.1.12...v0.1.13) - 2026-01-07
 
 ### Other

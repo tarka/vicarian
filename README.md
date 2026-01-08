@@ -59,12 +59,15 @@ platforms is welcome.
 
 - Access & error logs
 - [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) support
-- Static file support. (Pingora itself doesn't support static-files. There are
+- Static file support. Pingora itself doesn't support static-files. There are
   3rd-party crates that support this but they appear unmaintained at the moment;
   they will need to be evaluated. If you wish to serve a static website one
-  workaround is to use e.g `python3 -m http-server --bind localhost 8080` to
-  create a static backend. This is how [vicarian.org](https://vicarian.org/) and
-  [haltcondition.net](https://haltcondition.net/) are served currently.)
+  workaround is to use `static-web-server` to create a static backend:
+
+      static-web-server --host 127.0.0.1 --port 8080 --root .
+
+  This is how [vicarian.org](https://vicarian.org/) and
+  [haltcondition.net](https://haltcondition.net/) are served currently.
 - Docker images.
 
 ### Possible Future Features

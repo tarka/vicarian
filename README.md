@@ -1,9 +1,9 @@
 # Vicarian
 
-[Vicarian](https://vicarian.org/) is a TLS-only (sort-of; see features below)
-reverse proxy server with built-in ACME support. It is currently targeted at
-self-hosting and SOHO installations; in particular it supports provisioning TLS
-certificates behind-the-firewall via ACME DNS-01 and the
+[Vicarian](https://vicarian.org/) is a TLS-first reverse proxy server with
+built-in ACME support. It is currently targeted at self-hosting and SOHO
+installations; in particular it supports provisioning TLS certificates
+behind-the-firewall via ACME DNS-01 and the
 [zone-update](https://github.com/tarka/zone-update/) library.
 
 Vicarian aims to have sensible defaults without additional configuration.
@@ -27,10 +27,9 @@ platforms is welcome.
 
 ### Current features
 
-- **TLS-only**: More accurately 'TLS-first'. Port-80/HTTP can be enabled, but
-  will always redirect to the configured TLS server. The exception to this is
-  when the HTTP-01 ACME is enabled; Vicarian will serve the challenge responses
-  in this case.
+- **TLS-first**: Port-80/HTTP can be enabled, but will always redirect to the
+  configured TLS server. The exception to this is when the HTTP-01 ACME is
+  enabled; Vicarian will serve any challenge responses directly.
 - **Native ACME Support**: Vicarian has first-class support for
   ACME/LetsEncrypt, including DNS-01. LetEncrypt [certificate
   profiles](https://letsencrypt.org/docs/profiles/) are supported; `tlsserver`

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.16](https://github.com/tarka/vicarian/compare/v0.1.15...v0.1.16) - 2026-01-08
+
+### Other
+
+- Add not about tech stack.
+- Expand on static file updates.
+- Update to recommend static-web-server over python.
+- Soften the tone in AI section.
+- minor readme updates.
+- Add note about tarball layout.
+
 ## [0.1.15](https://github.com/tarka/vicarian/compare/v0.1.14...v0.1.15) - 2026-01-07
 
 ## Notable changes

@@ -209,6 +209,15 @@ APIs to the [zone-update](https://github.com/tarka/zone-update/) project.
 
 The project follows the Rust Code of Conduct; [this can be found online](https://www.rust-lang.org/conduct.html).
 
+### Tech stack
+
+As well as the usual dependencies Vicarian also uses:
+
+- [Pingora](https://github.com/cloudflare/pingora) for HTTP/TLS proxying.
+- [instant-acme](https://github.com/djc/instant-acme) for ACME/LetEncrypt support.
+- [path-tree](https://github.com/viz-rs/path-tree) for routing.
+- [corn](https://cornlang.dev) for configuration.
+
 ### AI Contribution Policy
 
 LLM and related 'AI' technologies can be useful for software development, but

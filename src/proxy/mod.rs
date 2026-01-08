@@ -37,7 +37,8 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
             vicarian);
 
         let cert_handler = CertHandler::new(certstore.clone());
-        let tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
+        let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
+        tls_settings.enable_h2();
 
         // TODO: Listen on specific IP/interface
         let addr = format!("{}:{}", context.config.listen.addr, context.config.listen.tls_port);

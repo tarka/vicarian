@@ -81,6 +81,7 @@ resources.
 - TLS-ALPN-01 ACME support.
 - Other ACME providers (e.g. ZeroSSL)
 - Prometheus stats.
+- HTTP/3 / Quic support.
 - Basic [12-factor configuration](https://12factor.net/config)-style
   configuration. This should be relatively easy due to
   [corn's](https://cornlang.dev/) support for environment injection; however

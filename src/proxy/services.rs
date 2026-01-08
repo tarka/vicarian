@@ -41,11 +41,18 @@ struct RequestComponents<'a> {
 }
 
 fn to_components(session: &Session) -> pingora_core::Result<RequestComponents<'_>> {
-    let host_header = session.req_header().headers.get(header::HOST)
+    let host = if session.is_http2() {
+        session.req_header().uri.host()
+            .or_err(ErrorType::InvalidHTTPHeader, "No Host component in request URI")?
+
+    } else {
+        let host_header = session.req_header().headers.get(header::HOST)
         .or_err(ErrorType::InvalidHTTPHeader, "No Host header in request")?
         .to_str()
         .or_err(ErrorType::InvalidHTTPHeader, "Invalid Host header")?;
-    let host = strip_port(host_header);
+        strip_port(host_header)
+    };
+
     let pq = session.req_header().uri.path_and_query();
     let (path, _query) = if let Some(pq) = pq {
         (pq.path(), pq.query().unwrap_or(""))
@@ -193,7 +200,6 @@ impl ProxyHttp for Vicarian {
         let pinned = self.routes_by_host.pin();
         let router = pinned.get(&components.host.to_string())
             .or_err(E404, "UP: Hostname not found in backends")?;
-
         let backend = router.lookup(components.path)
             .or_err(E404, "UP: Path not found in host backends")?
             .backend;

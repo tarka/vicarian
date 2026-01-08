@@ -78,7 +78,7 @@ impl ProxyBuilder {
         copy(&config, copied).await.unwrap();
 
         let child = Command::new(exe)
-            .arg("-vvv")
+            .arg("-vv")
             .arg("-c").arg(config)
             .stdout(stdout.into_std().await)
             .stderr(stderr.into_std().await)

@@ -102,8 +102,8 @@ features and settings.
 
 Other notable non-features:
 
-- Wildcard ACME certs; these are better generated externally and distributed to
-  multiple servers.
+- Wildcard ACME certificate generation; these are better generated externally
+  and distributed to multiple servers.
 - Load-balancing, round-robin, complex rewrite rules, etc.
 - Advanced connection tuning
 

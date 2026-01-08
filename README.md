@@ -81,7 +81,10 @@ resources.
 - TLS-ALPN-01 ACME support.
 - Other ACME providers (e.g. ZeroSSL)
 - Prometheus stats.
-- HTTP/3 / Quic support.
+- HTTP3/Quic support.
+- [h2c](https://httpwg.org/specs/rfc7540.html#versioning) backend support
+  (avoids a lot of proxy security corner-cases, but there's not much support in
+  backend server software).
 - Basic [12-factor configuration](https://12factor.net/config)-style
   configuration. This should be relatively easy due to
   [corn's](https://cornlang.dev/) support for environment injection; however

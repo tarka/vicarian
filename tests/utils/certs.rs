@@ -14,40 +14,42 @@ use rcgen::{
     KeyUsagePurpose, PKCS_ECDSA_P256_SHA256,
 };
 
-pub const CERT_BASE: &'static str = "target/certs";
-pub const CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(CERT_BASE));
+pub const CERT_BASE: &str = "target/certs";
+pub static CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(CERT_BASE));
 
 pub struct TestCerts {
     pub caroot: CaCert,
     pub www_example: LocalCert,
     pub test_example: LocalCert,
+    pub wildcard_example: LocalCert,
     pub snakeoil_1: LocalCert,
     pub snakeoil_2: LocalCert,
 }
 
 impl TestCerts {
     fn new() -> Result<Self> {
-        create_dir_all(&CERT_DIR.as_path())?;
+        create_dir_all(CERT_DIR.as_path())?;
 
         let caroot = get_root_ca()?;
         let www_example = get_default_cert("www.example.com", &caroot)?;
         let test_example = get_default_cert("test.example.com", &caroot)?;
+        let wildcard_example = get_cert("*.example.com", "_.example.com", None, None, &caroot)?;
 
         let snakeoil_1 = {
             let not_before = time::OffsetDateTime::now_utc();
-            let not_after = not_before.clone()
-                .checked_add(time::Duration::days(365)).unwrap();
+            let not_after = not_before
+                .checked_add(time::Duration::days(365));
             let host = "snakeoil.example.com";
             let name = "snakeoil-1";
-            get_cert(host, name, Some(not_before), Some(not_after), &caroot)?
+            get_cert(host, name, Some(not_before), not_after, &caroot)?
         };
         let snakeoil_2 = {
             let host = "snakeoil.example.com";
             let name = "snakeoil-2";
             let not_before = time::OffsetDateTime::now_utc();
-            let not_after = not_before.clone()
-                .checked_add(time::Duration::days(720)).unwrap();
-            get_cert(host, name, Some(not_before), Some(not_after), &caroot)?
+            let not_after = not_before
+                .checked_add(time::Duration::days(720));
+            get_cert(host, name, Some(not_before), not_after, &caroot)?
         };
 
 
@@ -55,6 +57,7 @@ impl TestCerts {
             caroot,
             www_example,
             test_example,
+            wildcard_example,
             snakeoil_1,
             snakeoil_2,
         })
@@ -65,8 +68,8 @@ pub static TEST_CERTS: LazyLock<TestCerts> = LazyLock::new(|| TestCerts::new().u
 
 
 fn lock_dir(dir: &Utf8Path) -> Result<LockFile> {
-    let _ = create_dir_all(&dir); // Ignore errs
-    let lockfile = dir.with_extension(".lock");
+    let _ = create_dir_all(dir); // Ignore errs
+    let lockfile = dir.with_added_extension("lock");
     Ok(LockFile::open(lockfile.as_os_str())?)
 }
 

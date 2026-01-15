@@ -36,7 +36,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct HostCertificate {
-//    name: String,
+    //name: String,
     hostnames: Vec<String>,
     keyfile: Utf8PathBuf,
     key: PKey<Private>,

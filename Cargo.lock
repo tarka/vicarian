@@ -387,9 +387,9 @@ dependencies = [
 
 [[package]]
 name = "boring"
-version = "4.19.0"
+version = "4.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4acbe9eda68fc7fbfb395aace52dfc37075928536ec2f149abce54dbd40e38d5"
+checksum = "d81d6cb628cee20daf9c88ea19ce8eecf881f544dcb4b2c71b23d31a473cb058"
 dependencies = [
  "bitflags 2.10.0",
  "boring-sys",
@@ -556,9 +556,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.42"
+version = "0.4.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
+checksum = "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
 dependencies = [
  "iana-time-zone",
  "num-traits",
@@ -2751,9 +2751,9 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "psl"
-version = "2.1.178"
+version = "2.1.179"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a54161bdf033552d905f5e653fb6263690e63df54745ad5199a5f8fa802a0d6"
+checksum = "e11b10341c9ceb422c24d24a87056e618489f9a3c0ea85351da21b5d4b3a7419"
 dependencies = [
  "psl-types",
 ]
@@ -3646,30 +3646,30 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.44"
+version = "0.3.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
+checksum = "f9e442fc33d7fdb45aa9bfeb312c095964abdf596f7567261062b2a7107aaabd"
 dependencies = [
  "deranged",
  "itoa",
  "num-conv",
  "powerfmt",
- "serde",
+ "serde_core",
  "time-core",
  "time-macros",
 ]
 
 [[package]]
 name = "time-core"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40868e7c1d2f0b8d73e4a8c7f0ff63af4f6d19be117e90bd73eb1d62cf831c6b"
+checksum = "8b36ee98fd31ec7426d599183e8fe26932a8dc1fb76ddb6214d05493377d34ca"
 
 [[package]]
 name = "time-macros"
-version = "0.2.24"
+version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30cfb0125f12d9c277f35663a0a33f8c30190f4e4574868a330595412d34ebf3"
+checksum = "71e552d1249bf61ac2a52db88179fd0673def1e1ad8243a00d9ec9ed71fee3dd"
 dependencies = [
  "num-conv",
  "time-core",
@@ -4714,9 +4714,9 @@ checksum = "ac93432f5b761b22864c774aac244fa5c0fd877678a4c37ebf6cf42208f9c9ec"
 
 [[package]]
 name = "zone-update"
-version = "0.9.3"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0aa8b818a182d7ba23890ceada68dede5070293858fbc8977f822eaee6b68fa"
+checksum = "2e310011e15f587a8cb29ba9c1b48d5fce6dc915427cbe4b93967a907c8a0152"
 dependencies = [
  "async-trait",
  "blocking",

@@ -34,7 +34,7 @@ platforms is welcome.
   ACME/LetsEncrypt, including DNS-01. LetEncrypt [certificate
   profiles](https://letsencrypt.org/docs/profiles/) are supported; `tlsserver`
   is the default.
-- **Multiple DNS-01 Providers**: Multiple DNS providers are supported for DNS-01
+- **Multiple DNS Providers**: Multiple DNS providers are supported for DNS-01
   via the [zone-update](https://github.com/tarka/zone-update/)
   sibling-project. See that project for a list of supported
   providers. (Contributions of provider support are very welcome.)
@@ -57,6 +57,7 @@ platforms is welcome.
 ### To-dos
 
 - Access & error logs
+- Wildcard certificate handling (but probably not ACME generation; see below).
 - [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) support
 - Static file support. Pingora itself doesn't support static-files. There are
   3rd-party crates that support this but they appear unmaintained at the moment

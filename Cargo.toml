@@ -16,9 +16,9 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0.100"
 async-trait = "0.1.89"
-boring = "4.19.0"
+boring = "4.20.0"
 camino = { version = "1.2.2", features = ["serde1"] }
-chrono = { version = "0.4.42", default-features = false, features = ["clock"] }
+chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
 clap = { version = "4.5.54", features = ["derive"] }
 dnsclient = "0.2.0"
 fastrand = "2.3.0"
@@ -39,7 +39,7 @@ pingora-boringssl = "0.6.0"
 pingora-core = { version = "0.6.0", features = ["boringssl"] }
 pingora-http = "0.6.0"
 pingora-proxy = "0.6.0"
-psl = "2.1.178"
+psl = "2.1.179"
 rustls = "0.23.36"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
@@ -50,7 +50,7 @@ tokio = { version = "1.49.0", features = ["macros", "rt", "sync"] }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-zone-update = { version = "0.9.3", features = ["async"] }
+zone-update = { version = "0.10.1", features = ["async"] }
 
 [features]
 default = ["integration_tests"]
@@ -67,7 +67,7 @@ serial_test = "3.3.1"
 tempfile = "3.24.0"
 test-context = "0.5.4"
 test-log = { version = "0.2.19", features = ["trace"] }
-time = { version = "0.3.44", features = ["macros"] }
+time = { version = "0.3.45", features = ["macros"] }
 tokio = { version = "1.49.0", features = ["fs"] }
 wiremock = "0.6.5"
 

@@ -50,7 +50,7 @@ tokio = { version = "1.49.0", features = ["macros", "rt", "sync"] }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-zone-update = { version = "0.10.1", features = ["async"] }
+zone-update = { version = "0.11.0", features = ["async"] }
 
 [features]
 default = ["integration_tests"]

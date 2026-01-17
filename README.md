@@ -86,7 +86,7 @@ resources.
 - [h2c](https://httpwg.org/specs/rfc7540.html#versioning) backend support
   (avoids a lot of proxy security corner-cases, but there's not much support in
   backend server software).
-- Basic [12-factor configuration](https://12factor.net/config)-style
+- Basic [12-factor](https://12factor.net/config)-style
   configuration. This should be relatively easy due to
   [corn's](https://cornlang.dev/) support for environment injection; however
   there is a [known issue](https://github.com/corn-config/corn/issues/49)

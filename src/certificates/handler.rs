@@ -27,11 +27,13 @@ impl TlsAccept for CertHandler {
     // currently support dynamic certs with rustls.
     async fn certificate_callback(&self, ssl: &mut TlsRef) -> () {
         let host = ssl.servername(NameType::HOST_NAME)
+            .map(str::to_string)
             .expect("No servername in TLS handshake");
 
         debug!("TLS Host is {host}; loading certs");
 
-        let cert = self.certstore.by_host(&host.to_string())
+        let cert = self.certstore.by_host(&host)
+            .or_else(|| self.certstore.by_wildcard(&host))
             .expect("Certificate for host not found");
         debug!("Found certificate for {host}");
 

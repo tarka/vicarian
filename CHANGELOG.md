@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.18](https://github.com/tarka/vicarian/compare/v0.1.17...v0.1.18) - 2026-01-20
 
+* Pull in latest DNS providers from zone-update.
+* Add support for externally supplied wildcard certificates.
+
 ### Other
 
 - Use corrected release-plz config.

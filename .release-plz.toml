@@ -18,4 +18,5 @@ commit_parsers = [
   { message = "^chore|^ci", group = "<!-- 7 -->Miscellaneous Tasks" },
   { body = ".*security", group = "<!-- 8 -->Security" },
   { message = "^revert", group = "<!-- 9 -->Revert" },
+  { message = "^.*", group = "other" },
 ]

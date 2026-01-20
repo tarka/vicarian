@@ -314,3 +314,32 @@ async fn test_wildcard() {
         .to_str().unwrap();
     assert_eq!("max-age=31536000; includeSubDomains", hsts);
 }
+
+#[tokio::test]
+#[serial]
+async fn test_no_wildcard() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_wildcard")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.cert.clone();
+
+    Mock::given(method("GET"))
+        .and(path("/status"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("OK"))
+        .mount(&backend_server).await;
+
+    let response = Client::builder()
+        .resolve("www.not-example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http2_prior_knowledge()
+        .build().unwrap()
+        .get(format!("https://www.not-example.com:{TLS_PORT}/status"))
+        .send().await;
+
+    assert!(response.is_err());
+}

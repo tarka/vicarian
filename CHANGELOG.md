@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18](https://github.com/tarka/vicarian/compare/v0.1.17...v0.1.18) - 2026-01-20
+
+### Other
+
+- Use corrected release-plz config.
+- Dependency bump
+- Fix README AI section.
+- Dependency bump to fix boring-ssl issues.
+- Dependency bump and tweak README.
+- Update dependencies and simplify AI statement.
+- Clarify wildcard position.
+- Add more release-plz tag categrories.
+
 ## [0.1.17](https://github.com/tarka/vicarian/compare/v0.1.16...v0.1.17) - 2026-01-08
 
 ### Other

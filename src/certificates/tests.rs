@@ -319,10 +319,20 @@ fn test_wildcard() -> Result<()> {
 
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(vec![wildcard.clone()], context)?;
-    let found = store.by_host(&"*.example.com".to_string()).unwrap();
 
-    assert_eq!(found, wildcard);
+    {
+        let by_host = store.by_host(&"otherhost.example.com".to_string());
+        let by_wildcard = store.by_wildcard("otherhost.example.com").unwrap();
+        assert!(by_host.is_none());
+        assert_eq!(Some("example.com".to_string()), by_wildcard.wildcard_for);
+    }
 
+    {
+        let by_host = store.by_host(&"*.example.com".to_string());
+        let by_wildcard = store.by_wildcard("*.example.com").unwrap();
+        assert!(by_host.is_none());
+        assert_eq!(Some("example.com".to_string()), by_wildcard.wildcard_for);
+    }
 
     Ok(())
 }

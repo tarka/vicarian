@@ -21,6 +21,7 @@ use crate::{
 pub struct CertStore {
     _context: Arc<RunContext>,
     by_host: papaya::HashMap<String, Arc<HostCertificate>>,
+    by_wildcard: papaya::HashMap<String, Arc<HostCertificate>>,
     by_file: papaya::HashMap<Utf8PathBuf, Arc<HostCertificate>>,
 }
 
@@ -31,12 +32,18 @@ impl CertStore {
 
         // Create an entry for each alias
         let by_host: papaya::HashMap<String, Arc<HostCertificate>> = certs.iter()
+            .filter(|cert| cert.wildcard_for.is_none())
             .flat_map(|cert|
                  cert.hostnames.iter()
-                 .map(|hostname| (
-                     hostname.clone(),
-                     cert.clone()
-                 )))
+                      .map(|hostname| (
+                          hostname.clone(),
+                          cert.clone()))
+            )
+            .collect();
+
+        let by_wildcard: papaya::HashMap<String, Arc<HostCertificate>> = certs.iter()
+            .filter_map(|cert| cert.wildcard_for.as_ref()
+                        .map(|domain| (domain.clone(), cert.clone())))
             .collect();
 
         let by_file = certs.iter()
@@ -51,6 +58,7 @@ impl CertStore {
         let certstore = Self {
             _context,
             by_host,
+            by_wildcard,
             by_file,
         };
         Ok(certstore)
@@ -62,11 +70,21 @@ impl CertStore {
             .map(Arc::clone)
     }
 
+    /// Takes a host and returns a matching wildcard, if any.
+    pub fn by_wildcard(&self, host: &str) -> Option<Arc<HostCertificate>> {
+        host.split_once('.')
+            .and_then(|(_host, domain)| {
+                let pmap = self.by_wildcard.pin();
+                pmap.get(domain).cloned()
+            })
+    }
+
     pub fn by_file(&self, file: &Utf8PathBuf) -> Option<Arc<HostCertificate>> {
         let pmap = self.by_file.pin();
         pmap.get(file)
             .cloned()
     }
+
 
     pub fn upsert(&self, newcert: Arc<HostCertificate>) -> Result<()> {
         for hostname in newcert.hostnames.iter() {
@@ -114,4 +132,5 @@ impl CertStore {
             .flatten()
             .collect()
     }
+
 }

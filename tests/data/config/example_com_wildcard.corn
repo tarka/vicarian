@@ -1,0 +1,26 @@
+{
+    listen = {
+        insecure_port = 8080
+        tls_port = 8443
+    }
+    vhosts = [
+        {
+            hostname = "www.example.com"
+
+            tls = {
+                files = {
+                    keyfile = "target/certs/_.example.com.key"
+                    certfile = "target/certs/_.example.com.crt"
+                    reload = true
+                }
+            }
+
+            backends = [
+                {
+                    context = "/"
+                    url = "http://127.0.0.1:9090"
+                }
+            ]
+        }
+    ]
+}

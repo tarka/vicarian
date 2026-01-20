@@ -30,6 +30,7 @@ struct TestHostCerts {
     pub snakeoil_1: Arc<HostCertificate>,
     pub snakeoil_2: Arc<HostCertificate>,
     pub www_example: Arc<HostCertificate>,
+    pub wildcard_example: Arc<HostCertificate>,
 }
 
 impl TestHostCerts {
@@ -37,11 +38,13 @@ impl TestHostCerts {
         let snakeoil_1 = from_localcert(&TEST_CERTS.snakeoil_1, true)?;
         let snakeoil_2 = from_localcert(&TEST_CERTS.snakeoil_2, true)?;
         let www_example = from_localcert(&TEST_CERTS.www_example, false)?;
+        let wildcard_example = from_localcert(&TEST_CERTS.wildcard_example, false)?;
 
         Ok(Self {
             snakeoil_1,
             snakeoil_2,
             www_example,
+            wildcard_example,
         })
     }
 }
@@ -255,7 +258,7 @@ fn sanity_check_pending_filter() {
         exp: Option<bool>,
         name: &'static str,
     }
-    let hosts = vec![
+    let hosts = [
         Cert{exp: Some(false), name: "ok" },
         Cert{exp: None, name: "new" },
         Cert{exp: Some(false), name: "ok" },
@@ -264,8 +267,7 @@ fn sanity_check_pending_filter() {
 
     let pending = hosts.iter()
     // Either None or expiring with 30 days
-        .filter(|cert| ! cert.exp
-                .is_some_and(|v| ! v))
+        .filter(|cert| cert.exp.is_none_or(|v| v))
         .collect::<Vec<&Cert>>();
 
     assert_eq!(2, pending.len());
@@ -279,7 +281,7 @@ fn test_asn1time_to_datetime() -> Result<()> {
     let past = chrono::DateTime::parse_from_rfc3339("2023-01-01 00:00:00+00:00")? // Jan 1, 2023
         .timestamp();
     let asn1_time = Asn1Time::from_unix(past).expect("Failed to create ASN.1 time");
-    let datetime = asn1time_to_datetime(&asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
+    let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
     let expected = chrono::Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).single().expect("Invalid date");
     assert_eq!(datetime, expected);
@@ -290,7 +292,7 @@ fn test_asn1time_to_datetime() -> Result<()> {
 fn test_asn1time_to_datetime_epoch() {
     // Test conversion of ASN.1 time at Unix epoch
     let asn1_time = Asn1Time::from_unix(0).expect("Failed to create ASN.1 time");
-    let datetime = asn1time_to_datetime(&asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
+    let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
     let expected = chrono::Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).single().expect("Invalid date");
     assert_eq!(datetime, expected);
@@ -301,7 +303,7 @@ fn test_asn1time_to_datetime_future() -> Result<()> {
     let datetime = chrono::DateTime::parse_from_rfc3339("2038-01-19 03:14:07+00:00")? // Jan 1, 2023
         .timestamp();
     let asn1_time = Asn1Time::from_unix(datetime).expect("Failed to create ASN.1 time"); // Year 2038
-    let datetime = asn1time_to_datetime(&asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
+    let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
     let expected = chrono::Utc.with_ymd_and_hms(2038, 1, 19, 3, 14, 7).single().expect("Invalid date");
     assert_eq!(datetime, expected);
@@ -310,9 +312,27 @@ fn test_asn1time_to_datetime_future() -> Result<()> {
 }
 
 #[test]
-fn test_no_subject() -> Result<()> {
-    let _cert = HostCertificate::new(Utf8PathBuf::from("tests/data/certs/www.vicarian.no-subject.key"),
-                                     Utf8PathBuf::from("tests/data/certs/www.vicarian.no-subject.crt"),
-                                     false)?;
+fn test_wildcard() -> Result<()> {
+    let wildcard = TEST_HOST_CERTS.wildcard_example.clone();
+
+    assert!(wildcard.hostnames.contains(&"*.example.com".to_string()));
+
+    let context = Arc::new(RunContext::new(Config::default()));
+    let store = CertStore::new(vec![wildcard.clone()], context)?;
+
+    {
+        let by_host = store.by_host(&"otherhost.example.com".to_string());
+        let by_wildcard = store.by_wildcard("otherhost.example.com").unwrap();
+        assert!(by_host.is_none());
+        assert_eq!(Some("example.com".to_string()), by_wildcard.wildcard_for);
+    }
+
+    {
+        let by_host = store.by_host(&"*.example.com".to_string());
+        let by_wildcard = store.by_wildcard("*.example.com").unwrap();
+        assert!(by_host.is_none());
+        assert_eq!(Some("example.com".to_string()), by_wildcard.wildcard_for);
+    }
+
     Ok(())
 }

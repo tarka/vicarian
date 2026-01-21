@@ -5,7 +5,9 @@ let {
 
 } in {
     listen = {
-        addr = "[::]"  // Default; this covers IPv4 & IPv6
+        addrs = [
+            "[::]"   // Default; this covers IPv4 & IPv6
+        ]
         insecure_port = 80 // Default; will redirect to TLS
         tls_port = 443 // Default
     }

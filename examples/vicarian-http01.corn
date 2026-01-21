@@ -1,6 +1,8 @@
 {
     listen = {
-        addr = "[::]"  // Default; this covers IPv4 & IPv6
+        addrs = [
+            "[::]"  // Default; this covers IPv4 & IPv6
+        ]
         tls_port = 443 // Default
         // Default; this is implied by the ACME config
         // Non-ACME traffic will redirect to TLS

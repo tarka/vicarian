@@ -11,7 +11,9 @@ A minimal Vicarian configuration file would look something like this:
 ```corn
 {
     listen = {
-        addr = "[::]"  // This covers IPv4 & IPv6
+        addrs = [
+            "[::]"  // This covers IPv4 & IPv6
+        ]
         insecure_port = 80 // Default
         tls_port = 443 // Default
     }
@@ -50,7 +52,7 @@ A minimal Vicarian configuration file would look something like this:
 - **Optional**: Yes (uses default values if not specified)
 - **Description**: Network listening configuration for the proxy.
 - **Fields**:
-  - addr: The IP address to bind the server to (default: `"[::]"`)
+  - addrs: The IP addresses to bind the server to (default: `"[::]"`)
   - insecure_port: The HTTP port to listen on (default: 80)
   - tls_port: The HTTPS port to listen on (default: 443)
 

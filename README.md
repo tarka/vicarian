@@ -170,7 +170,9 @@ Let's Encrypt TLS would look like:
 ```corn
 {
     listen = {
-        addr = "[::]"  // Default; this covers IPv4 & IPv6
+        addrs = [
+            "[::]"  // Default; this covers IPv4 & IPv6
+        ]
         insecure_port = 80 // Disabled by default, this will redirect to HTTPS
         tls_port = 443 // Default
     }

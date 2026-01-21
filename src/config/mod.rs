@@ -143,7 +143,7 @@ pub struct Vhost {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Listen {
-    pub addr: String,
+    pub addrs: Vec<String>,
     pub insecure_port: Option<u16>,
     pub tls_port: u16,
 }
@@ -151,7 +151,7 @@ pub struct Listen {
 impl Default for Listen {
     fn default() -> Self {
         Self {
-            addr: "[::]".to_string(),
+            addrs: vec!["[::]".to_string()],
             insecure_port: None,
             tls_port: 443
         }

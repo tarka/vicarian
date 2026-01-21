@@ -286,7 +286,9 @@
                 <pre><code class="language-hcl">// Basic configuration example (corn format)
 {
     listen = {
-        addr = "[::]"  // Default; this covers IPv4 & IPv6
+        addrs = [
+            "[::]"  // Default; this covers IPv4 & IPv6
+        ]
         tls_port = 443 // Default
         // Non-ACME traffic will redirect to TLS.
         // his is also implied by the ACME config below.

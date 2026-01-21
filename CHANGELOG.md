@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 4 -->Performance
 
-- Enable LTO for release. Also enable runtime overflow checks.
+- Enable LTO for release. (Fixes #20, thanks to @zamazan4ik for the suggestion.)
+- Also enable runtime overflow checks.
 
 ### Other
 

@@ -71,6 +71,16 @@ time = { version = "0.3.45", features = ["macros"] }
 tokio = { version = "1.49.0", features = ["fs"] }
 wiremock = "0.6.5"
 
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+incremental = false
+
+
 [lints.clippy]
 unused_unit = "allow"
 

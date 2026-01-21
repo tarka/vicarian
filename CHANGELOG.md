@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 0 -->Features
 
 - [**breaking**] Add ability to listen on multiple ip addresses. This changes the config file format; `addr` is now `addrs` and is a list.
+- Vicarian now understands and will use externally generated wildcard certificates if provided.
 
 ### <!-- 4 -->Performance
 

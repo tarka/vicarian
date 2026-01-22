@@ -2,7 +2,10 @@ use anyhow::Result;
 use http::{uri::Builder, Uri};
 use test_log::test;
 
-use crate::{config::Backend, proxy::{rewrite_port, router::Router, strip_port}};
+use crate::{
+    config::Backend,
+    proxy::{normalise_ip, rewrite_port, router::Router, strip_brackets, strip_port}
+};
 
 #[test]
 fn test_uri_rewrite() -> Result<()> {
@@ -41,6 +44,26 @@ fn test_no_port_strip() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_strip_brackets() {
+    assert_eq!("192.168.1.1", strip_brackets("192.168.1.1"));
+    assert_eq!("::1", strip_brackets("[::1]"));
+    assert_eq!("2001:db8::1", strip_brackets("[2001:db8::1]"));
+    assert_eq!("[invalid", strip_brackets("[invalid"));
+}
+
+#[test]
+fn test_normalise_ip() -> Result<()> {
+    assert_eq!("192.168.1.1", normalise_ip("192.168.1.1")?);
+    assert_eq!("[::1]", normalise_ip("[::1]")?);
+    assert_eq!("[2001:db8::1]", normalise_ip("2001:db8::1")?);
+    assert_eq!("[2001:db8::1]", normalise_ip("[2001:db8::1]")?);
+
+    let result = normalise_ip("invalid");
+    assert!(result.is_err());
+
+    Ok(())
+}
 
 #[test]
 fn test_router() -> Result<()> {

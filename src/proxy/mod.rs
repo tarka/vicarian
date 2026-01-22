@@ -3,8 +3,9 @@ mod services;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 
+use anyhow::Result;
 use pingora_core::{
     listeners::tls::TlsSettings,
     services::listening::Service,
@@ -21,7 +22,7 @@ use crate::{
 };
 
 
-pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, context: Arc<RunContext>) -> anyhow::Result<()> {
+pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, context: Arc<RunContext>) -> Result<()> {
     info!("Starting Proxy");
 
     let mut pingora_server = PingoraServer::new(None)?;
@@ -41,7 +42,7 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
             tls_settings.enable_h2();
 
-            let addr_port = format!("{}:{}", addr, context.config.listen.tls_port);
+            let addr_port = format!("{}:{}", normalise_ip(addr)?, context.config.listen.tls_port);
             pingora_proxy.add_tls_with_settings(&addr_port, None, tls_settings);
         }
         pingora_proxy
@@ -60,7 +61,7 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
         for addr in &context.config.listen.addrs {
-            let addr_port = format!("{}:{}", addr, insecure_port);
+            let addr_port = format!("{}:{}", normalise_ip(addr)?, insecure_port);
             service.add_tcp(&addr_port);
         }
         pingora_server.add_service(service);
@@ -69,6 +70,24 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
     pingora_server.run(pingora_core::server::RunArgs::default());
 
     Ok(())
+}
+
+fn strip_brackets(before: &str) -> &str {
+    before.strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(before)
+}
+
+fn normalise_ip(before: &str) -> Result<String> {
+    let ip = strip_brackets(before)
+        .parse::<IpAddr>()?;
+
+    let ipstr = match ip {
+        IpAddr::V4(_) => ip.to_string(),
+        IpAddr::V6(_) => format!("[{ip}]"),
+    };
+
+    Ok(ipstr)
 }
 
 fn rewrite_port(host: &str, newport: &str) -> String {

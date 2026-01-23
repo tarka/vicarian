@@ -121,8 +121,8 @@ impl AcmeRuntime {
 
                 let cert_file = cert_dir
                     .join(&fqdn);
-                let keyfile = cert_file.with_extension("key");
-                let certfile = cert_file.with_extension("crt");
+                let keyfile = cert_file.with_added_extension("key");
+                let certfile = cert_file.with_added_extension("crt");
 
                 let contact = aconf.contact.clone();
                 let contact_dir = cert_base
@@ -132,7 +132,7 @@ impl AcmeRuntime {
 
                 let contactfile = contact_dir
                     .join(&contact)
-                    .with_extension("conf");
+                    .with_added_extension("conf");
 
                 let profile = LE_PROFILES.get(aconf.profile.into())
                         .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;

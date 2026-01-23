@@ -37,7 +37,6 @@ use crate::{
 #[derive(Debug)]
 pub struct HostCertificate {
     hostnames: Vec<String>,
-    wildcard_for: Option<String>,
     keyfile: Utf8PathBuf,
     key: PKey<Private>,
     certfile: Utf8PathBuf,
@@ -70,24 +69,12 @@ impl HostCertificate {
             .unique() // Subject may also appear in aliases
             .collect();
 
-        let wildcard_for = if hostnames.iter().any(|h| h.starts_with("*.")) {
-            if hostnames.len() > 1 {
-                bail!("Wildcard cert exists, but has other hostnames: {hostnames:?}")
-            }
-            Some(hostnames[0].strip_prefix("*."))
-                .flatten()
-                .map(str::to_string)
-        } else {
-            None
-        };
-
         let not_after = certs[0].not_after();
         let expires = asn1time_to_datetime(not_after)?;
 
         info!("Loaded certificate {:?}, expires {}", hostnames, expires);
         Ok(HostCertificate {
             hostnames,
-            wildcard_for,
             keyfile,
             key,
             certfile,

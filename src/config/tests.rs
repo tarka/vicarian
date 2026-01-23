@@ -32,6 +32,7 @@ fn test_dns01_example_config() -> Result<()> {
             acme_provider: AcmeProvider::LetsEncrypt,
             directory: _,
             challenge: AcmeChallenge::Dns01(DnsProvider {
+                wildcard: false,
                 dns_provider: zone_update::Provider::PorkBun(_)
             }),
             profile: AcmeProfile::TlsServer,
@@ -118,6 +119,7 @@ fn test_dns01_dev_config() -> Result<()> {
             acme_provider: AcmeProvider::LetsEncrypt,
             directory: _,
             challenge: AcmeChallenge::Dns01(DnsProvider {
+                wildcard: false,
                 dns_provider: zone_update::Provider::PorkBun(_)
             }),
             profile: AcmeProfile::TlsServer,

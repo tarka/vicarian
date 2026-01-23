@@ -103,24 +103,34 @@ impl AcmeRuntime {
                 TlsConfig::Acme(aconf) => Some((vhost, aconf)),
             })
             .map(|(vhost, aconf)| {
-                // Default;
-                // keyfile  -> /var/lib/vicarian/acme/www.example.com/www.example.com.key
-                // certfile -> /var/lib/vicarian/acme/www.example.com/www.example.com.crt
-                let fqdn = vhost.hostname.clone();
-
-                let domain_psl = psl::domain(fqdn.as_bytes())
-                    .ok_or(anyhow!("Failed to find base domain for {fqdn}"))?;
+                let domain_psl = psl::domain(vhost.hostname.as_bytes())
+                    .ok_or(anyhow!("Failed to find base domain for {}", vhost.hostname))?;
                 let domain = String::from_utf8(domain_psl.as_bytes().to_vec())?;
+                let is_wildcard = matches!(aconf.challenge, AcmeChallenge::Dns01(DnsProvider {wildcard: true, dns_provider: _}));
+
+                let (cert_hostname, cert_fname) = if is_wildcard {
+                    let wildcard_domain = if vhost.hostname == domain {
+                        &domain
+                    } else {
+                        vhost.hostname.split_once('.')
+                            .map(|(_host, domain)| domain)
+                            .ok_or(anyhow!("Invalid host for wildcard certificate: {}", vhost.hostname))?
+                    };
+                    (format!("*.{wildcard_domain}"), format!("_.{wildcard_domain}"))
+                } else {
+                    (vhost.hostname.clone(), vhost.hostname.clone())
+                };
+
 
                 let cert_base = Utf8PathBuf::from(&aconf.directory);
                 let cert_dir = cert_base
-                    .join(&fqdn);
+                    .join(&cert_fname);
                 info!("Creating ACME certificate dir {cert_base}");
                 create_dir_all(&cert_dir)
                     .context(format!("Error creating directory {cert_base}"))?;
 
                 let cert_file = cert_dir
-                    .join(&fqdn);
+                    .join(&cert_fname);
                 let keyfile = cert_file.with_added_extension("key");
                 let certfile = cert_file.with_added_extension("crt");
 
@@ -138,7 +148,7 @@ impl AcmeRuntime {
                         .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;
 
                 let acme_host = AcmeHost {
-                    fqdn,
+                    fqdn: cert_hostname,
                     aliases: vhost.aliases.clone(),
                     domain,
                     keyfile,
@@ -150,6 +160,9 @@ impl AcmeRuntime {
                 };
                 Ok(acme_host)
             })
+            // Filter out duplicate wildcard hosts
+            .unique_by(|ahost| ahost.as_ref().ok()
+                       .map(|ahost| ahost.fqdn.clone()))
             .collect::<Result<Vec<AcmeHost>>>()?;
 
         Ok(Self {
@@ -284,9 +297,9 @@ impl AcmeRuntime {
 
         info!("Create order for {}", acme_host.fqdn);
         let hids = acme_host.hostnames().into_iter()
-            .cloned()
-            .map(Identifier::Dns)
-            .collect::<Vec<Identifier>>();
+                .cloned()
+                .map(Identifier::Dns)
+                .collect::<Vec<Identifier>>();
 
         let no = NewOrder::new(&hids)
             .profile(acme_host.profile.name);
@@ -386,8 +399,8 @@ impl AcmeRuntime {
             AcmeChallenge::Dns01(provider) => {
 
                 let fqdn = challenge.identifier().to_string();
-                let txt_name = self.to_txt_name(acme_host, &fqdn)?;
-                let txt_fqdn = format!("_acme-challenge.{fqdn}");
+                let txt_name = to_txt_name(&acme_host.domain, &fqdn);
+                let txt_fqdn = format!("{txt_name}.{}", acme_host.domain);
                 let token = challenge.key_authorization().dns_value();
 
                 info!("Creating TXT: {} -> {}", txt_name, token);
@@ -416,13 +429,7 @@ impl AcmeRuntime {
         match &acme_host.challenge {
             AcmeChallenge::Dns01(provider) => {
                 for hostname in acme_host.hostnames() {
-                    let txt_name = match self.to_txt_name(acme_host, hostname) {
-                        Ok(txt_name) => txt_name,
-                        Err(_) => {
-                            warn!("Failed to cleanup {hostname} TXT record");
-                            continue;
-                        }
-                    };
+                    let txt_name = to_txt_name(&acme_host.domain, hostname);
 
                     info!("Attempting cleanup of {txt_name} record");
                     // FIXME: Doesn't handle multiple records currently. We need to
@@ -455,20 +462,6 @@ impl AcmeRuntime {
         pin.get(fqdn).cloned()
     }
 
-    fn strip_domain(&self, acme_host: &AcmeHost, fqdn: &str) -> Result<String> {
-        fqdn.strip_suffix(&format!(".{}", acme_host.domain))
-            .ok_or(anyhow!("Failed to strip domain {} from {}", acme_host.domain, fqdn))
-            .map(str::to_owned)
-    }
-
-    fn to_txt_name(&self, acme_host: &AcmeHost, fqdn: &str) -> Result<String> {
-        let id = self.strip_domain(acme_host, fqdn)?;
-        if id.is_empty() {
-            Ok("_acme-challenge".to_string())
-        } else {
-            Ok(format!("_acme-challenge.{id}"))
-        }
-    }
 
 }
 
@@ -480,6 +473,20 @@ fn get_dns_client(acme_host: &AcmeHost, provider: &DnsProvider) -> Box<dyn Async
     };
     provider.dns_provider.async_impl(dns_config)
 }
+
+pub(crate) fn to_txt_name(domain: &str, fqdn: &str) -> String {
+    let fqdn = fqdn.strip_prefix("*.")
+        .unwrap_or(fqdn);
+
+    if let Some(stripped) = fqdn.strip_suffix(&format!(".{domain}"))
+        && !stripped.is_empty()
+    {
+        format!("_acme-challenge.{}", stripped)
+    } else {
+        "_acme-challenge".to_string()
+    }
+}
+
 
 impl From<&AcmeChallenge> for ChallengeType {
     fn from(value: &AcmeChallenge) -> Self {

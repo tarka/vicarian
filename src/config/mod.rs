@@ -55,7 +55,7 @@ pub enum AcmeProvider {
     #[default]
     LetsEncrypt,
     // TODO:
-    ZeroSsl,
+    // ZeroSsl,
 }
 
 #[derive(Copy, Clone, Debug, Default, Deserialize, IntoStaticStr)]
@@ -69,6 +69,8 @@ pub enum AcmeProfile {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DnsProvider {
+    #[serde(default = "default_bool::<false>")]
+    pub wildcard: bool,
     pub dns_provider: zone_update::Provider,
 }
 

@@ -16,9 +16,9 @@ use test_log::test;
 use tracing_log::log::info;
 
 use crate::{
-    certificates::{
-        asn1time_to_datetime, load_certs, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}, HostCertificate
-    }, config::Config, errors::VicarianError, RunContext
+    RunContext, certificates::{
+        HostCertificate, acme::to_txt_name, asn1time_to_datetime, load_certs, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}
+    }, config::Config, errors::VicarianError
 };
 
 use certutils::TEST_CERTS;
@@ -252,31 +252,6 @@ fn test_file_update_success() -> Result<()> {
 }
 
 #[test]
-fn sanity_check_pending_filter() {
-    // Simplified test of acme->pending() logic
-    struct Cert {
-        exp: Option<bool>,
-        name: &'static str,
-    }
-    let hosts = [
-        Cert{exp: Some(false), name: "ok" },
-        Cert{exp: None, name: "new" },
-        Cert{exp: Some(false), name: "ok" },
-        Cert{exp: Some(true), name: "expiring" },
-    ];
-
-    let pending = hosts.iter()
-    // Either None or expiring with 30 days
-        .filter(|cert| cert.exp.is_none_or(|v| v))
-        .collect::<Vec<&Cert>>();
-
-    assert_eq!(2, pending.len());
-    assert_eq!("new", pending[0].name);
-    assert_eq!("expiring", pending[1].name);
-}
-
-
-#[test]
 fn test_asn1time_to_datetime() -> Result<()> {
     let past = chrono::DateTime::parse_from_rfc3339("2023-01-01 00:00:00+00:00")? // Jan 1, 2023
         .timestamp();
@@ -312,6 +287,21 @@ fn test_asn1time_to_datetime_future() -> Result<()> {
 }
 
 #[test]
+fn test_to_txt_name() {
+    let domain = "example.com";
+
+    assert_eq!("_acme-challenge.www", to_txt_name(domain, "www.example.com"));
+    assert_eq!("_acme-challenge.www.dev", to_txt_name(domain, "www.dev.example.com"));
+    assert_eq!("_acme-challenge", to_txt_name(domain, "example.com"));
+    assert_eq!("_acme-challenge", to_txt_name(domain, "example.com."));
+    assert_eq!("_acme-challenge", to_txt_name(domain, ""));
+
+    assert_eq!("_acme-challenge", to_txt_name(domain, "*.example.com"));
+    assert_eq!("_acme-challenge.dev", to_txt_name(domain, "*.dev.example.com"));
+
+}
+
+#[test]
 fn test_wildcard() -> Result<()> {
     let wildcard = TEST_HOST_CERTS.wildcard_example.clone();
 
@@ -322,16 +312,16 @@ fn test_wildcard() -> Result<()> {
 
     {
         let by_host = store.by_host(&"otherhost.example.com".to_string());
-        let by_wildcard = store.by_wildcard("otherhost.example.com").unwrap();
         assert!(by_host.is_none());
-        assert_eq!(Some("example.com".to_string()), by_wildcard.wildcard_for);
+        let by_wildcard = store.by_wildcard("otherhost.example.com").unwrap();
+        assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames.first());
     }
 
     {
-        let by_host = store.by_host(&"*.example.com".to_string());
-        let by_wildcard = store.by_wildcard("*.example.com").unwrap();
-        assert!(by_host.is_none());
-        assert_eq!(Some("example.com".to_string()), by_wildcard.wildcard_for);
+        let by_host = store.by_host(&"*.example.com".to_string()).unwrap();
+        assert_eq!(Some(&"*.example.com".to_string()), by_host.hostnames.first());
+        let by_wildcard = store.by_wildcard("realhost.example.com").unwrap();
+        assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames.first());
     }
 
     Ok(())

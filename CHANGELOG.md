@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/tarka/vicarian/compare/v0.1.17...v0.2.0) - 2026-01-23
+
+### <!-- 0 -->Features
+
+- [**breaking**] Add ability to listen on multiple ip addresses. This changes the config file format; `addr` is now `addrs` and is a list.
+
+### <!-- 1 -->Bug Fixes
+
+- Add the crt/key suffix to certfiles rather than replacing the root.
+
+### <!-- 4 -->Performance
+
+- Enable LTO for release. Also enable runtime overflow checks.
+
+### Other
+
+- Normalise IPs before initialising listener.
+- Simplify release profile.
+- Use corrected release-plz config.
+- Dependency bump
+- Fix README AI section.
+- Dependency bump to fix boring-ssl issues.
+- Dependency bump and tweak README.
+- Update dependencies and simplify AI statement.
+- Clarify wildcard position.
+- Add more release-plz tag categrories.
+
 ## [0.1.17](https://github.com/tarka/vicarian/compare/v0.1.16...v0.1.17) - 2026-01-08
 
 ### Other

@@ -53,11 +53,11 @@ platforms is welcome.
   [EnvironmentFile](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
   and [corn](https://cornlang.dev) environment injection (see
   [vicarian-dns01.corn](examples/vicarian-dns01.corn) for an example).
+- Wildcard ACME certificate generation.
 
 ### To-dos
 
 - Access & error logs
-- Wildcard certificate handling (but probably not ACME generation; see below).
 - [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) support
 - Static file support. Pingora itself doesn't support static-files. There are
   3rd-party crates that support this but they appear unmaintained at the moment
@@ -103,8 +103,6 @@ features and settings.
 
 Other notable non-features:
 
-- Wildcard ACME certificate generation; these are better generated externally
-  and distributed to multiple servers.
 - Load-balancing, round-robin, complex rewrite rules, etc.
 - Advanced connection tuning
 

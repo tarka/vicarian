@@ -146,6 +146,7 @@ tls = {
       }
     }
     profile = "tlsserver"
+    wildcard = false
   }
 }
 ```
@@ -159,6 +160,7 @@ tls = {
   - key: API key for the DNS provider
   - secret: API secret for the DNS provider
 - profile: Certificate profile - "shortlived" or "tlsserver" (default: "tlsserver")
+- wildcard: Whether to generate a wildcard certificate. (default: false)
 
 ## Backend Configuration
 

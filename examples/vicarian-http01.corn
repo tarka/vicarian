@@ -12,6 +12,12 @@
     vhosts = [
         {
             hostname = "www.example.com"
+            // Optional aliases for this host. These will be added to
+            // the generated TLS certificate.
+            aliases = [
+                "docs.example.com"
+                "pics.example.com"
+            ]
 
             tls = {
                 acme = {

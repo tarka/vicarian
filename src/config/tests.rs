@@ -65,6 +65,15 @@ fn test_http01_example_config() -> Result<()> {
 }
 
 #[test]
+fn test_wildcard_example_config() -> Result<()> {
+    let file = Utf8PathBuf::from("examples/vicarian-wildcard-tls.corn");
+    let config = Config::from_file(&file)?;
+    assert_eq!("files.example.com", config.vhosts[0].hostname);
+
+    Ok(())
+}
+
+#[test]
 fn test_no_optionals() -> Result<()> {
     let file = Utf8PathBuf::from("tests/data/config/no-optionals.corn");
     let config = Config::from_file(&file)?;

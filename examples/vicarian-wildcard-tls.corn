@@ -1,0 +1,68 @@
+
+let {
+    // The corn format allow reusable fragments:
+    $acme_snippet = {
+        acme = {
+            acme_provider = "letsencrypt"
+            profile = "shortlived"
+            contact = "admin@haltcondition.net"
+            challenge = {
+                type = "dns-01"
+		wildcard = true
+                dns_provider = {
+                    name = "porkbun"
+                    key = $env_PORKBUN_KEY
+                    secret = $env_PORKBUN_SECRET
+                }
+            }
+        }
+    }
+
+} in {
+    listen = {
+        addrs = [ "[::]" ]
+        insecure_port = 80
+    }
+
+    vhosts = [
+        {
+            // This will generate the certificate *.example.com
+            hostname = "files.example.com"
+            tls = $acme_snippet
+
+            backends = [{
+                url = "http://192.168.20.27:9090"
+            }]
+        }
+
+        // All the following hosts will share a
+        // common *.files.example.com certificate.
+        {
+            hostname = "images.files.example.com"
+            tls = $acme_snippet
+
+            backends = [{
+                url = "http://192.168.20.27:9191"
+            }]
+        }
+
+        {
+            hostname = "docs.files.example.com"
+            tls = $acme_snippet
+
+            backends = [{
+                url = "http://192.168.20.175:8188"
+            }]
+        }
+
+
+        {
+            hostname = "downloads.files.example.com"
+            tls = $acme_snippet
+
+            backends = [{
+                url = "http://192.168.20.73:8080"
+            }]
+        }
+    ]
+}

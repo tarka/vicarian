@@ -11,6 +11,11 @@
     vhosts = [
         {
             hostname = "files.example.com"
+            // Optional aliases for this host
+            aliases = [
+                "docs.example.com"
+                "pics.example.com"
+            ]
 
             tls = {
                 files = {

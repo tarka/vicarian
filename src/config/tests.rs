@@ -66,6 +66,10 @@ fn test_http01_example_config() -> Result<()> {
 
 #[test]
 fn test_wildcard_example_config() -> Result<()> {
+    unsafe {
+        std::env::set_var("DNS_KEY", "my-key");
+        std::env::set_var("DNS_SECRET", "my-secret");
+    }
     let file = Utf8PathBuf::from("examples/vicarian-wildcard-tls.corn");
     let config = Config::from_file(&file)?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);

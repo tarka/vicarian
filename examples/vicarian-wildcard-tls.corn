@@ -11,8 +11,8 @@ let {
 		wildcard = true
                 dns_provider = {
                     name = "porkbun"
-                    key = $env_PORKBUN_KEY
-                    secret = $env_PORKBUN_SECRET
+                    key = $env_DNS_KEY
+                    secret = $env_DNS_SECRET
                 }
             }
         }

@@ -35,10 +35,10 @@ papaya = "0.2.3"
 path-tree = "0.8.3"
 phf = { version = "0.13.1", features = ["phf_macros"] }
 phf_macros = "0.13.1"
-pingora-boringssl = "0.6.0"
-pingora-core = { version = "0.6.0", features = ["boringssl"] }
-pingora-http = "0.6.0"
-pingora-proxy = "0.6.0"
+pingora-boringssl = { path = "../../software/pingora/pingora-boringssl" }
+pingora-core = { path = "../../software/pingora/pingora-core", features = ["boringssl"] }
+pingora-http = { path = "../../software/pingora/pingora-http" }
+pingora-proxy = { path = "../../software/pingora/pingora-proxy" }
 psl = "2.1.180"
 rustls = "0.23.36"
 serde = { version = "1.0.228", features = ["derive"] }

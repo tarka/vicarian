@@ -181,6 +181,15 @@ impl AcmeRuntime {
 
         info!("Starting ACME runtime");
 
+        // let certs = stream::iter(cert_files)
+        //     .then(|cf| async move {
+        //         info!("Loading certs from {}, {}", cf.keyfile, cf.certfile);
+        //         let hc = HostCertificate::new(cf.keyfile.clone(), cf.certfile.clone()).await?;
+        //         Ok(Arc::new(hc))
+        //     })
+        //     .collect::<Vec<Result<Arc<HostCertificate>>>>().await
+        //     .into_iter().collect::<Result<Vec<Arc<HostCertificate>>>>()?;
+
         let existing = self.acme_hosts.iter()
             .filter(|ah| ah.keyfile.exists() && ah.certfile.exists())
             .map(|ah| Ok(Arc::new(HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false)?)))

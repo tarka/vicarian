@@ -36,7 +36,8 @@ path-tree = "0.8.3"
 phf = { version = "0.13.1", features = ["phf_macros"] }
 phf_macros = "0.13.1"
 pingora-boringssl = { path = "../../software/pingora/pingora-boringssl" }
-pingora-core = { path = "../../software/pingora/pingora-core", features = ["boringssl"] }
+pingora-rustls = { path = "../../software/pingora/pingora-rustls" }
+pingora-core = { path = "../../software/pingora/pingora-core", features = ["rustls"] }
 pingora-http = { path = "../../software/pingora/pingora-http" }
 pingora-proxy = { path = "../../software/pingora/pingora-proxy" }
 psl = "2.1.180"
@@ -51,6 +52,9 @@ tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 zone-update = { version = "0.11.0", features = ["async"] }
+rustls-pki-types = "1.14.0"
+blocking = "1.6.2"
+x509-parser = "0.18.0"
 
 [features]
 default = ["integration_tests"]

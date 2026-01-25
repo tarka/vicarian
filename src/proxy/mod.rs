@@ -39,7 +39,7 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
 
         for addr in &context.config.listen.addrs {
             let cert_handler = CertHandler::new(certstore.clone());
-            let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
+            let mut tls_settings = TlsSettings::resolver(Arc::new(cert_handler))?;
             tls_settings.enable_h2();
 
             let addr_port = format!("{}:{}", normalise_ip(addr)?, context.config.listen.tls_port);

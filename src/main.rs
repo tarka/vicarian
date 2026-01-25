@@ -33,6 +33,7 @@ fn init_logging(level: u8) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct RunContext {
     pub config: Config,
     pub quit_rx: watch::Receiver<bool>,

@@ -28,6 +28,10 @@ pub struct TestCerts {
 
 impl TestCerts {
     fn new() -> Result<Self> {
+        rustls::crypto::aws_lc_rs::default_provider().install_default()
+            .expect("Failed to install Rustls crypto provider");
+
+
         create_dir_all(CERT_DIR.as_path())?;
 
         let caroot = get_root_ca()?;

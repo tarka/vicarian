@@ -16,7 +16,6 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0.100"
 async-trait = "0.1.89"
-boring = "4.20.0"
 camino = { version = "1.2.2", features = ["serde1"] }
 chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
 clap = { version = "4.5.54", features = ["derive"] }
@@ -35,7 +34,6 @@ papaya = "0.2.3"
 path-tree = "0.8.3"
 phf = { version = "0.13.1", features = ["phf_macros"] }
 phf_macros = "0.13.1"
-#pingora-boringssl = { git = "https://github.com/tarka/pingora-rustls.git" }
 pingora-rustls = { git = "https://github.com/tarka/pingora-rustls.git" }
 pingora-core = { git = "https://github.com/tarka/pingora-rustls.git", features = ["rustls"] }
 pingora-http = { git = "https://github.com/tarka/pingora-rustls.git" }

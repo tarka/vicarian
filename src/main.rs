@@ -66,7 +66,8 @@ fn main() -> Result<()> {
         .unwrap_or(Utf8PathBuf::from(DEFAULT_CONFIG_FILE));
     let config = Config::from_file(&config_file)?;
 
-    rustls::crypto::aws_lc_rs::default_provider().install_default()
+    //rustls::crypto::aws_lc_rs::default_provider().install_default()
+    rustls_graviola::default_provider().install_default()
         .expect("Failed to install Rustls crypto provider");
 
     let context = Arc::new(RunContext::new(config));

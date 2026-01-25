@@ -33,7 +33,8 @@ pub struct TestCerts {
 
 impl TestCerts {
     fn new() -> Result<Self> {
-        let _ignore = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        //let _ignore = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let _ignore = rustls_graviola::default_provider().install_default();
 
         create_dir_all(CERT_DIR.as_path())?;
 

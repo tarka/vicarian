@@ -30,7 +30,6 @@ use crate::{
         }
     },
     config::Config,
-    errors::VicarianError,
 };
 
 use certutils::TEST_CERTS;
@@ -95,13 +94,11 @@ fn test_snakeoil_valid() -> Result<()> {
 fn test_snakeoil_invalid_pair() -> Result<()> {
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
     let so2 = TEST_HOST_CERTS.snakeoil_2.clone();
-    let key_path = &so1.keyfile;
-    let other_cert_path = &so2.certfile;
+    let key_path = so1.keyfile.clone();
+    let other_cert_path = so2.certfile.clone();
 
-    let result = load_certs(key_path, other_cert_path);
+    let result = HostCertificate::new(key_path, other_cert_path, false);
     assert!(result.is_err());
-    let err: VicarianError = result.unwrap_err().downcast()?;
-    assert!(matches!(err, VicarianError::CertificateMismatch(_, _)));
 
     Ok(())
 }

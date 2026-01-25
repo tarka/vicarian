@@ -27,7 +27,7 @@ use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
 //     x509::X509,
 // };
 use tracing_log::log::info;
-use x509_parser::{prelude::{FromDer, X509Certificate}, time::ASN1Time};
+use x509_parser::{prelude::{FromDer, GeneralName, X509Certificate}, time::ASN1Time};
 
 use crate::{
     RunContext,
@@ -67,14 +67,15 @@ impl HostCertificate {
             .filter_map(|cn| cn.as_str().ok())
             .map(str::to_string)
             .collect::<Vec<String>>();
-        println!("SUBJ: {subject:?}");
 
         let aliases = x509.subject_alternative_name()?
-            .map(|ext| ext.value.general_names.iter()
-                 .map(|gn| gn.to_string())
-                .collect::<Vec<String>>())
-            .unwrap_or(Vec::new());
-        println!("aliases: {aliases:?}");
+            .map(|sans| sans.value.general_names.iter())
+            .unwrap_or(Vec::new().iter())
+            .filter_map(|gn| match gn {
+                GeneralName::DNSName(san) => Some(san.to_string()),
+                _ => None,
+            })
+            .collect_vec();
 
         let hostnames: Vec<String> = subject.into_iter()
             .chain(aliases)
@@ -84,6 +85,7 @@ impl HostCertificate {
         let crypto = CryptoProvider::get_default()
             .ok_or(anyhow!("Failed to find default crypto provider in rustls"))?;
         let cert = Arc::new(CertifiedKey::from_der(certs, key, crypto)?);
+        cert.keys_match()?;
 
         let expires = asn1time_to_datetime(&x509.validity.not_after)?;
 
@@ -148,6 +150,7 @@ fn load_certs(keyfile: &Utf8Path, certfile: &Utf8Path) -> Result<(PrivateKey, Ve
     if certs.is_empty() {
         bail!("No certificates found in TLS .crt file");
     }
+
     Ok((key, certs))
 }
 
@@ -173,7 +176,7 @@ fn load_certs(keyfile: &Utf8Path, certfile: &Utf8Path) -> Result<(PrivateKey, Ve
 //         return Err(err)
 //     }
 
-//     Ok((key, certs))
+//     OK((key, certs))
 // }
 
 

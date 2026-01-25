@@ -28,9 +28,7 @@ pub struct TestCerts {
 
 impl TestCerts {
     fn new() -> Result<Self> {
-        rustls::crypto::aws_lc_rs::default_provider().install_default()
-            .expect("Failed to install Rustls crypto provider");
-
+        let _ignore = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         create_dir_all(CERT_DIR.as_path())?;
 
@@ -179,7 +177,11 @@ fn gen_cert(host: &str,
     let sans = vec![host.to_string()];
     let keypair = KeyPair::generate()?;
     let mut params = CertificateParams::new(sans)?;
-    params.distinguished_name = DistinguishedName::new();
+
+    let mut subject = DistinguishedName::new();
+    // subject.push(DnType::CommonName, "www.example.com");
+    params.distinguished_name = subject;
+
     if let Some(not_before) = not_before {
         params.not_before = not_before;
     }

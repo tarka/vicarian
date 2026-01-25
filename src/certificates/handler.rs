@@ -28,7 +28,7 @@ impl CertHandler {
 impl ResolvesServerCert for CertHandler {
     fn resolve(&self, hello: ClientHello<'_>) -> Option<Arc<CertifiedKey>> {
         let host = hello.server_name()?.to_string();
-        info!("TLS Host is {host}; loading certs");
+        info!("TLS Host is {host}; loading certs with Rustls");
 
         // FIXME: This should be a `get()` in CertStore, but papaya
         // guard lifetimes make it pointless (we'd have to generate a

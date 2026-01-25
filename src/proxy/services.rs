@@ -306,7 +306,7 @@ impl ProxyHttp for Vicarian {
         let hsts = format!("max-age={YEAR_IN_SECS}; includeSubDomains");
         upstream_response.insert_header(STRICT_TRANSPORT_SECURITY, hsts)?;
 
-        let via = format!("{:?} Vicarian", session.req_header().version);
+        let via = format!("{:?} Vicarian-Rustls", session.req_header().version);
         upstream_response.insert_header(VIA, via)?;
 
         Ok(())

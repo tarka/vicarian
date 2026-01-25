@@ -2,17 +2,22 @@
 
 use std::{fs::{self, create_dir_all}, sync::LazyLock};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use camino::{Utf8Path, Utf8PathBuf};
 use fslock::LockFile;
-use pingora_boringssl::{
-    pkey::{PKey, Private},
-    x509::X509,
-};
+// use pingora_boringssl::{
+//     pkey::{PKey, Private},
+//     x509::X509,
+// };
 use rcgen::{
     BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, Issuer, KeyPair,
     KeyUsagePurpose, PKCS_ECDSA_P256_SHA256,
 };
+use rustls::sign::CertifiedKey;
+use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
+
+pub type PrivateKey = PrivateKeyDer<'static>;
+pub type Certificate = CertificateDer<'static>;
 
 pub const CERT_BASE: &str = "target/certs";
 pub static CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(CERT_BASE));
@@ -82,9 +87,8 @@ pub struct CaCert {
 
 pub struct LocalCert {
     pub keyfile: Utf8PathBuf,
-    pub key: PKey<Private>,
     pub certfile: Utf8PathBuf,
-    pub certs: Vec<X509>,
+    pub cert: CertifiedKey
 }
 
 fn gen_ca() -> Result<CaCert> {
@@ -202,26 +206,49 @@ fn gen_cert(host: &str,
 }
 
 fn load_cert(keyfile: Utf8PathBuf, certfile: Utf8PathBuf) -> Result<LocalCert> {
-    let kdata = fs::read(&keyfile)
-        .context("Failed to load keyfile {keyfile}")?;
-    let cdata = fs::read(&certfile)
-        .context("Failed to load certfile {certfile}")?;
+    let key = PrivateKeyDer::from_pem_file(keyfile.to_path_buf())?;
+    let certs = CertificateDer::pem_file_iter(certfile.to_path_buf())?
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let key = PKey::private_key_from_pem(&kdata)?;
-    let certs = X509::stack_from_pem(&cdata)?;
     if certs.is_empty() {
         bail!("No certificates found in TLS .crt file");
     }
 
+    let crypto = rustls::crypto::CryptoProvider::get_default()
+        .ok_or(anyhow!("Failed to find default crypto provider in rustls"))?;
+    let cert = CertifiedKey::from_der(certs, key, crypto)?;
+
     let lc = LocalCert {
             keyfile,
             certfile,
-            key,
-            certs,
+            cert,
         };
 
     Ok(lc)
 }
+
+
+// fn load_cert(keyfile: Utf8PathBuf, certfile: Utf8PathBuf) -> Result<LocalCert> {
+//     let kdata = fs::read(&keyfile)
+//         .context("Failed to load keyfile {keyfile}")?;
+//     let cdata = fs::read(&certfile)
+//         .context("Failed to load certfile {certfile}")?;
+
+//     let key = PKey::private_key_from_pem(&kdata)?;
+//     let certs = X509::stack_from_pem(&cdata)?;
+//     if certs.is_empty() {
+//         bail!("No certificates found in TLS .crt file");
+//     }
+
+//     let lc = LocalCert {
+//             keyfile,
+//             certfile,
+//             key,
+//             certs,
+//         };
+
+//     Ok(lc)
+// }
 
 fn get_default_cert(host: &str, ca: &CaCert) -> Result<LocalCert>
 {

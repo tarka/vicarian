@@ -35,11 +35,11 @@ papaya = "0.2.3"
 path-tree = "0.8.3"
 phf = { version = "0.13.1", features = ["phf_macros"] }
 phf_macros = "0.13.1"
-pingora-boringssl = { path = "../../software/pingora/pingora-boringssl" }
-pingora-rustls = { path = "../../software/pingora/pingora-rustls" }
-pingora-core = { path = "../../software/pingora/pingora-core", features = ["rustls"] }
-pingora-http = { path = "../../software/pingora/pingora-http" }
-pingora-proxy = { path = "../../software/pingora/pingora-proxy" }
+#pingora-boringssl = { git = "https://github.com/tarka/pingora-rustls.git" }
+pingora-rustls = { git = "https://github.com/tarka/pingora-rustls.git" }
+pingora-core = { git = "https://github.com/tarka/pingora-rustls.git", features = ["rustls"] }
+pingora-http = { git = "https://github.com/tarka/pingora-rustls.git" }
+pingora-proxy = { git = "https://github.com/tarka/pingora-rustls.git" }
 psl = "2.1.180"
 rustls = "0.23.36"
 serde = { version = "1.0.228", features = ["derive"] }

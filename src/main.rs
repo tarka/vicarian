@@ -8,6 +8,7 @@ use std::thread;
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
+use nix::sys::resource::{Resource, getrlimit, setrlimit};
 use tokio::sync::watch;
 use tracing::level_filters::LevelFilter;
 use tracing_log::log::info;
@@ -55,11 +56,21 @@ impl RunContext {
     }
 }
 
+fn system_setup() -> Result<()> {
+    let (_soft, hard) = getrlimit(Resource::RLIMIT_NOFILE)?;
+    info!("Increasing NOFILE to {hard}");
+    setrlimit(Resource::RLIMIT_NOFILE, hard, hard)?;
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = config::CliOptions::from_args();
 
     init_logging(cli.verbose)?;
     info!("Starting");
+
+    system_setup()?;
 
     let config_file = cli.config
         .unwrap_or(Utf8PathBuf::from(DEFAULT_CONFIG_FILE));

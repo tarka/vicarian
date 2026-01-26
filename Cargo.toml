@@ -29,6 +29,7 @@ instant-acme = { version = "0.8.4", features = ["time"] }
 
 itertools = "0.14.0"
 libcorn = "0.10.0"
+nix = { version = "0.30.1", features = ["resource"] }
 notify = { version = "8.2.0", features = ["crossbeam-channel"] }
 notify-debouncer-full = { version = "0.6.0", features = ["crossbeam-channel"] }
 papaya = "0.2.3"

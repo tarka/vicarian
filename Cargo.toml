@@ -16,7 +16,7 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0.100"
 async-trait = "0.1.89"
-boring = "4.20.0"
+boring = "4.21.1"
 camino = { version = "1.2.2", features = ["serde1"] }
 chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
 clap = { version = "4.5.54", features = ["derive"] }
@@ -28,10 +28,10 @@ http-serde = "2.1.1"
 instant-acme = { version = "0.8.4", features = ["time"] }
 
 itertools = "0.14.0"
-libcorn = "0.10.0"
-nix = { version = "0.30.1", features = ["resource"] }
+libcorn = "0.10.1"
+nix = { version = "0.31.1", features = ["resource"] }
 notify = { version = "8.2.0", features = ["crossbeam-channel"] }
-notify-debouncer-full = { version = "0.6.0", features = ["crossbeam-channel"] }
+notify-debouncer-full = { version = "0.7.0", features = ["crossbeam-channel"] }
 papaya = "0.2.3"
 path-tree = "0.8.3"
 phf = { version = "0.13.1", features = ["phf_macros"] }
@@ -40,7 +40,7 @@ pingora-boringssl = "0.6.0"
 pingora-core = { version = "0.6.0", features = ["boringssl"] }
 pingora-http = "0.6.0"
 pingora-proxy = "0.6.0"
-psl = "2.1.180"
+psl = "2.1.182"
 rustls = "0.23.36"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
@@ -60,7 +60,7 @@ integration_tests = []
 [dev-dependencies]
 ctor = "0.6.3"
 fslock = "0.2.1"
-nix = { version = "0.30.1", features = ["process", "signal", "term"] }
+nix = { version = "0.31.1", features = ["process", "signal", "term"] }
 pem = "3.0.6"
 rcgen = { version = "0.14.7", features = ["x509-parser"] }
 reqwest = { version = "0.13.1", default-features = false, features = ["http2", "rustls"] }
@@ -68,7 +68,7 @@ serial_test = "3.3.1"
 tempfile = "3.24.0"
 test-context = "0.5.4"
 test-log = { version = "0.2.19", features = ["trace"] }
-time = { version = "0.3.45", features = ["macros"] }
+time = { version = "0.3.46", features = ["macros"] }
 tokio = { version = "1.49.0", features = ["fs"] }
 wiremock = "0.6.5"
 

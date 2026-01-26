@@ -44,7 +44,7 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
             tls_settings.enable_h2();
 
-            let addr_port = format!("{}:{}", normalise_ip(&addr.to_string())?, context.config.listen.tls_port);
+            let addr_port = format!("{}:{}", ip_socket_str(&addr), context.config.listen.tls_port);
             pingora_proxy.add_tls_with_settings(&addr_port, None, tls_settings);
         }
         pingora_proxy
@@ -63,7 +63,7 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
         for addr in &addrs {
-            let addr_port = format!("{}:{}", normalise_ip(&addr.to_string())?, insecure_port);
+            let addr_port = format!("{}:{}", ip_socket_str(&addr), insecure_port);
             service.add_tcp(&addr_port);
         }
         pingora_server.add_service(service);
@@ -72,24 +72,6 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
     pingora_server.run(pingora_core::server::RunArgs::default());
 
     Ok(())
-}
-
-fn strip_brackets(before: &str) -> &str {
-    before.strip_prefix('[')
-        .and_then(|s| s.strip_suffix(']'))
-        .unwrap_or(before)
-}
-
-fn normalise_ip(before: &str) -> Result<String> {
-    let ip = strip_brackets(before)
-        .parse::<IpAddr>()?;
-
-    let ipstr = match ip {
-        IpAddr::V4(_) => ip.to_string(),
-        IpAddr::V6(_) => format!("[{ip}]"),
-    };
-
-    Ok(ipstr)
 }
 
 fn rewrite_port(host: &str, newport: &str) -> String {
@@ -112,5 +94,12 @@ fn strip_port(host_header: &str) -> &str {
         &host_header[0..i]
     } else {
         host_header
+    }
+}
+
+fn ip_socket_str(addr: &IpAddr) -> String {
+    match addr {
+        IpAddr::V4(_) => addr.to_string(),
+        IpAddr::V6(_) => format!("[{addr}]"),
     }
 }

@@ -133,18 +133,49 @@ fn test_get_if_addr() -> Result<()> {
 
 #[test]
 fn test_get_if_expansion() -> Result<()> {
-    
-
-    let ifname = "lo";
+    let addrs = vec!["if#lo".to_string()];
 
     let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
     let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
 
-    let addrs = get_if_addrs(ifname)?;
-    assert_eq!(2, addrs.len());
+    let ips = expand_listen_addrs(&addrs)?;
 
-    assert!(addrs.contains(&v4));
-    assert!(addrs.contains(&v6));
+    assert_eq!(2, ips.len());
+
+    assert!(ips.contains(&v4));
+    assert!(ips.contains(&v6));
 
     Ok(())
+}
+
+#[test]
+fn test_get_mixed_if_expansion() -> Result<()> {
+    let addrs = vec![
+        "if#lo".to_string(),
+        "10.1.1.1".to_string(),
+        "[fc00::1]".to_string(),
+    ];
+
+    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
+    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
+    let ten: IpAddr = Ipv4Addr::new(10,1,1,1).into();
+    let fc00: IpAddr = Ipv6Addr::new(0xfc00,0,0,0,0,0,0,1).into();
+
+    let ips = expand_listen_addrs(&addrs)?;
+    assert_eq!(4, ips.len());
+
+    assert!(ips.contains(&v4));
+    assert!(ips.contains(&v6));
+    assert!(ips.contains(&ten));
+    assert!(ips.contains(&fc00));
+
+    Ok(())
+}
+
+#[test]
+fn test_strip_brackets() {
+    assert_eq!("192.168.1.1", strip_brackets("192.168.1.1"));
+    assert_eq!("::1", strip_brackets("[::1]"));
+    assert_eq!("2001:db8::1", strip_brackets("[2001:db8::1]"));
+    assert_eq!("[invalid", strip_brackets("[invalid"));
 }

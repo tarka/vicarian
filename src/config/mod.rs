@@ -156,24 +156,7 @@ impl Listen {
 
     /// Resolve iface and hostname addresses
     pub fn addrs(&self) -> Result<Vec<IpAddr>> {
-        let addrs = self.addrs.iter()
-            .map(|addr_str| {
-                if let Some((pref, body)) = addr_str.split_once(':') {
-                    match pref {
-                        "iface" => get_if_addrs(body),
-                        _ => Err(anyhow!("Unexpected address prefix: {pref}"))
-                    }
-                } else {
-                    let addr = addr_str.parse()?;
-                    Ok(vec![addr])
-                }
-            })
-            .collect::<Result<Vec<Vec<IpAddr>>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
-
-        Ok(addrs)
+        expand_listen_addrs(&self.addrs)
     }
 
 }
@@ -219,6 +202,37 @@ impl Config {
         Ok(config)
     }
 
+}
+
+fn strip_brackets(before: &str) -> &str {
+    before.strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(before)
+}
+
+const SPECIAL_ADDRESS_DELIMITER: char = '#';
+const SPECIAL_ADDRESS_INTERFACE: &str = "if";
+
+fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<IpAddr>> {
+    let ips = addrs.iter()
+        .map(|addr_str| {
+            if let Some((pref, body)) = addr_str.split_once(SPECIAL_ADDRESS_DELIMITER) {
+                match pref {
+                    SPECIAL_ADDRESS_INTERFACE => get_if_addrs(body),
+                    _ => Err(anyhow!("Unexpected address prefix: {pref}"))
+                }
+            } else {
+                let addr = strip_brackets(addr_str);
+                let addr = addr.parse()?;
+                Ok(vec![addr])
+            }
+        })
+        .collect::<Result<Vec<Vec<IpAddr>>>>()?
+        .into_iter()
+        .flatten()
+        .collect();
+
+    Ok(ips)
 }
 
 #[allow(clippy::manual_map)]

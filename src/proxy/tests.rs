@@ -4,7 +4,7 @@ use test_log::test;
 
 use crate::{
     config::Backend,
-    proxy::{normalise_ip, rewrite_port, router::Router, strip_brackets, strip_port}
+    proxy::{rewrite_port, router::Router, strip_port}
 };
 
 #[test]
@@ -40,27 +40,6 @@ fn test_no_port_strip() -> Result<()> {
     let host_header = "example.com";
     let host = strip_port(host_header);
     assert_eq!("example.com", host);
-
-    Ok(())
-}
-
-#[test]
-fn test_strip_brackets() {
-    assert_eq!("192.168.1.1", strip_brackets("192.168.1.1"));
-    assert_eq!("::1", strip_brackets("[::1]"));
-    assert_eq!("2001:db8::1", strip_brackets("[2001:db8::1]"));
-    assert_eq!("[invalid", strip_brackets("[invalid"));
-}
-
-#[test]
-fn test_normalise_ip() -> Result<()> {
-    assert_eq!("192.168.1.1", normalise_ip("192.168.1.1")?);
-    assert_eq!("[::1]", normalise_ip("[::1]")?);
-    assert_eq!("[2001:db8::1]", normalise_ip("2001:db8::1")?);
-    assert_eq!("[2001:db8::1]", normalise_ip("[2001:db8::1]")?);
-
-    let result = normalise_ip("invalid");
-    assert!(result.is_err());
 
     Ok(())
 }

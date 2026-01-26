@@ -1,3 +1,5 @@
+use std::net::{Ipv4Addr, Ipv6Addr};
+
 use super::*;
 
 #[test]
@@ -108,6 +110,41 @@ fn test_extract_files() -> Result<()> {
     assert_eq!(Utf8PathBuf::from("/etc/ssl/certs/host01.example.com.key"), files.keyfile);
     assert_eq!(Utf8PathBuf::from("/etc/ssl/certs/host01.example.com.crt"), files.certfile);
     assert!(files.reload);
+
+    Ok(())
+}
+
+
+#[test]
+fn test_get_if_addr() -> Result<()> {
+    let ifname = "lo";
+
+    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
+    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
+
+    let addrs = get_if_addrs(ifname)?;
+    assert_eq!(2, addrs.len());
+
+    assert!(addrs.contains(&v4));
+    assert!(addrs.contains(&v6));
+
+    Ok(())
+}
+
+#[test]
+fn test_get_if_expansion() -> Result<()> {
+    
+
+    let ifname = "lo";
+
+    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
+    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
+
+    let addrs = get_if_addrs(ifname)?;
+    assert_eq!(2, addrs.len());
+
+    assert!(addrs.contains(&v4));
+    assert!(addrs.contains(&v6));
 
     Ok(())
 }

@@ -1,7 +1,9 @@
 #[cfg(test)]
 mod tests;
 
-use anyhow::{Context, Result};
+use std::net::IpAddr;
+
+use anyhow::{Context, Result, anyhow};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{ArgAction, Parser};
 use http::Uri;
@@ -145,9 +147,35 @@ pub struct Vhost {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Listen {
-    pub addrs: Vec<String>,
+    addrs: Vec<String>,
     pub insecure_port: Option<u16>,
     pub tls_port: u16,
+}
+
+impl Listen {
+
+    /// Resolve iface and hostname addresses
+    pub fn addrs(&self) -> Result<Vec<IpAddr>> {
+        let addrs = self.addrs.iter()
+            .map(|addr_str| {
+                if let Some((pref, body)) = addr_str.split_once(':') {
+                    match pref {
+                        "iface" => get_if_addrs(body),
+                        _ => Err(anyhow!("Unexpected address prefix: {pref}"))
+                    }
+                } else {
+                    let addr = addr_str.parse()?;
+                    Ok(vec![addr])
+                }
+            })
+            .collect::<Result<Vec<Vec<IpAddr>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        Ok(addrs)
+    }
+
 }
 
 impl Default for Listen {
@@ -191,4 +219,24 @@ impl Config {
         Ok(config)
     }
 
+}
+
+#[allow(clippy::manual_map)]
+fn get_if_addrs(ifname: &str) -> Result<Vec<IpAddr>> {
+    let addrs = nix::ifaddrs::getifaddrs()?;
+    let ifaddrs = addrs
+        .filter(|ifaddr| ifaddr.interface_name == ifname)
+        .filter_map(|ifaddr| ifaddr.address
+                    .and_then(|addr|
+                              if let Some(ip) = addr.as_sockaddr_in() {
+                                  Some(ip.ip().into())
+                              } else if let Some(ip) = addr.as_sockaddr_in6() {
+                                  Some(ip.ip().into())
+                              } else {
+                                  None
+                              }
+                    ))
+        .collect();
+
+    Ok(ifaddrs)
 }

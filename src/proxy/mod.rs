@@ -30,6 +30,8 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
 
     // TODO: Currently single-server; support vhosts here in the future?
 
+    let addrs = context.config.listen.addrs()?;
+
     let tls_proxy = {
         let vicarian = Vicarian::new(certstore.clone(), context.clone());
 
@@ -37,12 +39,12 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
             &pingora_server.configuration,
             vicarian);
 
-        for addr in &context.config.listen.addrs {
+        for addr in &addrs {
             let cert_handler = CertHandler::new(certstore.clone());
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
             tls_settings.enable_h2();
 
-            let addr_port = format!("{}:{}", normalise_ip(addr)?, context.config.listen.tls_port);
+            let addr_port = format!("{}:{}", normalise_ip(&addr.to_string())?, context.config.listen.tls_port);
             pingora_proxy.add_tls_with_settings(&addr_port, None, tls_settings);
         }
         pingora_proxy
@@ -60,8 +62,8 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
         let redirector = CleartextHandler::new(acme, context.config.listen.tls_port);
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
-        for addr in &context.config.listen.addrs {
-            let addr_port = format!("{}:{}", normalise_ip(addr)?, insecure_port);
+        for addr in &addrs {
+            let addr_port = format!("{}:{}", normalise_ip(&addr.to_string())?, insecure_port);
             service.add_tcp(&addr_port);
         }
         pingora_server.add_service(service);

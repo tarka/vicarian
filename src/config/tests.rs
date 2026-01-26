@@ -173,6 +173,42 @@ fn test_get_mixed_if_expansion() -> Result<()> {
 }
 
 #[test]
+fn test_collapse_dups() -> Result<()> {
+    let addrs = vec![
+        "if#lo".to_string(),
+        "10.1.1.1".to_string(),
+        "::1".to_string(),
+    ];
+
+    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
+    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
+    let ten: IpAddr = Ipv4Addr::new(10,1,1,1).into();
+
+    let ips = expand_listen_addrs(&addrs)?;
+    assert_eq!(3, ips.len());
+
+    assert!(ips.contains(&v4));
+    assert!(ips.contains(&v6));
+    assert!(ips.contains(&ten));
+
+    Ok(())
+}
+
+#[test]
+fn test_get_invalid_prefix() -> Result<()> {
+    let addrs = vec![
+        "if#lo".to_string(),
+        "10.1.1.1".to_string(),
+        "typo#eth0".to_string(),
+        "[fc00::1]".to_string(),
+    ];
+    let result = expand_listen_addrs(&addrs);
+    assert!(result.is_err());
+
+    Ok(())
+}
+
+#[test]
 fn test_strip_brackets() {
     assert_eq!("192.168.1.1", strip_brackets("192.168.1.1"));
     assert_eq!("::1", strip_brackets("[::1]"));

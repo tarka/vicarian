@@ -7,6 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{ArgAction, Parser};
 use http::Uri;
+use itertools::Itertools;
 use serde::{Deserialize, Deserializer};
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
@@ -230,6 +231,7 @@ fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<IpAddr>> {
         .collect::<Result<Vec<Vec<IpAddr>>>>()?
         .into_iter()
         .flatten()
+        .unique()
         .collect();
 
     Ok(ips)

@@ -1,5 +1,8 @@
 {
     listen = {
+        addrs = [
+            "if#lo"
+        ]
         insecure_port = 8080
         tls_port = 8443
     }

@@ -11,7 +11,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Deserializer};
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
-use tracing_log::log::info;
+use tracing_log::log::{info, warn};
 
 #[derive(Clone, Debug, Parser)]
 #[command(
@@ -247,7 +247,12 @@ fn get_if_addrs(ifname: &str) -> Result<Vec<IpAddr>> {
                               if let Some(ip) = addr.as_sockaddr_in() {
                                   Some(ip.ip().into())
                               } else if let Some(ip) = addr.as_sockaddr_in6() {
-                                  Some(ip.ip().into())
+                                  if ip.ip().is_unicast_link_local() {
+                                      warn!("Not using link-local address {ip} due to pingora limitations.");
+                                      None
+                                  } else {
+                                      Some(ip.ip().into())
+                                  }
                               } else {
                                   None
                               }

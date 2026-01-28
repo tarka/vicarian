@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/tarka/vicarian/compare/v0.2.0...v0.2.1) - 2026-01-28
+
+### <!-- 0 -->Features
+
+- Allow specifying listening on an interface with the "if#" prefix.
+
+### <!-- 1 -->Bug Fixes
+
+- Increase the FD limit on startup.
+
+### Other
+
+- We have to exclude link-local scoped addresses due to pingora only accepting strings for listening addresses, which breaks scoped addresses
+- More cleanups and testing for IF expansion.
+- Start of interface address expansion
+- Remove obsolete early dev test.
+- Bump dependencies.
+
 ## [0.2.0](https://github.com/tarka/vicarian/compare/v0.1.17...v0.2.0) - 2026-01-23
 
 ### <!-- 0 -->Features

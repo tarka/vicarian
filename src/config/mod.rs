@@ -8,7 +8,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use clap::{ArgAction, Parser};
 use http::Uri;
 use itertools::Itertools;
-use nix::{ifaddrs::InterfaceAddress, sys::socket::SockaddrStorage};
+use nix::sys::socket::SockaddrStorage;
 use serde::{Deserialize, Deserializer};
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
@@ -242,8 +242,10 @@ fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<SocketAddr>> {
                 }
             } else {
                 let addr = strip_brackets(addr_str);
-                let addr = addr.parse()?;
-                Ok(vec![addr])
+                let addr: IpAddr = addr.parse()
+                    .context(format!("Parsing listening address {addr_str}"))?;
+                let sock = SocketAddr::new(addr, 0);
+                Ok(vec![sock])
             }
         })
         .collect::<Result<Vec<Vec<SocketAddr>>>>()?

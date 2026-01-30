@@ -115,6 +115,20 @@ fn test_extract_files() -> Result<()> {
 }
 
 
+#[test]
+fn test_sockaddr_text_full_circle() -> Result<()> {
+    let ip6 = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
+    let sa6: SocketAddr = SocketAddrV6::new(ip6, 0, 0, 3).into();
+
+    let sa6_str = sa6.to_string();
+    assert_eq!(sa6_str, "[fe80::1%3]:0".to_string());
+
+    let sa6_parsed: SocketAddr = sa6_str.parse()?;
+    assert_eq!(sa6, sa6_parsed);
+
+    Ok(())
+}
+
 // #[test]
 // fn test_get_if_addr() -> Result<()> {
 //     let ifname = "lo";

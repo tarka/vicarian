@@ -3,7 +3,7 @@ mod services;
 #[cfg(test)]
 mod tests;
 
-use std::{net::IpAddr, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Result;
 use pingora_core::{
@@ -28,8 +28,6 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
     let mut pingora_server = PingoraServer::new(None)?;
     pingora_server.bootstrap();
 
-    // TODO: Currently single-server; support vhosts here in the future?
-
     let addrs = context.config.listen.addrs()?;
 
     let tls_proxy = {
@@ -44,8 +42,12 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
             tls_settings.enable_h2();
 
-            let addr_port = format!("{}:{}", ip_socket_str(&addr), context.config.listen.tls_port);
+            let mut addr_port = *addr;
+            addr_port.set_port(context.config.listen.tls_port);
+            let addr_port = addr_port.to_string();
+            info!("Binding to {addr_port}");
             pingora_proxy.add_tls_with_settings(&addr_port, None, tls_settings);
+
         }
         pingora_proxy
     };
@@ -63,7 +65,10 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
         for addr in &addrs {
-            let addr_port = format!("{}:{}", ip_socket_str(&addr), insecure_port);
+            let mut addr_port = *addr;
+            addr_port.set_port(insecure_port);
+            let addr_port = addr_port.to_string();
+            info!("Binding to {addr_port}");
             service.add_tcp(&addr_port);
         }
         pingora_server.add_service(service);
@@ -94,12 +99,5 @@ fn strip_port(host_header: &str) -> &str {
         &host_header[0..i]
     } else {
         host_header
-    }
-}
-
-fn ip_socket_str(addr: &IpAddr) -> String {
-    match addr {
-        IpAddr::V4(_) => addr.to_string(),
-        IpAddr::V6(_) => format!("[{addr}]"),
     }
 }

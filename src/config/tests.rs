@@ -1,4 +1,4 @@
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4};
 
 use super::*;
 
@@ -119,8 +119,8 @@ fn test_extract_files() -> Result<()> {
 fn test_get_if_addr() -> Result<()> {
     let ifname = "lo";
 
-    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
-    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
+    let v4: SocketAddr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0).into();
+    let v6: SocketAddr = SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0).into();
 
     let addrs = get_if_addrs(ifname)?;
     assert_eq!(2, addrs.len());
@@ -135,8 +135,8 @@ fn test_get_if_addr() -> Result<()> {
 fn test_get_if_expansion() -> Result<()> {
     let addrs = vec!["if#lo".to_string()];
 
-    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
-    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
+    let v4: SocketAddr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0).into();
+    let v6: SocketAddr = SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0).into();
 
     let ips = expand_listen_addrs(&addrs)?;
 
@@ -156,10 +156,10 @@ fn test_get_mixed_if_expansion() -> Result<()> {
         "[fc00::1]".to_string(),
     ];
 
-    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
-    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
-    let ten: IpAddr = Ipv4Addr::new(10,1,1,1).into();
-    let fc00: IpAddr = Ipv6Addr::new(0xfc00,0,0,0,0,0,0,1).into();
+    let v4: SocketAddr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0).into();
+    let v6: SocketAddr = SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0).into();
+    let ten: SocketAddr = SocketAddrV4::new(Ipv4Addr::new(10,1,1,1), 0).into();
+    let fc00: SocketAddr = SocketAddrV6::new( Ipv6Addr::new(0xfc00,0,0,0,0,0,0,1), 0, 0, 0).into();
 
     let ips = expand_listen_addrs(&addrs)?;
     assert_eq!(4, ips.len());
@@ -180,9 +180,9 @@ fn test_collapse_dups() -> Result<()> {
         "::1".to_string(),
     ];
 
-    let v4: IpAddr = Ipv4Addr::LOCALHOST.into();
-    let v6: IpAddr = Ipv6Addr::LOCALHOST.into();
-    let ten: IpAddr = Ipv4Addr::new(10,1,1,1).into();
+    let v4: SocketAddr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0).into();
+    let v6: SocketAddr = SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0).into();
+    let ten: SocketAddr = SocketAddrV4::new(Ipv4Addr::new(10,1,1,1), 0).into();
 
     let ips = expand_listen_addrs(&addrs)?;
     assert_eq!(3, ips.len());

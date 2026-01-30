@@ -40,6 +40,12 @@ pingora-boringssl = "0.6.0"
 pingora-core = { version = "0.6.0", features = ["boringssl"] }
 pingora-http = "0.6.0"
 pingora-proxy = "0.6.0"
+
+# pingora-boringssl = { path = "/home/ssmith/programming/pingora/pingora-boringssl/" }
+# pingora-core = { path = "/home/ssmith/programming/pingora/pingora-core", features = ["boringssl"] }
+# pingora-http = { path = "/home/ssmith/programming/pingora/pingora-http/" }
+# pingora-proxy = { path = "/home/ssmith/programming/pingora/pingora-proxy/" }
+
 psl = "2.1.182"
 rustls = "0.23.36"
 serde = { version = "1.0.228", features = ["derive"] }

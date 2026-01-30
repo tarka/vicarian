@@ -257,7 +257,6 @@ fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<SocketAddr>> {
     Ok(ips)
 }
 
-#[allow(clippy::manual_map)]
 fn get_if_addrs(ifname: &str) -> Result<Vec<SocketAddr>> {
     let addrs = nix::ifaddrs::getifaddrs()?;
     let ifaddrs = addrs

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/tarka/vicarian/compare/v0.2.0...v0.2.1) - 2026-01-30
+
+### <!-- 0 -->Features
+
+- Allow specifying listening on an interface with the "if#" prefix.
+
+### <!-- 1 -->Bug Fixes
+
+- Increase the FD limit on startup.
+
+### Other
+
+- Add docs and examples for interface listener
+- Merge branch 'sockaddr-interface'
+- Remove obsolete clippy directive.
+- Convert to using SocketAddr internally to preserve IPv6 link-local scope-ids
+- Add ipv6 text conversion test.
+- Working versin with SockAddr propogation.
+- Convert to modified sockaddr pingora version
+- Link to local pingora master.
+- More cleanups and testing for IF expansion.
+- Start of interface address expansion
+- Remove obsolete early dev test.
+- Bump dependencies.
+
 ## [0.2.0](https://github.com/tarka/vicarian/compare/v0.1.17...v0.2.0) - 2026-01-23
 
 ### <!-- 0 -->Features

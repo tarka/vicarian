@@ -53,7 +53,7 @@ platforms is welcome.
   [EnvironmentFile](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
   and [corn](https://cornlang.dev) environment injection (see
   [vicarian-dns01.corn](examples/vicarian-dns01.corn) for an example).
-- Wildcard ACME certificate generation.
+- **Wildcards**: Wildcard ACME certificate generation.
 
 ### To-dos
 

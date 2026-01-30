@@ -33,7 +33,7 @@
                     // A service that does not allow a custom root/context,
                     // so we must place at root.
                     context = "/"
-                    url = "http://localhost:8443"
+                    url = "https://localhost:8443"
                     // This service enforces TLS with a self-signed cert, so
                     // we need to disable certificate verification.
                     trust = true

@@ -52,7 +52,8 @@ A minimal Vicarian configuration file would look something like this:
 - **Optional**: Yes (uses default values if not specified)
 - **Description**: Network listening configuration for the proxy.
 - **Fields**:
-  - addrs: The IP addresses to bind the server to (default: `"[::]"`)
+  - addrs: The IP addresses to bind the server to (default: `"[::]"`), or
+    interface name(s) prefixed with `if#`; e.g. `"if#eth0"`.
   - insecure_port: The HTTP port to listen on (default: 80)
   - tls_port: The HTTPS port to listen on (default: 443)
 

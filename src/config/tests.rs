@@ -80,6 +80,25 @@ fn test_wildcard_example_config() -> Result<()> {
 }
 
 #[test]
+fn test_tls_example_interface() -> Result<()> {
+    let file = Utf8PathBuf::from("examples/vicarian-listen-interface.corn");
+    let config = Config::from_file(&file)?;
+    assert_eq!("files.example.com", config.vhosts[0].hostname);
+
+    assert_eq!(443, config.listen.tls_port);
+    assert!(matches!(&config.vhosts[0].tls, TlsConfig::Files(
+        TlsFilesConfig {
+            keyfile: _,  // FIXME: Match Utf8PathBuf?
+            certfile: _,
+            reload: true,
+        })));
+
+    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap());
+
+    Ok(())
+}
+
+#[test]
 fn test_no_optionals() -> Result<()> {
     let file = Utf8PathBuf::from("tests/data/config/no-optionals.corn");
     let config = Config::from_file(&file)?;

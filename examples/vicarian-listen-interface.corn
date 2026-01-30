@@ -1,0 +1,30 @@
+
+{
+    listen = {
+        addrs = [
+            // We can listen on interfaces using the `if#` prefix:
+            "if#lo"
+            "if#eth0"
+        ]
+    }
+
+    vhosts = [
+        {
+            hostname = "files.example.com"
+            tls = {
+                files = {
+                    keyfile = "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+                    certfile = "/etc/ssl/private/ssl-cert-snakeoil.key"
+                    reload = true
+                }
+            }
+
+            backends = [
+                {
+                    context = "/"
+                    url = "http://localhost:9090"
+                }
+            ]
+        }
+    ]
+}

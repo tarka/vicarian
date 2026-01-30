@@ -3,7 +3,7 @@ mod services;
 #[cfg(test)]
 mod tests;
 
-use std::{net::IpAddr, sync::Arc};
+use std::{net::{IpAddr, SocketAddr, SocketAddrV6}, sync::Arc};
 
 use anyhow::Result;
 use pingora_core::{
@@ -45,8 +45,11 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
             tls_settings.enable_h2();
 
             //let addr_port = format!("{}:{}", ip_socket_str(&addr), context.config.listen.tls_port);
-            let addr_port = (addr.clone(), context.config.listen.tls_port);
+            let mut addr_port = addr.clone();
+            addr_port.set_port(context.config.listen.tls_port);
+            println!("ADDR: {addr_port:?}");
             pingora_proxy.add_tls_with_settings(&addr_port, None, tls_settings);
+
         }
         pingora_proxy
     };
@@ -63,10 +66,11 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
         let redirector = CleartextHandler::new(acme, context.config.listen.tls_port);
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
-        for addr in addrs {
+        for addr in &addrs {
             //let addr_port = format!("{}:{}", ip_socket_str(&addr), insecure_port);
-            let addr_port = (addr, insecure_port);
-            service.add_tcp(&addr_port);
+            let mut addr_port = *addr;
+            addr_port.set_port(insecure_port);
+            service.add_tcp(&addr);
         }
         pingora_server.add_service(service);
     };
@@ -98,10 +102,3 @@ fn strip_port(host_header: &str) -> &str {
         host_header
     }
 }
-
-// fn ip_socket_str(addr: &IpAddr) -> String {
-//     match addr {
-//         IpAddr::V4(_) => addr.to_string(),
-//         IpAddr::V6(_) => format!("[{addr}]"),
-//     }
-// }

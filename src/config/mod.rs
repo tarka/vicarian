@@ -1,13 +1,14 @@
 #[cfg(test)]
 mod tests;
 
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr, SocketAddrV6};
 
 use anyhow::{Context, Result, anyhow};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{ArgAction, Parser};
 use http::Uri;
 use itertools::Itertools;
+use nix::{ifaddrs::InterfaceAddress, sys::socket::SockaddrStorage};
 use serde::{Deserialize, Deserializer};
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
@@ -156,7 +157,7 @@ pub struct Listen {
 impl Listen {
 
     /// Resolve iface and hostname addresses
-    pub fn addrs(&self) -> Result<Vec<IpAddr>> {
+    pub fn addrs(&self) -> Result<Vec<SocketAddr>> {
         expand_listen_addrs(&self.addrs)
     }
 
@@ -214,7 +215,24 @@ fn strip_brackets(before: &str) -> &str {
 const SPECIAL_ADDRESS_DELIMITER: char = '#';
 const SPECIAL_ADDRESS_INTERFACE: &str = "if";
 
-fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<IpAddr>> {
+fn to_sockaddr(addr: Option<SockaddrStorage>) -> Option<SocketAddr> {
+    let in_addr = addr?;
+    if let Some(sai) = in_addr.as_sockaddr_in() {
+        Some(SocketAddr::new(sai.ip().into(), 0))
+
+    } else if let Some(sai6) = in_addr.as_sockaddr_in6() {
+        let ip6 = SocketAddrV6::new(sai6.ip().into(), 0,
+                                    sai6.flowinfo(),
+                                    sai6.scope_id());
+        Some(ip6.into())
+
+    } else {
+        None
+    }
+}
+
+
+fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<SocketAddr>> {
     let ips = addrs.iter()
         .map(|addr_str| {
             if let Some((pref, body)) = addr_str.split_once(SPECIAL_ADDRESS_DELIMITER) {
@@ -228,7 +246,7 @@ fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<IpAddr>> {
                 Ok(vec![addr])
             }
         })
-        .collect::<Result<Vec<Vec<IpAddr>>>>()?
+        .collect::<Result<Vec<Vec<SocketAddr>>>>()?
         .into_iter()
         .flatten()
         .unique()
@@ -238,20 +256,11 @@ fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<IpAddr>> {
 }
 
 #[allow(clippy::manual_map)]
-fn get_if_addrs(ifname: &str) -> Result<Vec<IpAddr>> {
+fn get_if_addrs(ifname: &str) -> Result<Vec<SocketAddr>> {
     let addrs = nix::ifaddrs::getifaddrs()?;
     let ifaddrs = addrs
         .filter(|ifaddr| ifaddr.interface_name == ifname)
-        .filter_map(|ifaddr| ifaddr.address
-                    .and_then(|addr|
-                              if let Some(ip) = addr.as_sockaddr_in() {
-                                  Some(ip.ip().into())
-                              } else if let Some(ip) = addr.as_sockaddr_in6() {
-                                  Some(ip.ip().into())
-                              } else {
-                                  None
-                              }
-                    ))
+        .filter_map(|ifaddr| to_sockaddr(ifaddr.address))
         .collect();
 
     Ok(ifaddrs)

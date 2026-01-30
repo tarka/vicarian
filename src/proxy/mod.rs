@@ -44,7 +44,8 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
             tls_settings.enable_h2();
 
-            let addr_port = format!("{}:{}", ip_socket_str(&addr), context.config.listen.tls_port);
+            //let addr_port = format!("{}:{}", ip_socket_str(&addr), context.config.listen.tls_port);
+            let addr_port = (addr.clone(), context.config.listen.tls_port);
             pingora_proxy.add_tls_with_settings(&addr_port, None, tls_settings);
         }
         pingora_proxy
@@ -62,8 +63,9 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
         let redirector = CleartextHandler::new(acme, context.config.listen.tls_port);
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
-        for addr in &addrs {
-            let addr_port = format!("{}:{}", ip_socket_str(&addr), insecure_port);
+        for addr in addrs {
+            //let addr_port = format!("{}:{}", ip_socket_str(&addr), insecure_port);
+            let addr_port = (addr, insecure_port);
             service.add_tcp(&addr_port);
         }
         pingora_server.add_service(service);
@@ -97,9 +99,9 @@ fn strip_port(host_header: &str) -> &str {
     }
 }
 
-fn ip_socket_str(addr: &IpAddr) -> String {
-    match addr {
-        IpAddr::V4(_) => addr.to_string(),
-        IpAddr::V6(_) => format!("[{addr}]"),
-    }
-}
+// fn ip_socket_str(addr: &IpAddr) -> String {
+//     match addr {
+//         IpAddr::V4(_) => addr.to_string(),
+//         IpAddr::V6(_) => format!("[{addr}]"),
+//     }
+// }

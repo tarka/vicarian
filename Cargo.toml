@@ -29,7 +29,7 @@ instant-acme = { version = "0.8.4", features = ["time"] }
 
 itertools = "0.14.0"
 libcorn = "0.10.1"
-nix = { version = "0.31.1", features = ["net", "resource"] }
+nix = { path = "/home/ssmith/programming/nix-rust/", features = ["net", "resource"] }
 notify = { version = "8.2.0", features = ["crossbeam-channel"] }
 notify-debouncer-full = { version = "0.7.0", features = ["crossbeam-channel"] }
 papaya = "0.2.3"
@@ -60,7 +60,7 @@ integration_tests = []
 [dev-dependencies]
 ctor = "0.6.3"
 fslock = "0.2.1"
-nix = { version = "0.31.1", features = ["process", "signal", "term"] }
+nix = { path = "/home/ssmith/programming/nix-rust/", features = ["process", "signal", "term"] }
 pem = "3.0.6"
 rcgen = { version = "0.14.7", features = ["x509-parser"] }
 reqwest = { version = "0.13.1", default-features = false, features = ["http2", "rustls"] }

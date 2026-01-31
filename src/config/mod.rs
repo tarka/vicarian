@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::net::{IpAddr, SocketAddr, SocketAddrV6};
+use std::net::{IpAddr, SocketAddr, SocketAddrV6, ToSocketAddrs};
 
 use anyhow::{Context, Result, anyhow};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -215,23 +215,6 @@ fn strip_brackets(before: &str) -> &str {
 const SPECIAL_ADDRESS_DELIMITER: char = '#';
 const SPECIAL_ADDRESS_INTERFACE: &str = "if";
 
-fn to_sockaddr(addr: Option<SockaddrStorage>) -> Option<SocketAddr> {
-    let in_addr = addr?;
-    if let Some(sai) = in_addr.as_sockaddr_in() {
-        Some(SocketAddr::new(sai.ip().into(), 0))
-
-    } else if let Some(sai6) = in_addr.as_sockaddr_in6() {
-        let ip6 = SocketAddrV6::new(sai6.ip().into(), 0,
-                                    sai6.flowinfo(),
-                                    sai6.scope_id());
-        Some(ip6.into())
-
-    } else {
-        None
-    }
-}
-
-
 fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<SocketAddr>> {
     let ips = addrs.iter()
         .map(|addr_str| {
@@ -262,7 +245,9 @@ fn get_if_addrs(ifname: &str) -> Result<Vec<SocketAddr>> {
     let addrs = nix::ifaddrs::getifaddrs()?;
     let ifaddrs = addrs
         .filter(|ifaddr| ifaddr.interface_name == ifname)
-        .filter_map(|ifaddr| to_sockaddr(ifaddr.address))
+        .filter_map(|ifaddr| ifaddr.address
+                    .and_then(|addr| addr.to_socket_addrs().ok()
+                              .and_then(|mut addr| addr.next())))
         .collect();
 
     Ok(ifaddrs)

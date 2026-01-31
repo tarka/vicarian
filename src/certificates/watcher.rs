@@ -59,7 +59,7 @@ impl CertWatcher {
                 events = self.ev_rx.recv() => {
                     match events {
                         Some(Err(errs)) => warn!("Received errors from cert watcher: {errs:#?}"),
-                        Some(Ok(evs)) => self.process_events(evs)?,
+                        Some(Ok(evs)) => self.process_events(evs).await?,
                         None => {
                             warn!("Notify watcher channel closed; quitting");
                             break;
@@ -76,7 +76,7 @@ impl CertWatcher {
         Ok(())
     }
 
-    fn process_events(&self, events: Vec<DebouncedEvent>) -> Result<()> {
+    async fn process_events(&self, events: Vec<DebouncedEvent>) -> Result<()> {
         info!("Processing {} files update events", events.len());
         let paths = events.into_iter()
             .filter(|dev| matches!(dev.event.kind,
@@ -93,51 +93,49 @@ impl CertWatcher {
             })
             .collect::<Result<Vec<Utf8PathBuf>>>()?;
 
-        self.process_paths(paths)?;
+        self.process_paths(paths).await?;
 
         Ok(())
     }
 
-    fn process_paths(&self, paths: Vec<Utf8PathBuf>) -> Result<()> {
+    async fn process_paths(&self, paths: Vec<Utf8PathBuf>) -> Result<()> {
         debug!("Processing updated paths: {paths:#?}");
-        let certs = paths.iter()
+        let existing = paths.into_iter()
             .map(|path| {
-                let cert = self.certstore.by_file(path)
+                let cert = self.certstore.by_file(&path)
                  .ok_or(anyhow!("Path not found in store: {path}"))?
                     .clone();
                 Ok(cert)
             })
             // 2-pass as .unique() doesn't work with Results
             .collect::<Result<Vec<Arc<HostCertificate>>>>()?
-            .iter()
+            .into_iter()
             .unique()
-            .filter_map(|existing| {
-                // Attempt to reload the relevant HostCertificate.
-                // However as errors can be expected while the certs
-                // are being replaced externally we just warn and pass
-                // for now.
-                match HostCertificate::from(existing) {
-                    Ok(hc) => Some(Ok(Arc::new(hc))),
-                    Err(err) => {
-                        if err.is::<VicarianError>() {
-                            let perr = err.downcast::<VicarianError>()
+            .collect::<Vec<Arc<HostCertificate>>>();
+
+        for old in existing {
+            // Attempt to reload the relevant HostCertificate.
+            // However as errors can be expected while the certs
+            // are being replaced externally we just warn and pass
+            // for now.
+            match HostCertificate::from(&old).await {
+                Ok(hc) => {
+                    self.certstore.update(Arc::new(hc))?;
+                }
+                Err(err) => {
+                    if err.is::<VicarianError>() {
+                        let perr = err.downcast::<VicarianError>()
                                 .expect("Error downcasting VicarianError after check; this shouldn't happen");
                             if matches!(perr, VicarianError::CertificateMismatch(_, _)) {
                                 warn!("Possible error on reload: {perr}. This may be transient.");
-                                None
                             } else {
-                                Some(Err(perr.into()))
+                                return Err(perr.into())
                             }
                         } else {
-                            Some(Err(err))
+                            return Err(err)
                         }
                     },
-                }
-            })
-            .collect::<Result<Vec<Arc<HostCertificate>>>>()?;
-
-        for cert in certs {
-            self.certstore.update(cert)?;
+            }
         }
 
         Ok(())

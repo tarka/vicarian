@@ -81,7 +81,9 @@ fn main() -> Result<()> {
 
     let context = Arc::new(RunContext::new(config));
 
-    let ext_provider = ExternalProvider::new(context.clone())?;
+    let ext_provider = futures::executor::block_on(
+        ExternalProvider::new(context.clone())
+    )?;
 
     // Alternatively have ExternalProvider inject certs ala acme?
     let certs = ext_provider.read_certs();

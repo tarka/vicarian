@@ -4,6 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use camino::Utf8PathBuf;
 use chrono::{DateTime, Local, TimeDelta, Utc};
 use dnsclient::{UpstreamServer, r#async::DNSClient};
+use futures::{stream, StreamExt, TryStreamExt};
 use instant_acme::{
     Account, AccountCredentials, AuthorizationStatus, ChallengeHandle, ChallengeType, Identifier,
     LetsEncrypt, NewOrder, OrderStatus, RetryPolicy,
@@ -181,10 +182,23 @@ impl AcmeRuntime {
 
         info!("Starting ACME runtime");
 
+        // let existing = self.acme_hosts.iter()
+        //     .filter(|ah| ah.keyfile.exists() && ah.certfile.exists())
+        //     .map(|ah| Ok(Arc::new(HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false)?)))
+        //     .collect::<Result<Vec<Arc<HostCertificate>>>>()?;
+
+
         let existing = self.acme_hosts.iter()
-            .filter(|ah| ah.keyfile.exists() && ah.certfile.exists())
-            .map(|ah| Ok(Arc::new(HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false)?)))
-            .collect::<Result<Vec<Arc<HostCertificate>>>>()?;
+            .filter(|ah| ah.keyfile.exists() && ah.certfile.exists());
+        let existing = stream::iter(existing)
+            .then(|ah| async move {
+                info!("Loading certs from {}, {}", ah.keyfile, ah.certfile);
+                let hc = HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false).await?;
+                Ok(Arc::new(hc))
+            })
+            .collect::<Vec<Result<Arc<HostCertificate>>>>().await
+            .into_iter().collect::<Result<Vec<Arc<HostCertificate>>>>()?;
+
 
         // Initial load of existing certs. NOTE: This is slightly hacky
         // as we're possibly loading expired certs only to immediately
@@ -263,7 +277,10 @@ impl AcmeRuntime {
         fs::write(&acme_host.certfile, pem_certificate.cert_chain.as_bytes()).await?;
 
         info!("Loading new certificate");
-        let hc = Arc::new(HostCertificate::new(acme_host.keyfile.clone(), acme_host.certfile.clone(), false)?);
+        let hc = {
+            let hc = HostCertificate::new(acme_host.keyfile.clone(), acme_host.certfile.clone(), false).await?;
+            Arc::new(hc)
+        };
         self.certstore.upsert(hc.clone())?;
 
         Ok(hc)

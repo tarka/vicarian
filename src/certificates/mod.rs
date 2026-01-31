@@ -7,7 +7,6 @@ pub mod watcher;
 mod tests;
 
 use std::{
-    fs,
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -51,8 +50,8 @@ impl HostCertificate {
     /// performed, and Error::CertificateMismatch may be returned; as
     /// this may be expected (e.g. while certs are being updated) it
     /// should be checked for if necessary.
-    pub fn new(keyfile: Utf8PathBuf, certfile: Utf8PathBuf, watch: bool) -> Result<Self> {
-        let (key, certs) = load_certs(&keyfile, &certfile)?;
+    pub async fn new(keyfile: Utf8PathBuf, certfile: Utf8PathBuf, watch: bool) -> Result<Self> {
+        let (key, certs) = load_certs(&keyfile, &certfile).await?;
 
         let subject_p = certs[0].subject_name().entries().next()
             .and_then(|e| e.data().as_utf8().ok())
@@ -86,8 +85,8 @@ impl HostCertificate {
 
     /// Generates a fresh certificate from an existing one. This is
     /// effectively a reload.
-    pub fn from(hc: &Arc<HostCertificate>) -> Result<HostCertificate> {
-        HostCertificate::new(hc.keyfile.clone(), hc.certfile.clone(), hc.watch)
+    pub async fn from(hc: &Arc<HostCertificate>) -> Result<HostCertificate> {
+        HostCertificate::new(hc.keyfile.clone(), hc.certfile.clone(), hc.watch).await
     }
 
     pub fn expires_in_secs(&self) -> i64 {
@@ -131,10 +130,10 @@ impl Hash for HostCertificate {
     }
 }
 
-fn load_certs(keyfile: &Utf8Path, certfile: &Utf8Path) -> Result<(PKey<Private>, Vec<X509>)> {
-    let kdata = fs::read(keyfile)
+async fn load_certs(keyfile: &Utf8Path, certfile: &Utf8Path) -> Result<(PKey<Private>, Vec<X509>)> {
+    let kdata = tokio::fs::read(keyfile).await
         .context("Failed to load keyfile {keyfile}")?;
-    let cdata = fs::read(certfile)
+    let cdata = tokio::fs::read(certfile).await
         .context("Failed to load certfile {certfile}")?;
 
     let key = PKey::private_key_from_pem(&kdata)?;

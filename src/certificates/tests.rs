@@ -52,16 +52,17 @@ impl TestHostCerts {
 static TEST_HOST_CERTS: LazyLock<TestHostCerts> = LazyLock::new(|| TestHostCerts::new().unwrap());
 
 fn from_localcert(lc: &LocalCert, watch: bool) -> Result<Arc<HostCertificate>> {
-    let hc = HostCertificate::new(lc.keyfile.clone(),
-                                  lc.certfile.clone(),
-                                  watch)?;
+    let hc = futures::executor::block_on(
+        HostCertificate::new(lc.keyfile.clone(),
+                             lc.certfile.clone(),
+                             watch))?;
     Ok(Arc::new(hc))
 }
 
-#[test]
-fn test_load_certs_valid_pair() -> Result<()> {
+#[tokio::test]
+async fn test_load_certs_valid_pair() -> Result<()> {
     let so = &TEST_HOST_CERTS.snakeoil_1;
-    let result = load_certs(&so.keyfile, &so.certfile);
+    let result = load_certs(&so.keyfile, &so.certfile).await;
     assert!(result.is_ok());
 
     let (key, certs) = result.unwrap();
@@ -73,14 +74,14 @@ fn test_load_certs_valid_pair() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_load_certs_invalid_pair() -> Result<()> {
+#[tokio::test]
+async fn test_load_certs_invalid_pair() -> Result<()> {
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
     let so2 = TEST_HOST_CERTS.snakeoil_2.clone();
     let key_path = &so1.keyfile;
     let other_cert_path = &so2.certfile;
 
-    let result = load_certs(key_path, other_cert_path);
+    let result = load_certs(key_path, other_cert_path).await;
     assert!(result.is_err());
     let err: VicarianError = result.unwrap_err().downcast()?;
     assert!(matches!(err, VicarianError::CertificateMismatch(_, _)));
@@ -88,24 +89,24 @@ fn test_load_certs_invalid_pair() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_load_certs_nonexistent_files() {
+#[tokio::test]
+async fn test_load_certs_nonexistent_files() {
     let key_path = Utf8Path::new("nonexistent.key");
     let cert_path = Utf8Path::new("nonexistent.crt");
 
-    let result = load_certs(key_path, cert_path);
+    let result = load_certs(key_path, cert_path).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_load_certs_empty_cert_file() -> Result<()> {
+#[tokio::test]
+async fn test_load_certs_empty_cert_file() -> Result<()> {
     let mut empty_cert_file = NamedTempFile::new()?;
     empty_cert_file.write_all(b"")?;
     let empty_cert_path = Utf8PathBuf::from(empty_cert_file.path().to_str().unwrap());
 
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
 
-    let result = load_certs(&so1.keyfile, &empty_cert_path);
+    let result = load_certs(&so1.keyfile, &empty_cert_path).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("No certificates found in TLS .crt file"));
 
@@ -126,7 +127,7 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     tokio::fs::copy(&so1.keyfile, &key_path).await?;
     tokio::fs::copy(&so1.certfile, &cert_path).await?;
 
-    let hc = Arc::new(HostCertificate::new(key_path.clone(), cert_path.clone(), true)?);
+    let hc = Arc::new(HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?);
     let certs = vec![hc.clone()];
     let store = Arc::new(CertStore::new(certs, context.clone())?);
     let original_host = hc.hostnames[0].clone();
@@ -166,8 +167,8 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_by_host() {
+#[tokio::test]
+async fn test_by_host() {
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
     let certs = vec![cert.clone()];
     let context = Arc::new(RunContext::new(Config::default()));
@@ -177,8 +178,8 @@ fn test_by_host() {
     assert_eq!(found, cert);
 }
 
-#[test]
-fn test_by_file() {
+#[tokio::test]
+async fn test_by_file() {
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
     let certs = vec![cert.clone()];
     let context = Arc::new(RunContext::new(Config::default()));
@@ -188,8 +189,8 @@ fn test_by_file() {
     assert_eq!(found, cert);
 }
 
-#[test]
-fn test_watchlist() -> Result<()> {
+#[tokio::test]
+async fn test_watchlist() -> Result<()> {
     let hc1 = TEST_HOST_CERTS.snakeoil_1.clone();
     let hc2 = TEST_HOST_CERTS.www_example.clone();
 
@@ -204,8 +205,8 @@ fn test_watchlist() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_file_update_success() -> Result<()> {
+#[tokio::test]
+async fn test_file_update_success() -> Result<()> {
 
     let temp_dir = tempdir()?;
     let key_path = temp_dir.path().join("test.key");
@@ -228,7 +229,7 @@ fn test_file_update_success() -> Result<()> {
     let cert = TEST_HOST_CERTS.snakeoil_2.clone();
     fs::copy(&cert.keyfile, &key_path)?;
     fs::copy(&cert.certfile, &cert_path)?;
-    let newcert = Arc::new(HostCertificate::from(&first_cert)?);
+    let newcert = Arc::new(HostCertificate::from(&first_cert).await?);
 
     store.update(newcert)?;
 
@@ -236,7 +237,7 @@ fn test_file_update_success() -> Result<()> {
         Utf8PathBuf::from_path_buf(key_path).unwrap(),
         Utf8PathBuf::from_path_buf(cert_path).unwrap(),
         true
-    )?;
+    ).await?;
     let new_host = updated_cert_from_file.hostnames[0].clone();
 
     // The store should have updated the certificate.
@@ -301,8 +302,8 @@ fn test_to_txt_name() {
 
 }
 
-#[test]
-fn test_wildcard() -> Result<()> {
+#[tokio::test]
+async fn test_wildcard() -> Result<()> {
     let wildcard = TEST_HOST_CERTS.wildcard_example.clone();
 
     assert!(wildcard.hostnames.contains(&"*.example.com".to_string()));

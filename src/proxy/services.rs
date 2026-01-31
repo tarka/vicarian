@@ -269,10 +269,10 @@ impl ProxyHttp for Vicarian {
         Ok(())
     }
 
-    fn upstream_response_filter(&self, session: &mut Session,
-                                upstream_response: &mut ResponseHeader,
-                                _ctx: &mut Self::CTX)
-                                -> pingora_core::Result<()>
+    async fn upstream_response_filter(&self, session: &mut Session,
+                                      upstream_response: &mut ResponseHeader,
+                                      _ctx: &mut Self::CTX)
+                                      -> pingora_core::Result<()>
     {
         let components = to_components(session)?;
 

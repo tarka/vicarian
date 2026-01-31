@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use camino::Utf8PathBuf;
 use chrono::{DateTime, Local, TimeDelta, Utc};
 use dnsclient::{UpstreamServer, r#async::DNSClient};
-use futures::{stream, StreamExt, TryStreamExt};
+use futures_lite::{stream, StreamExt};
 use instant_acme::{
     Account, AccountCredentials, AuthorizationStatus, ChallengeHandle, ChallengeType, Identifier,
     LetsEncrypt, NewOrder, OrderStatus, RetryPolicy,
@@ -181,16 +181,8 @@ impl AcmeRuntime {
         }
 
         info!("Starting ACME runtime");
-
-        // let existing = self.acme_hosts.iter()
-        //     .filter(|ah| ah.keyfile.exists() && ah.certfile.exists())
-        //     .map(|ah| Ok(Arc::new(HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false)?)))
-        //     .collect::<Result<Vec<Arc<HostCertificate>>>>()?;
-
-
-        let existing = self.acme_hosts.iter()
-            .filter(|ah| ah.keyfile.exists() && ah.certfile.exists());
-        let existing = stream::iter(existing)
+        let existing = stream::iter(self.acme_hosts.iter())
+            .filter(|ah| ah.keyfile.exists() && ah.certfile.exists())
             .then(|ah| async move {
                 info!("Loading certs from {}, {}", ah.keyfile, ah.certfile);
                 let hc = HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false).await?;

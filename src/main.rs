@@ -81,12 +81,17 @@ fn main() -> Result<()> {
 
     let context = Arc::new(RunContext::new(config));
 
-    let ext_provider = futures::executor::block_on(
-        ExternalProvider::new(context.clone())
-    )?;
-
+    // Temporary runtime to load certs.
     // Alternatively have ExternalProvider inject certs ala acme?
+    let ext_provider = tokio::runtime::Builder::new_multi_thread()
+        .enable_time()
+        .enable_io()
+        .build()?
+        .block_on(
+            ExternalProvider::new(context.clone())
+        )?;
     let certs = ext_provider.read_certs();
+
     let certstore = Arc::new(CertStore::new(certs, context.clone())?);
 
     let acme = Arc::new(AcmeRuntime::new(certstore.clone(), context.clone())?);

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/tarka/vicarian/compare/v0.2.1...v0.2.2) - 2026-02-01
+
+### Other
+
+- Update comments and make certificate runtime single-threaded.
+- Big refactor to move all certificate-related processing under a common runtime
+- Tweaks and cleanups before futher refactoring.
+- Intial cut of async host certs (and many knock-on effects)
+- Update to Pingora 0.7.0
+- Remove old test dependencies from cargo
+
 ## [0.2.1](https://github.com/tarka/vicarian/compare/v0.2.0...v0.2.1) - 2026-01-30
 
 ### <!-- 0 -->Features

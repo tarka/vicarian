@@ -14,7 +14,7 @@ use tracing::level_filters::LevelFilter;
 use tracing_log::log::info;
 
 use crate::{
-    certificates::{acme::AcmeRuntime, external::ExternalProvider, store::CertStore},
+    certificates::CertificateRuntime,
     config::{Config, DEFAULT_CONFIG_FILE},
 };
 
@@ -61,6 +61,9 @@ fn system_setup() -> Result<()> {
     info!("Increasing NOFILE to {hard}");
     setrlimit(Resource::RLIMIT_NOFILE, hard, hard)?;
 
+    rustls::crypto::aws_lc_rs::default_provider().install_default()
+        .expect("Failed to install Rustls crypto provider");
+
     Ok(())
 }
 
@@ -76,42 +79,23 @@ fn main() -> Result<()> {
         .unwrap_or(Utf8PathBuf::from(DEFAULT_CONFIG_FILE));
     let config = Config::from_file(&config_file)?;
 
-    rustls::crypto::aws_lc_rs::default_provider().install_default()
-        .expect("Failed to install Rustls crypto provider");
-
     let context = Arc::new(RunContext::new(config));
-
-    // Temporary runtime to load certs.
-    // Alternatively have ExternalProvider inject certs ala acme?
-    let ext_provider = tokio::runtime::Builder::new_multi_thread()
-        .enable_time()
-        .enable_io()
-        .build()?
-        .block_on(
-            ExternalProvider::new(context.clone())
-        )?;
-    let certs = ext_provider.read_certs();
-
-    let certstore = Arc::new(CertStore::new(certs, context.clone())?);
-
-    let acme = Arc::new(AcmeRuntime::new(certstore.clone(), context.clone())?);
 
     ///// Runtime start
 
+    let cert_runtime = Arc::new(CertificateRuntime::new(context.clone())?);
     let cert_handle = {
-        let certstore = certstore.clone();
-        let context = context.clone();
-        let acme = acme.clone();
+        let crt = cert_runtime.clone();
 
         thread::spawn(move || -> Result<()> {
             info!("Starting Certificate Management runtime");
-            let cert_runtime = tokio::runtime::Builder::new_multi_thread()
+            let trt = tokio::runtime::Builder::new_multi_thread()
                 .enable_time()
                 .enable_io()
                 .build()?;
 
-            cert_runtime.block_on(
-                certificates::run_indefinitely(certstore, acme, context)
+            trt.block_on(
+                crt.run_indefinitely()
             )?;
 
             Ok(())
@@ -119,7 +103,7 @@ fn main() -> Result<()> {
     };
 
     info!("Starting Vicarian");
-    proxy::run_indefinitely(certstore, acme, context.clone())?;
+    proxy::run_indefinitely(cert_runtime.clone(), context.clone())?;
 
     context.quit()?;
     cert_handle.join()

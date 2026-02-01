@@ -16,9 +16,12 @@ use test_log::test;
 use tracing_log::log::info;
 
 use crate::{
-    RunContext, certificates::{
-        HostCertificate, acme::to_txt_name, asn1time_to_datetime, load_certs, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}
-    }, config::Config, errors::VicarianError
+    RunContext,
+    certificates::{
+        HostCertificate, acme::to_txt_name, host::asn1time_to_datetime, host::load_hostcert, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}
+    },
+    config::Config,
+    errors::VicarianError,
 };
 
 use certutils::TEST_CERTS;
@@ -62,7 +65,7 @@ fn from_localcert(lc: &LocalCert, watch: bool) -> Result<Arc<HostCertificate>> {
 #[tokio::test]
 async fn test_load_certs_valid_pair() -> Result<()> {
     let so = &TEST_HOST_CERTS.snakeoil_1;
-    let result = load_certs(&so.keyfile, &so.certfile).await;
+    let result = load_hostcert(&so.keyfile, &so.certfile).await;
     assert!(result.is_ok());
 
     let (key, certs) = result.unwrap();
@@ -81,7 +84,7 @@ async fn test_load_certs_invalid_pair() -> Result<()> {
     let key_path = &so1.keyfile;
     let other_cert_path = &so2.certfile;
 
-    let result = load_certs(key_path, other_cert_path).await;
+    let result = load_hostcert(key_path, other_cert_path).await;
     assert!(result.is_err());
     let err: VicarianError = result.unwrap_err().downcast()?;
     assert!(matches!(err, VicarianError::CertificateMismatch(_, _)));
@@ -94,7 +97,7 @@ async fn test_load_certs_nonexistent_files() {
     let key_path = Utf8Path::new("nonexistent.key");
     let cert_path = Utf8Path::new("nonexistent.crt");
 
-    let result = load_certs(key_path, cert_path).await;
+    let result = load_hostcert(key_path, cert_path).await;
     assert!(result.is_err());
 }
 
@@ -106,7 +109,7 @@ async fn test_load_certs_empty_cert_file() -> Result<()> {
 
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
 
-    let result = load_certs(&so1.keyfile, &empty_cert_path).await;
+    let result = load_hostcert(&so1.keyfile, &empty_cert_path).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("No certificates found in TLS .crt file"));
 
@@ -127,10 +130,10 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     tokio::fs::copy(&so1.keyfile, &key_path).await?;
     tokio::fs::copy(&so1.certfile, &cert_path).await?;
 
-    let hc = Arc::new(HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?);
-    let certs = vec![hc.clone()];
-    let store = Arc::new(CertStore::new(certs, context.clone())?);
+    let hc = HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?;
     let original_host = hc.hostnames[0].clone();
+    let store = Arc::new(CertStore::new(context.clone())?);
+    store.upsert_all(vec![hc])?;
 
     let original_cert = store.by_host(&original_host).unwrap();
     let original_expiry = original_cert.certs[0].not_after().to_string();
@@ -169,10 +172,10 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
 
 #[tokio::test]
 async fn test_by_host() {
-    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
-    let certs = vec![cert.clone()];
     let context = Arc::new(RunContext::new(Config::default()));
-    let store = CertStore::new(certs, context).unwrap();
+    let store = CertStore::new(context).unwrap();
+    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
+    store.upsert(cert.clone()).unwrap();
     let found = store.by_host(&cert.hostnames[0]).unwrap();
 
     assert_eq!(found, cert);
@@ -180,10 +183,10 @@ async fn test_by_host() {
 
 #[tokio::test]
 async fn test_by_file() {
-    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
-    let certs = vec![cert.clone()];
     let context = Arc::new(RunContext::new(Config::default()));
-    let store = CertStore::new(certs, context).unwrap();
+    let store = CertStore::new(context).unwrap();
+    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
+    store.upsert(cert.clone()).unwrap();
     let found = store.by_file(&"target/certs/snakeoil-1.key".into()).unwrap();
 
     assert_eq!(found, cert);
@@ -195,8 +198,9 @@ async fn test_watchlist() -> Result<()> {
     let hc2 = TEST_HOST_CERTS.www_example.clone();
 
     let context = Arc::new(RunContext::new(Config::default()));
-    let certs = vec![hc1, hc2];
-    let store = CertStore::new(certs, context)?;
+    let store = CertStore::new(context)?;
+    store.upsert(hc1)?;
+    store.upsert(hc2)?;
     let watchlist = store.watchlist();
 
     assert_eq!(watchlist.len(), 2);
@@ -216,9 +220,9 @@ async fn test_file_update_success() -> Result<()> {
     fs::copy(&cert.certfile, &cert_path)?;
 
 
-    let certs = vec![cert.clone()];
     let context = Arc::new(RunContext::new(Config::default()));
-    let store = CertStore::new(certs, context)?;
+    let store = CertStore::new(context)?;
+    store.upsert(cert.clone())?;
     let original_host = cert.hostnames[0].clone();
 
     // The original cert is snakeoil
@@ -309,7 +313,8 @@ async fn test_wildcard() -> Result<()> {
     assert!(wildcard.hostnames.contains(&"*.example.com".to_string()));
 
     let context = Arc::new(RunContext::new(Config::default()));
-    let store = CertStore::new(vec![wildcard.clone()], context)?;
+    let store = CertStore::new(context)?;
+    store.upsert(wildcard.clone())?;
 
     {
         let by_host = store.by_host(&"otherhost.example.com".to_string());

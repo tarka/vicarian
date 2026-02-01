@@ -108,7 +108,6 @@ impl CleartextHandler {
             .header(header::LOCATION, location.to_string())
             .body(body)
             .expect("Failed to create HTTP->HTTPS redirect response")
-
     }
 
     async fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {

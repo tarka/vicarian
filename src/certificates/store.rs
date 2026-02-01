@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use camino::Utf8PathBuf;
+use papaya::HashMap as Papaya;
 use tracing::info;
 
 use crate::{
@@ -20,38 +21,19 @@ use crate::{
 // truth. But a bit fiddly for MVP version.
 pub struct CertStore {
     _context: Arc<RunContext>,
-    by_host: papaya::HashMap<String, Arc<HostCertificate>>,
-    by_file: papaya::HashMap<Utf8PathBuf, Arc<HostCertificate>>,
+    by_host: Papaya<String, Arc<HostCertificate>>,
+    by_file: Papaya<Utf8PathBuf, Arc<HostCertificate>>,
 }
 
 impl CertStore {
 
-    pub fn new(certs: Vec<Arc<HostCertificate>>, _context: Arc<RunContext>) -> Result<Self> {
+    pub fn new(_context: Arc<RunContext>) -> Result<Self> {
         info!("Loading host certificates");
-
-        // Create an entry for each alias
-        let by_host: papaya::HashMap<String, Arc<HostCertificate>> = certs.iter()
-            .flat_map(|cert|
-                 cert.hostnames.iter()
-                      .map(|hostname| (
-                          hostname.clone(),
-                          cert.clone()))
-            )
-            .collect();
-
-        let by_file = certs.iter()
-            .flat_map(|cert| {
-                vec!((cert.keyfile.clone(), cert.clone()),
-                     (cert.certfile.clone(), cert.clone()))
-            })
-            .collect();
-
-        info!("Loaded {} certificates", certs.len());
 
         let certstore = Self {
             _context,
-            by_host,
-            by_file,
+            by_host: Papaya::new(),
+            by_file: Papaya::new(),
         };
         Ok(certstore)
     }
@@ -78,7 +60,6 @@ impl CertStore {
             .cloned()
     }
 
-
     pub fn upsert(&self, newcert: Arc<HostCertificate>) -> Result<()> {
         for hostname in newcert.hostnames.iter() {
             let host = hostname.clone();
@@ -93,6 +74,13 @@ impl CertStore {
         by_file.update_or_insert(keyfile, |_old| newcert.clone(), newcert.clone());
         by_file.update_or_insert(certfile, |_old| newcert.clone(), newcert.clone());
 
+        Ok(())
+    }
+
+    pub fn upsert_all(&self, newcerts: Vec<HostCertificate>) -> Result<()> {
+        for hc in newcerts {
+            self.upsert(Arc::new(hc))?;
+        }
         Ok(())
     }
 

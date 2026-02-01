@@ -14,15 +14,15 @@ use pingora_core::{
 use tracing::info;
 
 use crate::{
-    certificates::{
-        acme::AcmeRuntime, handler::CertHandler, store::CertStore
+    RunContext, certificates::{
+        CertificateRuntime, handler::CertHandler,
     }, config::{AcmeChallenge, TlsAcmeConfig, TlsConfig}, proxy::services::{
         CleartextHandler, Vicarian
-    }, RunContext
+    }
 };
 
 
-pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, context: Arc<RunContext>) -> Result<()> {
+pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunContext>) -> Result<()> {
     info!("Starting Proxy");
 
     let mut pingora_server = PingoraServer::new(None)?;
@@ -31,14 +31,14 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
     let addrs = context.config.listen.addrs()?;
 
     let tls_proxy = {
-        let vicarian = Vicarian::new(certstore.clone(), context.clone());
+        let vicarian = Vicarian::new(cert_runtime.certstore().clone(), context.clone());
 
         let mut pingora_proxy = pingora_proxy::http_proxy_service(
             &pingora_server.configuration,
             vicarian);
 
         for addr in &addrs {
-            let cert_handler = CertHandler::new(certstore.clone());
+            let cert_handler = CertHandler::new(cert_runtime.certstore().clone());
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
             tls_settings.enable_h2();
 
@@ -61,7 +61,7 @@ pub fn run_indefinitely(certstore: Arc<CertStore>, acme: Arc<AcmeRuntime>, conte
         let insecure_port = context.config.listen.insecure_port
             .unwrap_or(80);
 
-        let redirector = CleartextHandler::new(acme, context.config.listen.tls_port);
+        let redirector = CleartextHandler::new(cert_runtime.acme().clone(), context.config.listen.tls_port);
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
         for addr in &addrs {

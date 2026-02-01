@@ -1,4 +1,3 @@
-
 mod certs;
 
 use std::sync::LazyLock;

@@ -186,18 +186,15 @@ impl AcmeRuntime {
             .then(|ah| async move {
                 info!("Loading certs from {}, {}", ah.keyfile, ah.certfile);
                 let hc = HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false).await?;
-                Ok(Arc::new(hc))
+                Ok(hc)
             })
-            .collect::<Vec<Result<Arc<HostCertificate>>>>().await
-            .into_iter().collect::<Result<Vec<Arc<HostCertificate>>>>()?;
-
+            .collect::<Vec<Result<HostCertificate>>>().await
+            .into_iter().collect::<Result<Vec<HostCertificate>>>()?;
 
         // Initial load of existing certs. NOTE: This is slightly hacky
         // as we're possibly loading expired certs only to immediately
         // replace them, but it simplifies pending() etc.
-        for cert in existing.into_iter() {
-            self.certstore.upsert(cert)?;
-        }
+        self.certstore.upsert_all(existing)?;
 
         self.renew_all_pending().await?;
 

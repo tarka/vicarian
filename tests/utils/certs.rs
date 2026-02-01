@@ -248,4 +248,3 @@ fn get_cert(host: &str,
 
     Ok(localcert)
 }
-

@@ -89,7 +89,7 @@ fn main() -> Result<()> {
 
         thread::spawn(move || -> Result<()> {
             info!("Starting Certificate Management runtime");
-            let trt = tokio::runtime::Builder::new_multi_thread()
+            let trt = tokio::runtime::Builder::new_current_thread()
                 .enable_time()
                 .enable_io()
                 .build()?;

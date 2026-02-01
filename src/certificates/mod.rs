@@ -19,8 +19,8 @@ use crate::{
 pub use host::HostCertificate;
 
 
-/// Externally managed certificates
-// TODO: Need a better name
+/// Top-level certificate management; loads supplied certificates,
+/// starts a watcher on them, and starts the ACME runtime.'
 pub struct CertificateRuntime {
     acme: Arc<AcmeRuntime>,
     certstore: Arc<CertStore>,

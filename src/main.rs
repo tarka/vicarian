@@ -1,6 +1,7 @@
 mod certificates;
 mod config;
 mod errors;
+mod mdns;
 mod proxy;
 
 use std::sync::Arc;

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/tarka/vicarian/compare/v0.2.1...v0.2.2) - 2026-02-20
+
+### Other
+
+- rustls-pemfile is deprecated; us PemObject instead.
+- Bump dependencies
+- Remove some old dev dependencies.
+- Move rustls-pemfile to dev.
+- Minor cleanups.
+- Add localhost certificate and use for websocket testing.
+- Initial non-working attempt.
+- More cert store fixes.
+- Add loading of generated test certs as a rustls root store.
+- Remove duplication in test cert generation
+- Update comments and make certificate runtime single-threaded.
+- Big refactor to move all certificate-related processing under a common runtime
+- Tweaks and cleanups before futher refactoring.
+- Intial cut of async host certs (and many knock-on effects)
+- Update to Pingora 0.7.0
+- Remove old test dependencies from cargo
+
 ## [0.2.1](https://github.com/tarka/vicarian/compare/v0.2.0...v0.2.1) - 2026-01-30
 
 ### <!-- 0 -->Features

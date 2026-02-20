@@ -53,7 +53,6 @@ impl TestCerts {
             get_cert(host, name, Some(not_before), not_after, &caroot)?
         };
 
-
         Ok(Self {
             caroot,
             www_example,
@@ -124,10 +123,12 @@ fn load_ca(certfile: Utf8PathBuf, cakey: Utf8PathBuf) -> Result<CaCert> {
 
     let reqcert = reqwest::Certificate::from_pem(capem.as_bytes())?;
 
-    let rust_cert = rustls_pemfile::certs(&mut capem.as_bytes())
-        .next().unwrap()?;
+    let mut pem = capem.as_bytes();
+    let rust_certs = rustls_pemfile::certs(&mut pem);
     let mut store = RootCertStore::empty();
-    store.add(rust_cert).unwrap();
+    for cert in rust_certs {
+        store.add(cert?).unwrap();
+    }
 
     let cacert = CaCert {
         issuer,
@@ -148,11 +149,11 @@ fn get_root_ca() -> Result<CaCert> {
     if !(cafile.exists() && cakey.exists()) {
         gen_ca()?;
     };
-
     lock.unlock()?;
-    let issuer = load_ca(cafile, cakey)?;
 
-    Ok(issuer)
+    let ca = load_ca(cafile, cakey)?;
+
+    Ok(ca)
 }
 
 fn gen_default_cert(host: &str, ca: &CaCert) -> Result<()>

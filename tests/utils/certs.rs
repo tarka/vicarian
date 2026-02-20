@@ -13,6 +13,7 @@ use rcgen::{
     BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, Issuer, KeyPair,
     KeyUsagePurpose, PKCS_ECDSA_P256_SHA256,
 };
+use rustls::{RootCertStore, pki_types::{CertificateDer, pem::{PemObject, SectionKind}}};
 
 pub const CERT_BASE: &str = "target/certs";
 pub static CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(CERT_BASE));
@@ -75,7 +76,8 @@ fn lock_dir(dir: &Utf8Path) -> Result<LockFile> {
 
 pub struct CaCert {
     pub issuer: Issuer<'static, KeyPair>,
-    pub cert: reqwest::Certificate,
+    pub reqcert: reqwest::Certificate,
+    pub store: rustls::RootCertStore,
 }
 
 pub struct LocalCert {
@@ -122,9 +124,15 @@ fn load_ca(certfile: Utf8PathBuf, cakey: Utf8PathBuf) -> Result<CaCert> {
 
     let reqcert = reqwest::Certificate::from_pem(capem.as_bytes())?;
 
+    let rust_cert = rustls_pemfile::certs(&mut capem.as_bytes())
+        .next().unwrap()?;
+    let mut store = RootCertStore::empty();
+    store.add(rust_cert).unwrap();
+
     let cacert = CaCert {
         issuer,
-        cert: reqcert,
+        reqcert,
+        store,
     };
 
     Ok(cacert)

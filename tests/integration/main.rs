@@ -4,6 +4,7 @@
 mod certutils;
 #[path = "../utils/proxy.rs"]
 mod proxyutils;
+mod websockets;
 
 use reqwest::{Client, redirect, header::{VIA, STRICT_TRANSPORT_SECURITY}};
 use serial_test::serial;
@@ -55,7 +56,7 @@ async fn test_dns_override() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
     let ready = Client::builder()
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
@@ -77,7 +78,7 @@ async fn test_mocked_backend() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
         .and(path("/status"))
@@ -107,7 +108,7 @@ async fn test_vhosts() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = &TEST_CERTS.caroot.cert;
+    let root_cert = &TEST_CERTS.caroot.reqcert;
 
     // www.example.com
 
@@ -155,7 +156,7 @@ async fn test_invalid_cert() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("wrong.example.com", example_com)
@@ -177,7 +178,7 @@ async fn test_https_headers() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
         .and(path("/status"))
@@ -214,7 +215,7 @@ async fn test_http1() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
         .and(path("/status"))
@@ -251,7 +252,7 @@ async fn test_http2() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
         .and(path("/status"))
@@ -288,7 +289,7 @@ async fn test_wildcard() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
         .and(path("/status"))
@@ -325,7 +326,7 @@ async fn test_no_wildcard() {
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.cert.clone();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
         .and(path("/status"))

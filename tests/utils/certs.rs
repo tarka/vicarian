@@ -20,6 +20,7 @@ pub static CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(
 
 pub struct TestCerts {
     pub caroot: CaCert,
+    pub localhost: LocalCert,
     pub www_example: LocalCert,
     pub test_example: LocalCert,
     pub wildcard_example: LocalCert,
@@ -32,6 +33,7 @@ impl TestCerts {
         create_dir_all(CERT_DIR.as_path())?;
 
         let caroot = get_root_ca()?;
+        let localhost = get_default_cert("localhost", &caroot)?;
         let www_example = get_default_cert("www.example.com", &caroot)?;
         let test_example = get_default_cert("test.example.com", &caroot)?;
         let wildcard_example = get_cert("*.example.com", "_.example.com", None, None, &caroot)?;
@@ -55,6 +57,7 @@ impl TestCerts {
 
         Ok(Self {
             caroot,
+            localhost,
             www_example,
             test_example,
             wildcard_example,

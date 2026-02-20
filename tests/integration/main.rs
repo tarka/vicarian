@@ -74,10 +74,9 @@ async fn test_mocked_backend() {
     let backend_server = mock_server(BACKEND_PORT).await.unwrap();
 
     let _proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_simple")
+        .with_simple_config("localhost_simple")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
@@ -87,10 +86,9 @@ async fn test_mocked_backend() {
         .mount(&backend_server).await;
 
     let response = Client::builder()
-        .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://localhost:{TLS_PORT}/status"))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());

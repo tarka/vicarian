@@ -1,0 +1,26 @@
+{
+    listen = {
+        insecure_port = 8080
+        tls_port = 8443
+    }
+    vhosts = [
+        {
+            hostname = "localhost"
+
+            tls = {
+                files = {
+                    keyfile = "target/certs/localhost.key"
+                    certfile = "target/certs/localhost.crt"
+                    reload = true
+                }
+            }
+
+            backends = [
+                {
+                    context = "/"
+                    url = "http://127.0.0.1:9090"
+                }
+            ]
+        }
+    ]
+}

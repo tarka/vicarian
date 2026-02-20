@@ -34,7 +34,7 @@ async fn test_ws_backend() {
     ws_server.register(mock).await;
 
     let _proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_simple")
+        .with_simple_config("localhost_simple")
         .run().await.unwrap();
 
     let config = ClientConfig::builder()
@@ -42,7 +42,7 @@ async fn test_ws_backend() {
         .with_no_client_auth();
     let connector = Connector::Rustls(Arc::new(config));
 
-    let proxy_uri = format!("wss://www.example.com:{TLS_PORT}/");
+    let proxy_uri = format!("wss://localhost:{TLS_PORT}/");
 
     let (mut stream, _response) = connect_async_tls_with_config(proxy_uri, None, false, Some(connector)).await.unwrap();
 
@@ -55,9 +55,5 @@ async fn test_ws_backend() {
     std::mem::drop(stream);
 
     ws_server.verify().await;
-
-
-//    assert_eq!(200, response.status().as_u16());
-//    assert!(response.text().await.unwrap().contains("OK"));
 }
 

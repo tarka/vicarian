@@ -85,7 +85,7 @@ pub struct LocalCert {
     pub certs: Vec<X509>,
 }
 
-fn gen_ca() -> Result<CaCert> {
+fn gen_ca() -> Result<()> {
     let mut params = CertificateParams::default();
 
     params.distinguished_name = DistinguishedName::new();
@@ -111,14 +111,7 @@ fn gen_ca() -> Result<CaCert> {
     fs::write(&certfile, &certpem)?;
     fs::write(&cakey, &key)?;
 
-    let reqcert = reqwest::Certificate::from_pem(certpem.as_bytes())?;
-
-    let cacert = CaCert {
-        cert: reqcert,
-        issuer,
-    };
-
-    Ok(cacert)
+    Ok(())
 }
 
 fn load_ca(certfile: Utf8PathBuf, cakey: Utf8PathBuf) -> Result<CaCert> {
@@ -144,15 +137,12 @@ fn get_root_ca() -> Result<CaCert> {
     let mut lock = lock_dir(&CERT_DIR)?;
     lock.lock()?;
 
-    let issuer = if cafile.exists() && cakey.exists() {
-        lock.unlock()?;
-        load_ca(cafile, cakey)?
-
-    } else {
-        let ca = gen_ca()?;
-        lock.unlock()?;
-        ca
+    if !(cafile.exists() && cakey.exists()) {
+        gen_ca()?;
     };
+
+    lock.unlock()?;
+    let issuer = load_ca(cafile, cakey)?;
 
     Ok(issuer)
 }

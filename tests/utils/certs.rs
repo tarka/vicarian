@@ -118,16 +118,15 @@ fn gen_ca() -> Result<()> {
     Ok(())
 }
 
-fn load_ca(certfile: Utf8PathBuf, cakey: Utf8PathBuf) -> Result<CaCert> {
+fn load_ca(cacert: Utf8PathBuf, cakey: Utf8PathBuf) -> Result<CaCert> {
     let keypem = String::from_utf8(fs::read(&cakey)?)?;
     let key = KeyPair::from_pem(&keypem)?;
-    let capem = String::from_utf8(fs::read(&certfile)?)?;
+    let capem = String::from_utf8(fs::read(&cacert)?)?;
     let issuer = Issuer::from_ca_cert_pem(&capem, key)?;
 
     let reqcert = reqwest::Certificate::from_pem(capem.as_bytes())?;
 
-    let mut pem = capem.as_bytes();
-    let rust_certs = rustls_pemfile::certs(&mut pem);
+    let rust_certs = PemObject::pem_reader_iter(capem.as_bytes());
     let mut store = RootCertStore::empty();
     for cert in rust_certs {
         store.add(cert?).unwrap();

@@ -1,6 +1,3 @@
-#[path = "../utils/proxy.rs"]
-mod proxyutils;
-
 use std::sync::Arc;
 
 use futures::SinkExt;
@@ -9,7 +6,7 @@ use serde_json::json;
 use serial_test::serial;
 use tokio_tungstenite::{Connector, connect_async_tls_with_config, tungstenite::Message};
 
-use proxyutils::{
+use crate::proxyutils::{
     BACKEND_PORT, ProxyBuilder, TLS_PORT,
 };
 use tokio::net::TcpListener;

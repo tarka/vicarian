@@ -221,7 +221,7 @@ fn to_sockaddr(addr: Option<SockaddrStorage>) -> Option<SocketAddr> {
         Some(SocketAddr::new(sai.ip().into(), 0))
 
     } else if let Some(sai6) = in_addr.as_sockaddr_in6() {
-        let ip6 = SocketAddrV6::new(sai6.ip().into(), 0,
+        let ip6 = SocketAddrV6::new(sai6.ip(), 0,
                                     sai6.flowinfo(),
                                     sai6.scope_id());
         Some(ip6.into())

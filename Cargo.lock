@@ -783,22 +783,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "424e0138278faeb2b401f174ad17e715c829512d74f3d1e81eb43365c2e0590e"
-dependencies = [
- "ctor-proc-macro",
- "dtor",
-]
-
-[[package]]
-name = "ctor-proc-macro"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
-
-[[package]]
 name = "custom_derive"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1010,21 +994,6 @@ dependencies = [
  "rand 0.8.5",
  "thiserror 2.0.18",
 ]
-
-[[package]]
-name = "dtor"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "404d02eeb088a82cfd873006cb713fe411306c7d182c344905e101fb1167d301"
-dependencies = [
- "dtor-proc-macro",
-]
-
-[[package]]
-name = "dtor-proc-macro"
-version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
 
 [[package]]
 name = "dunce"
@@ -3538,27 +3507,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test-context"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d94db16dc1c321805ce55f286c4023fa58a2c9c742568f95c5cfe2e95d250d7"
-dependencies = [
- "futures",
- "test-context-macros",
-]
-
-[[package]]
-name = "test-context-macros"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aabcca9d2cad192cfe258cd3562b7584516191a5c9b6a0002a6bb8b75ee7d21d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
-]
-
-[[package]]
 name = "test-log"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4061,7 +4009,6 @@ dependencies = [
  "camino",
  "chrono",
  "clap",
- "ctor",
  "dnsclient",
  "fastrand",
  "fslock",
@@ -4095,7 +4042,6 @@ dependencies = [
  "serial_test",
  "strum_macros 0.27.2",
  "tempfile",
- "test-context",
  "test-log",
  "thiserror 2.0.18",
  "time",

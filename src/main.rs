@@ -10,13 +10,13 @@ use std::thread;
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use nix::sys::resource::{Resource, getrlimit, setrlimit};
-use tokio::sync::watch;
+use tokio::{sync::watch, try_join};
 use tracing::level_filters::LevelFilter;
 use tracing_log::log::info;
 
 use crate::{
     certificates::CertificateRuntime,
-    config::{Config, DEFAULT_CONFIG_FILE},
+    config::{Config, DEFAULT_CONFIG_FILE}, mdns::MdnsRuntime,
 };
 
 fn init_logging(level: u8) -> Result<()> {
@@ -85,8 +85,13 @@ fn main() -> Result<()> {
     ///// Runtime start
 
     let cert_runtime = Arc::new(CertificateRuntime::new(context.clone())?);
-    let cert_handle = {
+    let mdns_runtime = Arc::new(MdnsRuntime::new(context.clone())?);
+
+    // Pingora runs its own Tokio per-service instances, so we also
+    // have our own for the support services (cert handling, etc.)
+    let support_handle = {
         let crt = cert_runtime.clone();
+        let mrt = mdns_runtime.clone();
 
         thread::spawn(move || -> Result<()> {
             info!("Starting Certificate Management runtime");
@@ -96,7 +101,12 @@ fn main() -> Result<()> {
                 .build()?;
 
             trt.block_on(
-                crt.run_indefinitely()
+                async {
+                    try_join!(
+                        mrt.run_indefinitely(),
+                        crt.run_indefinitely(),
+                    )
+                }
             )?;
 
             Ok(())
@@ -107,7 +117,7 @@ fn main() -> Result<()> {
     proxy::run_indefinitely(cert_runtime.clone(), context.clone())?;
 
     context.quit()?;
-    cert_handle.join()
+    support_handle.join()
         .expect("Failed to finalise certificate management tasks")?;
 
     info!("Vicarian finished.");

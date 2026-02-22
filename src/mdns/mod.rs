@@ -5,7 +5,7 @@ use anyhow::Result;
 use tracing_log::log::{debug, info, warn};
 
 use crate::{
-    RunContext,
+    RunContext, config::Vhost,
 };
 
 
@@ -22,9 +22,17 @@ impl MdnsRuntime {
         })
     }
 
-    pub async fn run_indefinitely(&self) -> Result<()> {
+    pub fn run_indefinitely(&self) -> Result<()> {
+        let port = self.context.config.listen.tls_port;
 
-        let mut quit_rx = self.context.quit_rx.clone();
+        for vhost in self.context.config.vhosts.iter() {
+            self.advertise(vhost)?;
+        }
+
+        Ok(())
+    }
+
+    fn advertise(&self, vhost: &Vhost) -> Result<()> {
 
         Ok(())
     }

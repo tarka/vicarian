@@ -16,6 +16,7 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0.101"
 async-trait = "0.1.89"
+avahi-sys = "0.10.1"
 boring = "4.21.2"
 camino = { version = "1.2.2", features = ["serde1"] }
 chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
@@ -52,6 +53,7 @@ tokio = { version = "1.49.0", features = ["macros", "rt", "sync"] }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+zbus = "5.13.2"
 zone-update = { version = "0.11.0", features = ["async"] }
 
 [features]

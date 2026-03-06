@@ -9,7 +9,7 @@ use boring::{
     x509::GeneralNameRef,
 };
 use camino::{Utf8Path, Utf8PathBuf};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 
 use itertools::Itertools;
 use pingora_boringssl::{
@@ -74,17 +74,6 @@ impl HostCertificate {
     /// effectively a reload.
     pub async fn from(hc: &Arc<HostCertificate>) -> Result<HostCertificate> {
         HostCertificate::new(hc.keyfile.clone(), hc.certfile.clone(), hc.watch).await
-    }
-
-    pub fn expires_in_secs(&self) -> i64 {
-        let now = Utc::now();
-        let diff = self.expires - now;
-        diff.num_seconds()
-    }
-
-    pub fn is_expiring_in_secs(&self, secs: i64) -> bool {
-        let in_secs = Utc::now() + TimeDelta::seconds(secs);
-        in_secs >= self.expires
     }
 }
 

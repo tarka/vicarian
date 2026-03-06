@@ -1,4 +1,4 @@
-use std::{fs::create_dir_all, iter, net::SocketAddr, sync::Arc};
+use std::{fs::create_dir_all, iter, net::SocketAddr, sync::{Arc, RwLock}};
 
 use anyhow::{Context, Result, anyhow};
 use camino::Utf8PathBuf;
@@ -66,6 +66,7 @@ struct AcmeHost {
     certfile: Utf8PathBuf,
     challenge: AcmeChallenge,
     profile: &'static LeProfile,
+    renewal: RwLock<Renewal>,
 }
 
 impl AcmeHost {
@@ -76,6 +77,45 @@ impl AcmeHost {
             .collect()
     }
 }
+
+#[derive(Debug)]
+struct Renewal {
+    renew_at: DateTime<Utc>,
+    tries: u64,
+}
+
+impl Renewal {
+    const BACKOFF: TimeDelta = TimeDelta::hours(3);
+
+    fn new(renew_at: DateTime<Utc>) -> Self {
+        Self {
+            renew_at,
+            tries: 0,
+        }
+    }
+
+    fn is_renewable_in(&self, secs: i64) -> bool {
+        let in_secs = Utc::now() + TimeDelta::seconds(secs);
+        in_secs >= self.renew_at
+    }
+
+    pub fn expires_in_secs(&self) -> i64 {
+        let now = Utc::now();
+        let diff = self.renew_at - now;
+        diff.num_seconds()
+    }
+
+    fn backoff(&self) -> Self {
+        // We could do a simple exponetial backoff here but a flat
+        // backoff is probably fine assuming the errors are due to
+        // upstream issues with DNS providers or LetsEncrypt.
+        Self {
+            renew_at: Utc::now() + Self::BACKOFF,
+            tries: self.tries + 1,
+        }
+    }
+}
+
 
 pub struct AcmeRuntime {
     context: Arc<RunContext>,
@@ -148,6 +188,8 @@ impl AcmeRuntime {
                 let profile = LE_PROFILES.get(aconf.profile.into())
                         .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;
 
+                let renewal = RwLock::new(Renewal::new(DateTime::<Utc>::MIN_UTC));
+
                 let acme_host = AcmeHost {
                     fqdn: cert_hostname,
                     aliases: vhost.aliases.clone(),
@@ -158,6 +200,7 @@ impl AcmeRuntime {
                     contactfile,
                     challenge: aconf.challenge.clone(),
                     profile,
+                    renewal,
                 };
                 Ok(acme_host)
             })
@@ -185,11 +228,18 @@ impl AcmeRuntime {
             .filter(|ah| ah.keyfile.exists() && ah.certfile.exists())
             .then(|ah| async move {
                 info!("Loading certs from {}, {}", ah.keyfile, ah.certfile);
-                let hc = HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false).await?;
+                let hc = Arc::new(HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false).await?);
+
+                {
+                    let mut renewal = ah.renewal.write()
+                        .map_err(|e| anyhow!("Failed to lock renewal struct: {e}"))?;
+                    *renewal = Renewal::new(hc.expires);
+                }
+
                 Ok(hc)
             })
-            .collect::<Vec<Result<HostCertificate>>>().await
-            .into_iter().collect::<Result<Vec<HostCertificate>>>()?;
+            .collect::<Vec<Result<Arc<HostCertificate>>>>().await
+            .into_iter().collect::<Result<Vec<Arc<HostCertificate>>>>()?;
 
         // Initial load of existing certs. NOTE: This is slightly hacky
         // as we're possibly loading expired certs only to immediately
@@ -200,7 +250,7 @@ impl AcmeRuntime {
 
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
-            let next_secs = self.next_window_secs()
+            let next_secs = self.next_window_secs()?
                 .and_then(|s| TimeDelta::new(s, 0));
 
             let expiring_secs = if let Some(seconds) = next_secs {
@@ -237,11 +287,51 @@ impl AcmeRuntime {
     }
 
     async fn renew_all_pending(&self) -> Result<()> {
-        for ahost in self.pending() {
+        for ahost in self.pending()? {
             info!("ACME host {} requires renewal, initiating...", ahost.fqdn);
-            self.renew_acme(ahost).await?;
+
+            match self.renew_acme(ahost).await {
+                Ok(hc) => {
+                    let mut lock = ahost.renewal.write()
+                        .map_err(|e| anyhow!("Failed to lock renewal for {}: {e}", ahost.fqdn))?;
+                    *lock = Renewal::new(hc.expires);
+                },
+                Err(e) => {
+                    let mut renew = ahost.renewal.write()
+                        .map_err(|le| anyhow!("Failed to lock renewal for {}: {le}", ahost.fqdn))?;
+                    let backoff = renew.backoff();
+                    warn!("Failed to renew {} due to {e} (attempt {}), retrying later", ahost.fqdn, backoff.tries);
+                    *renew = backoff;
+                }
+            }
+
         }
         Ok(())
+    }
+
+    /// Returns certs that need creating or refreshing
+    fn pending(&self) -> Result<Vec<&AcmeHost>> {
+      self.acme_hosts.iter()
+            .map(|ah| {
+                let renew = ah.renewal.read()
+                    .map_err(|e| anyhow!("Failed to lock renewal info for {}: {e}", ah.fqdn))?;
+                Ok((ah, renew.is_renewable_in(ah.profile.exp_window_secs)))
+          })
+          .filter_ok(|(_, is_due)| *is_due)
+          .map_ok(|(ah, _)| ah)
+          .collect()
+    }
+
+    fn next_window_secs(&self) -> Result<Option<i64>> {
+        self.acme_hosts.iter()
+            .map(|ah| {
+                let renew = ah.renewal.read()
+                    .map_err(|e| anyhow!("Failed to read renewal: {e}"))?;
+                let exp_in = renew.expires_in_secs() - ah.profile.exp_window_secs;
+                Ok(exp_in.max(0))
+            })
+            .next()
+            .transpose()
     }
 
     async fn renew_acme(&self, acme_host: &AcmeHost) -> Result<Arc<HostCertificate>> {
@@ -275,28 +365,6 @@ impl AcmeRuntime {
         Ok(hc)
     }
 
-
-    /// Returns certs that need creating or refreshing
-    fn pending(&self) -> Vec<&AcmeHost> {
-        self.acme_hosts.iter()
-            // Either None or expiring within window.
-            // TODO: This could use renewal_info() in instant-acme.
-            .filter(|ah| self.certstore.by_host(&ah.fqdn)
-                    .is_none_or(|cert| cert.is_expiring_in_secs(ah.profile.exp_window_secs)))
-            .collect()
-    }
-
-    pub fn next_window_secs(&self) -> Option<i64> {
-        self.acme_hosts.iter()
-            .filter_map(|ah| {
-                self.certstore.by_host(&ah.fqdn)
-                    .map(|hc| hc.expires_in_secs() - ah.profile.exp_window_secs)
-            })
-            .map(|s| s.max(0))
-            .sorted()
-            .next()
-    }
-
     async fn renew_instant_acme(&self, acme_host: &AcmeHost) -> Result<PemCertificate> {
         info!("Initialising ACME account");
         let account = self.fetch_account(acme_host).await?;
@@ -310,9 +378,7 @@ impl AcmeRuntime {
         let no = NewOrder::new(&hids)
             .profile(acme_host.profile.name);
         let mut order = account.new_order(&no).await?;
-
         let mut authorisations = order.authorizations();
-
 
         while let Some(result) = authorisations.next().await {
             let mut auth = result?;
@@ -442,7 +508,7 @@ impl AcmeRuntime {
                     // add this to zone-update.
                     let dns_client = get_dns_client(acme_host, provider);
                     match dns_client.delete_txt_record(&txt_name).await {
-                        Ok(_) => {},
+                        Ok(_) => (),
                         Err(d_err) => {
                             warn!("Failed to delete DNS record {txt_name}: {d_err}");
                         }

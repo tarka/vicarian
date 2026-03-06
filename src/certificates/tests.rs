@@ -130,7 +130,7 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     tokio::fs::copy(&so1.keyfile, &key_path).await?;
     tokio::fs::copy(&so1.certfile, &cert_path).await?;
 
-    let hc = HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?;
+    let hc = Arc::new(HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?);
     let original_host = hc.hostnames[0].clone();
     let store = Arc::new(CertStore::new(context.clone())?);
     store.upsert_all(vec![hc])?;

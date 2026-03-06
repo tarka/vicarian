@@ -47,7 +47,7 @@ impl CertificateRuntime  {
         &self.certstore
     }
 
-    async fn load_local_certs(&self) -> Result<Vec<HostCertificate>> {
+    async fn load_local_certs(&self) -> Result<Vec<Arc<HostCertificate>>> {
         let iter = self.context.config.vhosts.iter();
         let certs: Vec<HostCertificate> = stream::iter(iter)
             .filter_map(|vhost| match &vhost.tls {
@@ -59,8 +59,11 @@ impl CertificateRuntime  {
                 tfc.certfile.clone(),
                 tfc.reload))
             .try_collect().await?;
+        let acerts = certs.into_iter()
+            .map(Arc::new)
+            .collect();
 
-        Ok(certs)
+        Ok(acerts)
     }
 
     pub async fn run_indefinitely(&self) -> Result<()> {

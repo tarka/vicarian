@@ -77,9 +77,9 @@ impl CertStore {
         Ok(())
     }
 
-    pub fn upsert_all(&self, newcerts: Vec<HostCertificate>) -> Result<()> {
+    pub fn upsert_all(&self, newcerts: Vec<Arc<HostCertificate>>) -> Result<()> {
         for hc in newcerts {
-            self.upsert(Arc::new(hc))?;
+            self.upsert(hc)?;
         }
         Ok(())
     }

@@ -85,7 +85,7 @@ struct Renewal {
 }
 
 impl Renewal {
-    const BACKOFF: TimeDelta = TimeDelta::hours(3);
+    const BACKOFF: TimeDelta = TimeDelta::hours(1);
 
     fn new(renew_at: DateTime<Utc>) -> Self {
         Self {
@@ -250,8 +250,8 @@ impl AcmeRuntime {
 
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
-            let next_secs = self.next_window_secs()?
-                .and_then(|s| TimeDelta::new(s, 0));
+            let next_secs = self.next_expiring_secs()?;
+            let next_secs = next_secs.and_then(|s| TimeDelta::new(s, 0));
 
             let expiring_secs = if let Some(seconds) = next_secs {
                 let fuzzy = {
@@ -296,6 +296,7 @@ impl AcmeRuntime {
                         .map_err(|e| anyhow!("Failed to lock renewal for {}: {e}", ahost.fqdn))?;
                     *lock = Renewal::new(hc.expires);
                 },
+                // TODO: Differentiate network vs local errors?
                 Err(e) => {
                     let mut renew = ahost.renewal.write()
                         .map_err(|le| anyhow!("Failed to lock renewal for {}: {le}", ahost.fqdn))?;
@@ -322,16 +323,17 @@ impl AcmeRuntime {
           .collect()
     }
 
-    fn next_window_secs(&self) -> Result<Option<i64>> {
-        self.acme_hosts.iter()
+    fn next_expiring_secs(&self) -> Result<Option<i64>> {
+        let next = self.acme_hosts.iter()
             .map(|ah| {
                 let renew = ah.renewal.read()
                     .map_err(|e| anyhow!("Failed to read renewal: {e}"))?;
-                let exp_in = renew.expires_in_secs() - ah.profile.exp_window_secs;
-                Ok(exp_in.max(0))
+                let exp_in = renew.expires_in_secs();
+                Ok::<i64, anyhow::Error>(exp_in.max(0))
             })
-            .next()
-            .transpose()
+            .process_results(|iter| iter.sorted())?
+            .next();
+        Ok(next)
     }
 
     async fn renew_acme(&self, acme_host: &AcmeHost) -> Result<Arc<HostCertificate>> {

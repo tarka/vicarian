@@ -14,9 +14,9 @@ use tokio::process::{Child, Command};
 use tracing_log::log::info;
 use wiremock::MockServer;
 
-pub const INSECURE_PORT: u16 = 8080;
-pub const TLS_PORT: u16 = 8443;
-pub const BACKEND_PORT: u16 = 9090;
+pub const INSECURE_PORT: u16 = 18080;
+pub const TLS_PORT: u16 = 18443;
+pub const BACKEND_PORT: u16 = 19090;
 
 pub struct ProxyBuilder {
     pub dir: TempDir,

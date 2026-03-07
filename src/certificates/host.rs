@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use pingora_boringssl::x509::GeneralNameRef;
 use camino::{Utf8Path, Utf8PathBuf};
 use chrono::{DateTime, Utc};
@@ -122,13 +122,13 @@ impl HostCertificate {
     }
 }
 
-pub fn offset_to_chrono(odt: OffsetDateTime) -> DateTime<Utc> {
+pub fn offset_to_chrono(odt: OffsetDateTime) -> Result<DateTime<Utc>> {
     let secs = odt.unix_timestamp();
     let nanos = odt.nanosecond();
 
-    // from_timestamp returns Option; unwrap if you trust the input
     DateTime::<Utc>::from_timestamp(secs, nanos)
-        .expect("Valid timestamp")
+        .ok_or(anyhow!("Failed to convert OffsetDateTime: {odt:?}"))
+
 }
 
 // When parsing a certificate, validity dates are already available as Asn1DateTime
@@ -137,7 +137,7 @@ pub(crate) fn get_not_after(der_data: &[u8]) -> Result<DateTime<Utc>> {
     let validity = cert.validity();
 
     // Asn1DateTime has to_datetime() that returns chrono::DateTime<Utc>
-    let not_after = offset_to_chrono(validity.not_after.to_datetime());
+    let not_after = offset_to_chrono(validity.not_after.to_datetime())?;
 
     Ok(not_after)
 }

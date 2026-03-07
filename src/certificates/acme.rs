@@ -354,8 +354,10 @@ impl AcmeRuntime {
         debug!("====== Cert Chain ======\n{}", pem_certificate.cert_chain);
 
         info!("Writing certificate and key");
-        fs::write(&acme_host.keyfile, pem_certificate.private_key.as_bytes()).await?;
-        fs::write(&acme_host.certfile, pem_certificate.cert_chain.as_bytes()).await?;
+        fs::write(&acme_host.keyfile, pem_certificate.private_key.as_bytes()).await
+            .context("Failed to write keyfile {keyfile}")?;
+        fs::write(&acme_host.certfile, pem_certificate.cert_chain.as_bytes()).await
+            .context("Failed to write certfile {certfile}")?;
 
         info!("Loading new certificate");
         let hc = {

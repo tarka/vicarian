@@ -72,7 +72,7 @@ impl ProxyBuilder {
 
         // Checked above
         let config = self.config.as_ref().unwrap();
-        let fname = config.components().last().ok_or(anyhow!("No filename"))?;
+        let fname = config.components().next_back().ok_or(anyhow!("No filename"))?;
         let copied = self.dir.path().join(fname);
         copy(&config, copied).await.unwrap();
 

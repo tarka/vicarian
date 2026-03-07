@@ -95,13 +95,19 @@ impl Renewal {
     }
 
     fn is_renewable_in(&self, secs: i64) -> bool {
-        let in_secs = OffsetDateTime::now_utc() + Duration::seconds(secs);
-        in_secs >= self.renew_at
+        let in_secs = self.renewable_in_secs(secs);
+        in_secs <= 0
     }
 
-    pub fn renewable_in_secs(&self) -> i64 {
+    pub fn renewable_in_secs(&self, secs: i64) -> i64 {
         let now = OffsetDateTime::now_utc();
-        let diff = self.renew_at - now;
+        let diff = if self.tries > 0 {
+            // We've backed-off, so we are already inside the renewal
+            // window, just return the backoff-until time.
+            self.renew_at - now
+        } else {
+            self.renew_at - now - Duration::seconds(secs)
+        };
         diff.whole_seconds()
     }
 
@@ -250,25 +256,13 @@ impl AcmeRuntime {
 
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
-            let next_secs = self.next_renewable_secs()?;
-            let next_secs = next_secs.map(Duration::seconds);
+            let next_secs = self.next_renewable_secs()?
+                .ok_or(anyhow!("Nothing expiring; this shouldn't really happen. Exiting."))?;
 
-            let expiring_secs = if let Some(seconds) = next_secs {
-                let fuzzy = {
-                    let rand = fastrand::i64(FUZZY_RANGE.0..FUZZY_RANGE.1);
-                    seconds + Duration::seconds(rand)
-                };
-                let renew_at = OffsetDateTime::now_utc() + fuzzy;
-                info!("Wait for next expiry at {renew_at}");
+            let fuzzy = fastrand::i64(FUZZY_RANGE.0..FUZZY_RANGE.1);
+            let expiring_secs = next_secs + Duration::seconds(fuzzy);
 
-                fuzzy
-
-            } else {
-                let msg = "Nothing expiring; this shouldn't really happen. Exiting.";
-                warn!("{msg}");
-                return Err(anyhow!(msg))
-            };
-
+            info!("Wait for next expiry at {}", OffsetDateTime::now_utc() + expiring_secs);
             tokio::select! {
                 _ = tokio::time::sleep(expiring_secs.try_into()?) => {
                     info!("Woken up for ACME renewal; processing all pending certs");
@@ -293,7 +287,7 @@ impl AcmeRuntime {
                 Ok(hc) => {
                     let mut lock = ahost.renewal.write()
                         .map_err(|e| anyhow!("Failed to lock renewal for {}: {e}", ahost.fqdn))?;
-                    *lock = Renewal::new(*hc.expires() - Duration::seconds(ahost.profile.exp_window_secs));
+                    *lock = Renewal::new(*hc.expires());
                 },
                 // TODO: Differentiate network vs local errors?
                 Err(e) => {
@@ -322,16 +316,17 @@ impl AcmeRuntime {
           .collect()
     }
 
-    fn next_renewable_secs(&self) -> Result<Option<i64>> {
+    fn next_renewable_secs(&self) -> Result<Option<Duration>> {
         let next = self.acme_hosts.iter()
             .map(|ah| {
                 let renew = ah.renewal.read()
                     .map_err(|e| anyhow!("Failed to read renewal: {e}"))?;
-                let exp_in = renew.renewable_in_secs();
+                let exp_in = renew.renewable_in_secs(ah.profile.exp_window_secs);
                 Ok::<i64, anyhow::Error>(exp_in.max(0))
             })
             .process_results(|iter| iter.sorted())?
-            .next();
+            .next()
+            .map(Duration::seconds);
         Ok(next)
     }
 

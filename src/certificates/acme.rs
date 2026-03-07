@@ -228,7 +228,7 @@ impl AcmeRuntime {
             .filter(|ah| ah.keyfile.exists() && ah.certfile.exists())
             .then(|ah| async move {
                 info!("Loading certs from {}, {}", ah.keyfile, ah.certfile);
-                let hc = Arc::new(HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false).await?);
+                let hc = HostCertificate::new(ah.keyfile.clone(), ah.certfile.clone(), false).await?;
 
                 {
                     let mut renewal = ah.renewal.write()
@@ -238,8 +238,8 @@ impl AcmeRuntime {
 
                 Ok(hc)
             })
-            .collect::<Vec<Result<Arc<HostCertificate>>>>().await
-            .into_iter().collect::<Result<Vec<Arc<HostCertificate>>>>()?;
+            .collect::<Vec<Result<HostCertificate>>>().await
+            .into_iter().collect::<Result<Vec<HostCertificate>>>()?;
 
         // Initial load of existing certs. NOTE: This is slightly hacky
         // as we're possibly loading expired certs only to immediately
@@ -336,7 +336,7 @@ impl AcmeRuntime {
         Ok(next)
     }
 
-    async fn renew_acme(&self, acme_host: &AcmeHost) -> Result<Arc<HostCertificate>> {
+    async fn renew_acme(&self, acme_host: &AcmeHost) -> Result<HostCertificate> {
 
         let certificate_r = self.renew_instant_acme(acme_host).await;
 
@@ -360,10 +360,7 @@ impl AcmeRuntime {
             .context("Failed to write certfile {certfile}")?;
 
         info!("Loading new certificate");
-        let hc = {
-            let hc = HostCertificate::new(acme_host.keyfile.clone(), acme_host.certfile.clone(), false).await?;
-            Arc::new(hc)
-        };
+        let hc = HostCertificate::new(acme_host.keyfile.clone(), acme_host.certfile.clone(), false).await?;
         self.certstore.upsert(hc.clone())?;
 
         Ok(hc)

@@ -75,6 +75,7 @@ pub struct HostCertificate {
     inner: Arc<HostCertificateInner>,
 }
 
+
 impl HostCertificate {
 
     /// Load and check a public/private keypair & certs. Checks are
@@ -119,6 +120,14 @@ impl HostCertificate {
 
     pub fn watch(&self) -> bool {
         self.inner.watch
+    }
+}
+
+impl Clone for HostCertificate {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner)
+        }
     }
 }
 

@@ -28,10 +28,10 @@ use certutils::TEST_CERTS;
 // in /tests/utils/certs.rs; may be worth merging at some point?
 
 struct TestHostCerts {
-    pub snakeoil_1: Arc<HostCertificate>,
-    pub snakeoil_2: Arc<HostCertificate>,
-    pub www_example: Arc<HostCertificate>,
-    pub wildcard_example: Arc<HostCertificate>,
+    pub snakeoil_1: HostCertificate,
+    pub snakeoil_2: HostCertificate,
+    pub www_example: HostCertificate,
+    pub wildcard_example: HostCertificate,
 }
 
 impl TestHostCerts {
@@ -52,12 +52,12 @@ impl TestHostCerts {
 
 static TEST_HOST_CERTS: LazyLock<TestHostCerts> = LazyLock::new(|| TestHostCerts::new().unwrap());
 
-fn from_localcert(lc: &LocalCert, watch: bool) -> Result<Arc<HostCertificate>> {
+fn from_localcert(lc: &LocalCert, watch: bool) -> Result<HostCertificate> {
     let hc = futures::executor::block_on(
         HostCertificate::new(lc.keyfile.clone(),
                              lc.certfile.clone(),
                              watch))?;
-    Ok(Arc::new(hc))
+    Ok(hc)
 }
 
 #[tokio::test]
@@ -128,7 +128,7 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     tokio::fs::copy(so1.keyfile(), &key_path).await?;
     tokio::fs::copy(so1.certfile(), &cert_path).await?;
 
-    let hc = Arc::new(HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?);
+    let hc = HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?;
     let original_host = hc.hostnames()[0].clone();
     let store = Arc::new(CertStore::new(context.clone())?);
     store.upsert_all(vec![hc])?;
@@ -231,7 +231,7 @@ async fn test_file_update_success() -> Result<()> {
     let cert = TEST_HOST_CERTS.snakeoil_2.clone();
     fs::copy(cert.keyfile(), &key_path)?;
     fs::copy(cert.certfile(), &cert_path)?;
-    let newcert = Arc::new(HostCertificate::from(&first_cert).await?);
+    let newcert = HostCertificate::from(&first_cert).await?;
 
     store.update(newcert)?;
 
@@ -253,41 +253,6 @@ async fn test_file_update_success() -> Result<()> {
 
     Ok(())
 }
-
-// #[test]
-// fn test_asn1time_to_datetime() -> Result<()> {
-//     let past = chrono::DateTime::parse_from_rfc3339("2023-01-01 00:00:00+00:00")? // Jan 1, 2023
-//         .timestamp();
-//     let asn1_time = Asn1Time::from_unix(past).expect("Failed to create ASN.1 time");
-//     let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
-
-//     let expected = chrono::Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).single().expect("Invalid date");
-//     assert_eq!(datetime, expected);
-//     Ok(())
-// }
-
-// #[test]
-// fn test_asn1time_to_datetime_epoch() {
-//     // Test conversion of ASN.1 time at Unix epoch
-//     let asn1_time = Asn1Time::from_unix(0).expect("Failed to create ASN.1 time");
-//     let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
-
-//     let expected = chrono::Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).single().expect("Invalid date");
-//     assert_eq!(datetime, expected);
-// }
-
-// #[test]
-// fn test_asn1time_to_datetime_future() -> Result<()> {
-//     let datetime = chrono::DateTime::parse_from_rfc3339("2038-01-19 03:14:07+00:00")? // Jan 1, 2023
-//         .timestamp();
-//     let asn1_time = Asn1Time::from_unix(datetime).expect("Failed to create ASN.1 time"); // Year 2038
-//     let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
-
-//     let expected = chrono::Utc.with_ymd_and_hms(2038, 1, 19, 3, 14, 7).single().expect("Invalid date");
-//     assert_eq!(datetime, expected);
-
-//     Ok(())
-// }
 
 #[test]
 fn test_to_txt_name() {

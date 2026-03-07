@@ -21,8 +21,8 @@ use crate::{
 // truth. But a bit fiddly for MVP version.
 pub struct CertStore {
     _context: Arc<RunContext>,
-    by_host: Papaya<String, Arc<HostCertificate>>,
-    by_file: Papaya<Utf8PathBuf, Arc<HostCertificate>>,
+    by_host: Papaya<String, HostCertificate>,
+    by_file: Papaya<Utf8PathBuf, HostCertificate>,
 }
 
 impl CertStore {
@@ -38,14 +38,14 @@ impl CertStore {
         Ok(certstore)
     }
 
-    pub fn by_host(&self, host: &String) -> Option<Arc<HostCertificate>> {
+    pub fn by_host(&self, host: &String) -> Option<HostCertificate> {
         let pmap = self.by_host.pin();
         pmap.get(host)
-            .map(Arc::clone)
+            .cloned()
     }
 
     /// Takes a host and returns a matching wildcard, if any.
-    pub fn by_wildcard(&self, host: &str) -> Option<Arc<HostCertificate>> {
+    pub fn by_wildcard(&self, host: &str) -> Option<HostCertificate> {
         host.split_once('.')
             .and_then(|(_host, domain)| {
                 let wildcard = format!("*.{domain}");
@@ -54,13 +54,13 @@ impl CertStore {
 
     }
 
-    pub fn by_file(&self, file: &Utf8PathBuf) -> Option<Arc<HostCertificate>> {
+    pub fn by_file(&self, file: &Utf8PathBuf) -> Option<HostCertificate> {
         let pmap = self.by_file.pin();
         pmap.get(file)
             .cloned()
     }
 
-    pub fn upsert(&self, newcert: Arc<HostCertificate>) -> Result<()> {
+    pub fn upsert(&self, newcert: HostCertificate) -> Result<()> {
         for hostname in newcert.hostnames().iter() {
             let host = hostname.clone();
 
@@ -77,14 +77,14 @@ impl CertStore {
         Ok(())
     }
 
-    pub fn upsert_all(&self, newcerts: Vec<Arc<HostCertificate>>) -> Result<()> {
+    pub fn upsert_all(&self, newcerts: Vec<HostCertificate>) -> Result<()> {
         for hc in newcerts {
             self.upsert(hc)?;
         }
         Ok(())
     }
 
-    pub fn update(&self, newcert: Arc<HostCertificate>) -> Result<()> {
+    pub fn update(&self, newcert: HostCertificate) -> Result<()> {
         for hostname in newcert.hostnames().iter() {
             info!("Updating certificate for {hostname}");
             self.by_host.pin().update(hostname.clone(), |_old| newcert.clone())

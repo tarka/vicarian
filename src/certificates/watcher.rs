@@ -108,10 +108,10 @@ impl CertWatcher {
                 Ok(cert)
             })
             // 2-pass as .unique() doesn't work with Results
-            .collect::<Result<Vec<Arc<HostCertificate>>>>()?
+            .collect::<Result<Vec<HostCertificate>>>()?
             .into_iter()
             .unique()
-            .collect::<Vec<Arc<HostCertificate>>>();
+            .collect::<Vec<HostCertificate>>();
 
         for old in existing {
             // Attempt to reload the relevant HostCertificate.
@@ -120,7 +120,7 @@ impl CertWatcher {
             // for now.
             match HostCertificate::from(&old).await {
                 Ok(hc) => {
-                    self.certstore.update(Arc::new(hc))?;
+                    self.certstore.update(hc)?;
                 }
                 Err(err) => {
                     if err.is::<VicarianError>() {

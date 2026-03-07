@@ -70,6 +70,13 @@ impl HostCertificateInner {
 
 }
 
+/// A certificate and private key pair for a host.
+///
+/// This struct manages the lifecycle of a host certificate, including its
+/// hostnames, private key, certificate chain, and expiration date.
+///
+/// `HostCertificate` uses an internal `Arc` to share the underlying certificate data.
+/// Cloning a `HostCertificate` is a cheap operation that increments the reference count.
 #[derive(Debug)]
 pub struct HostCertificate {
     inner: Arc<HostCertificateInner>,
@@ -124,6 +131,7 @@ impl HostCertificate {
 }
 
 impl Clone for HostCertificate {
+    /// Performs a cheap clone of the `HostCertificate` by incrementing the internal reference count.
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner)

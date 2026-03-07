@@ -37,13 +37,13 @@ impl TlsAccept for CertHandler {
             .expect("Certificate for host not found");
         debug!("Found certificate for {host}");
 
-        ssl.set_private_key(&cert.key)
+        ssl.set_private_key(cert.key())
             .expect("Failed to set private key");
-        ssl.set_certificate(&cert.certs[0])
+        ssl.set_certificate(&cert.certs()[0])
             .expect("Failed to set certificate");
 
-        if cert.certs.len() > 1 {
-            for c in cert.certs[1..].iter() {
+        if cert.certs().len() > 1 {
+            for c in cert.certs().iter().skip(1) {
                 ssl.add_chain_cert(c)
                     .expect("Failed to add chain certificate");
             }

@@ -63,7 +63,7 @@ fn from_localcert(lc: &LocalCert, watch: bool) -> Result<Arc<HostCertificate>> {
 #[tokio::test]
 async fn test_load_certs_valid_pair() -> Result<()> {
     let so = &TEST_HOST_CERTS.snakeoil_1;
-    let result = load_hostcert(&so.keyfile, &so.certfile).await;
+    let result = load_hostcert(so.keyfile(), so.certfile()).await;
     assert!(result.is_ok());
 
     let (key, certs) = result.unwrap();
@@ -79,8 +79,8 @@ async fn test_load_certs_valid_pair() -> Result<()> {
 async fn test_load_certs_invalid_pair() -> Result<()> {
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
     let so2 = TEST_HOST_CERTS.snakeoil_2.clone();
-    let key_path = &so1.keyfile;
-    let other_cert_path = &so2.certfile;
+    let key_path = so1.keyfile();
+    let other_cert_path = so2.certfile();
 
     let result = load_hostcert(key_path, other_cert_path).await;
     assert!(result.is_err());
@@ -107,7 +107,7 @@ async fn test_load_certs_empty_cert_file() -> Result<()> {
 
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
 
-    let result = load_hostcert(&so1.keyfile, &empty_cert_path).await;
+    let result = load_hostcert(so1.keyfile(), &empty_cert_path).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("No certificates found in TLS .crt file"));
 
@@ -125,16 +125,16 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     let context = Arc::new(RunContext::new(crate::config::Config::default()));
 
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
-    tokio::fs::copy(&so1.keyfile, &key_path).await?;
-    tokio::fs::copy(&so1.certfile, &cert_path).await?;
+    tokio::fs::copy(so1.keyfile(), &key_path).await?;
+    tokio::fs::copy(so1.certfile(), &cert_path).await?;
 
     let hc = Arc::new(HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?);
-    let original_host = hc.hostnames[0].clone();
+    let original_host = hc.hostnames()[0].clone();
     let store = Arc::new(CertStore::new(context.clone())?);
     store.upsert_all(vec![hc])?;
 
     let original_cert = store.by_host(&original_host).unwrap();
-    let original_expiry = original_cert.certs[0].not_after().to_string();
+    let original_expiry = original_cert.certs()[0].not_after().to_string();
 
     let mut watcher = CertWatcher::new(store.clone(), context.clone());
 
@@ -149,15 +149,15 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     // Update the files
     println!("Updating cert files");
     let so2 = TEST_HOST_CERTS.snakeoil_2.clone();
-    tokio::fs::copy(&so2.keyfile, &key_path).await?;
-    tokio::fs::copy(&so2.certfile, &cert_path).await?;
+    tokio::fs::copy(so2.keyfile(), &key_path).await?;
+    tokio::fs::copy(so2.certfile(), &cert_path).await?;
 
     // Wait for the watcher to process the event
     tokio::time::sleep(RELOAD_GRACE + std::time::Duration::from_millis(500)).await;
 
     info!("Checking updated certs");
     let updated_cert = store.by_host(&original_host).unwrap();
-    let updated_expiry = updated_cert.certs[0].not_after().to_string();
+    let updated_expiry = updated_cert.certs()[0].not_after().to_string();
 
     assert_ne!(original_expiry, updated_expiry);
 
@@ -174,7 +174,7 @@ async fn test_by_host() {
     let store = CertStore::new(context).unwrap();
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
     store.upsert(cert.clone()).unwrap();
-    let found = store.by_host(&cert.hostnames[0]).unwrap();
+    let found = store.by_host(&cert.hostnames()[0]).unwrap();
 
     assert_eq!(found, cert);
 }
@@ -214,23 +214,23 @@ async fn test_file_update_success() -> Result<()> {
     let key_path = temp_dir.path().join("test.key");
     let cert_path = temp_dir.path().join("test.crt");
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
-    fs::copy(&cert.keyfile, &key_path)?;
-    fs::copy(&cert.certfile, &cert_path)?;
+    fs::copy(cert.keyfile(), &key_path)?;
+    fs::copy(cert.certfile(), &cert_path)?;
 
 
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context)?;
     store.upsert(cert.clone())?;
-    let original_host = cert.hostnames[0].clone();
+    let original_host = cert.hostnames()[0].clone();
 
     // The original cert is snakeoil
     let first_cert = store.by_host(&original_host).unwrap();
-    assert_eq!("snakeoil.example.com", first_cert.hostnames[0]);
+    assert_eq!("snakeoil.example.com", first_cert.hostnames()[0]);
 
     // Now update the files to snakeoil-2
     let cert = TEST_HOST_CERTS.snakeoil_2.clone();
-    fs::copy(&cert.keyfile, &key_path)?;
-    fs::copy(&cert.certfile, &cert_path)?;
+    fs::copy(cert.keyfile(), &key_path)?;
+    fs::copy(cert.certfile(), &cert_path)?;
     let newcert = Arc::new(HostCertificate::from(&first_cert).await?);
 
     store.update(newcert)?;
@@ -240,11 +240,11 @@ async fn test_file_update_success() -> Result<()> {
         Utf8PathBuf::from_path_buf(cert_path).unwrap(),
         true
     ).await?;
-    let new_host = updated_cert_from_file.hostnames[0].clone();
+    let new_host = updated_cert_from_file.hostnames()[0].clone();
 
     // The store should have updated the certificate.
     let updated_cert_from_store = store.by_host(&new_host).expect("Cert not found for new host");
-    assert_eq!(updated_cert_from_store.hostnames[0], new_host);
+    assert_eq!(updated_cert_from_store.hostnames()[0], new_host);
 
     // The old entry should not exist anymore if the host has changed.
     if original_host != new_host {
@@ -308,7 +308,7 @@ fn test_to_txt_name() {
 async fn test_wildcard() -> Result<()> {
     let wildcard = TEST_HOST_CERTS.wildcard_example.clone();
 
-    assert!(wildcard.hostnames.contains(&"*.example.com".to_string()));
+    assert!(wildcard.hostnames().contains(&"*.example.com".to_string()));
 
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context)?;
@@ -318,14 +318,14 @@ async fn test_wildcard() -> Result<()> {
         let by_host = store.by_host(&"otherhost.example.com".to_string());
         assert!(by_host.is_none());
         let by_wildcard = store.by_wildcard("otherhost.example.com").unwrap();
-        assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames.first());
+        assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames().first());
     }
 
     {
         let by_host = store.by_host(&"*.example.com".to_string()).unwrap();
-        assert_eq!(Some(&"*.example.com".to_string()), by_host.hostnames.first());
+        assert_eq!(Some(&"*.example.com".to_string()), by_host.hostnames().first());
         let by_wildcard = store.by_wildcard("realhost.example.com").unwrap();
-        assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames.first());
+        assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames().first());
     }
 
     Ok(())

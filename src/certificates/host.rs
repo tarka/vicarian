@@ -20,17 +20,17 @@ use x509_parser::prelude::{FromDer, X509Certificate};
 use crate::errors::VicarianError;
 
 #[derive(Debug)]
-pub struct HostCertificate {
-    pub hostnames: Vec<String>,
-    pub keyfile: Utf8PathBuf,
-    pub key: PKey<Private>,
-    pub certfile: Utf8PathBuf,
-    pub certs: Vec<X509>,
-    pub expires: DateTime<Utc>,
-    pub watch: bool,
+pub struct HostCertificateInner {
+    hostnames: Vec<String>,
+    keyfile: Utf8PathBuf,
+    key: PKey<Private>,
+    certfile: Utf8PathBuf,
+    certs: Vec<X509>,
+    expires: DateTime<Utc>,
+    watch: bool,
 }
 
-impl HostCertificate {
+impl HostCertificateInner {
 
     /// Load and check a public/private keypair & certs. Checks are
     /// performed, and Error::CertificateMismatch may be returned; as
@@ -57,7 +57,7 @@ impl HostCertificate {
         let expires = get_not_after(certs[0].to_der()?.as_slice())?;
 
         info!("Loaded certificate {:?}, expires {}", hostnames, expires);
-        Ok(HostCertificate {
+        Ok(HostCertificateInner {
             hostnames,
             keyfile,
             key,
@@ -68,16 +68,63 @@ impl HostCertificate {
         })
     }
 
+}
+
+#[derive(Debug)]
+pub struct HostCertificate {
+    inner: Arc<HostCertificateInner>,
+}
+
+impl HostCertificate {
+
+    /// Load and check a public/private keypair & certs. Checks are
+    /// performed, and Error::CertificateMismatch may be returned; as
+    /// this may be expected (e.g. while certs are being updated) it
+    /// should be checked for if necessary.
+    pub async fn new(keyfile: Utf8PathBuf, certfile: Utf8PathBuf, watch: bool) -> Result<Self> {
+        Ok(Self {
+            inner: Arc::new(HostCertificateInner::new(keyfile, certfile, watch).await?),
+        })
+    }
+
     /// Generates a fresh certificate from an existing one. This is
     /// effectively a reload.
-    pub async fn from(hc: &Arc<HostCertificate>) -> Result<HostCertificate> {
-        HostCertificate::new(hc.keyfile.clone(), hc.certfile.clone(), hc.watch).await
+    pub async fn from(hc: &HostCertificate) -> Result<HostCertificate> {
+        HostCertificate::new(hc.keyfile().to_path_buf(), hc.certfile().to_path_buf(), hc.watch()).await
+    }
+
+    pub fn hostnames(&self) -> &[String] {
+        &self.inner.hostnames
+    }
+
+    pub fn keyfile(&self) -> &Utf8Path {
+        &self.inner.keyfile
+    }
+
+    pub fn key(&self) -> &PKey<Private> {
+        &self.inner.key
+    }
+
+    pub fn certfile(&self) -> &Utf8Path {
+        &self.inner.certfile
+    }
+
+    pub fn certs(&self) -> &[X509] {
+        &self.inner.certs
+    }
+
+    pub fn expires(&self) -> &DateTime<Utc> {
+        &self.inner.expires
+    }
+
+    pub fn watch(&self) -> bool {
+        self.inner.watch
     }
 }
 
 pub fn offset_to_chrono(odt: OffsetDateTime) -> DateTime<Utc> {
     let secs = odt.unix_timestamp();
-    let nanos = odt.nanosecond(); // 0–999_999_999
+    let nanos = odt.nanosecond();
 
     // from_timestamp returns Option; unwrap if you trust the input
     DateTime::<Utc>::from_timestamp(secs, nanos)
@@ -97,7 +144,7 @@ pub(crate) fn get_not_after(der_data: &[u8]) -> Result<DateTime<Utc>> {
 
 impl PartialEq<HostCertificate> for HostCertificate {
     fn eq(&self, other: &Self) -> bool {
-        self.certs[0].signature().as_slice() == other.certs[0].signature().as_slice()
+        self.certs()[0].signature().as_slice() == other.certs()[0].signature().as_slice()
     }
 }
 
@@ -106,7 +153,7 @@ impl Eq for HostCertificate {
 
 impl Hash for HostCertificate {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.certs[0].signature().as_slice()
+        self.certs()[0].signature().as_slice()
             .hash(state)
     }
 }

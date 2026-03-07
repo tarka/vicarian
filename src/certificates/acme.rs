@@ -233,7 +233,7 @@ impl AcmeRuntime {
                 {
                     let mut renewal = ah.renewal.write()
                         .map_err(|e| anyhow!("Failed to lock renewal struct: {e}"))?;
-                    *renewal = Renewal::new(hc.expires);
+                    *renewal = Renewal::new(*hc.expires());
                 }
 
                 Ok(hc)
@@ -294,7 +294,7 @@ impl AcmeRuntime {
                 Ok(hc) => {
                     let mut lock = ahost.renewal.write()
                         .map_err(|e| anyhow!("Failed to lock renewal for {}: {e}", ahost.fqdn))?;
-                    *lock = Renewal::new(hc.expires - TimeDelta::seconds(ahost.profile.exp_window_secs));
+                    *lock = Renewal::new(*hc.expires() - TimeDelta::seconds(ahost.profile.exp_window_secs));
                 },
                 // TODO: Differentiate network vs local errors?
                 Err(e) => {

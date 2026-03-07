@@ -61,15 +61,15 @@ impl CertStore {
     }
 
     pub fn upsert(&self, newcert: Arc<HostCertificate>) -> Result<()> {
-        for hostname in newcert.hostnames.iter() {
+        for hostname in newcert.hostnames().iter() {
             let host = hostname.clone();
 
             info!("Updating/inserting certificate for {host}");
             self.by_host.pin().update_or_insert(host, |_old| newcert.clone(), newcert.clone());
         }
 
-        let keyfile = newcert.keyfile.clone();
-        let certfile = newcert.certfile.clone();
+        let keyfile = newcert.keyfile().to_path_buf();
+        let certfile = newcert.certfile().to_path_buf();
         let by_file = self.by_file.pin();
         by_file.update_or_insert(keyfile, |_old| newcert.clone(), newcert.clone());
         by_file.update_or_insert(certfile, |_old| newcert.clone(), newcert.clone());
@@ -85,19 +85,19 @@ impl CertStore {
     }
 
     pub fn update(&self, newcert: Arc<HostCertificate>) -> Result<()> {
-        for hostname in newcert.hostnames.iter() {
+        for hostname in newcert.hostnames().iter() {
             info!("Updating certificate for {hostname}");
             self.by_host.pin().update(hostname.clone(), |_old| newcert.clone())
                 .ok_or(anyhow!("Matching host for {} not found in cert store", hostname))?;
         }
 
-        let keyfile = newcert.keyfile.clone();
-        let certfile = newcert.certfile.clone();
+        let keyfile = newcert.keyfile().to_path_buf();
+        let certfile = newcert.certfile().to_path_buf();
         let by_file = self.by_file.pin();
         by_file.update(keyfile, |_old| newcert.clone())
-            .ok_or(anyhow!("File {} not found in cert store", newcert.keyfile))?;
+            .ok_or(anyhow!("File {} not found in cert store", newcert.keyfile()))?;
         by_file.update(certfile, |_old| newcert.clone())
-            .ok_or(anyhow!("File {} not found in cert store", newcert.certfile))?;
+            .ok_or(anyhow!("File {} not found in cert store", newcert.certfile()))?;
 
         Ok(())
     }
@@ -105,8 +105,8 @@ impl CertStore {
     pub fn watchlist(&self) -> Vec<Utf8PathBuf> {
         let by_host = self.by_host.pin();
         by_host.values()
-            .filter_map(|h| if h.watch {
-                Some(vec![h.keyfile.clone(), h.certfile.clone()])
+            .filter_map(|h| if h.watch() {
+                Some(vec![h.keyfile().to_path_buf(), h.certfile().to_path_buf()])
             } else {
                 None
             })

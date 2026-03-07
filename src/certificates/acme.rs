@@ -99,7 +99,7 @@ impl Renewal {
         in_secs >= self.renew_at
     }
 
-    pub fn expires_in_secs(&self) -> i64 {
+    pub fn renewable_in_secs(&self) -> i64 {
         let now = Utc::now();
         let diff = self.renew_at - now;
         diff.num_seconds()
@@ -250,7 +250,7 @@ impl AcmeRuntime {
 
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
-            let next_secs = self.next_expiring_secs()?;
+            let next_secs = self.next_renewable_secs()?;
             let next_secs = next_secs.and_then(|s| TimeDelta::new(s, 0));
 
             let expiring_secs = if let Some(seconds) = next_secs {
@@ -294,7 +294,7 @@ impl AcmeRuntime {
                 Ok(hc) => {
                     let mut lock = ahost.renewal.write()
                         .map_err(|e| anyhow!("Failed to lock renewal for {}: {e}", ahost.fqdn))?;
-                    *lock = Renewal::new(hc.expires);
+                    *lock = Renewal::new(hc.expires - TimeDelta::seconds(ahost.profile.exp_window_secs));
                 },
                 // TODO: Differentiate network vs local errors?
                 Err(e) => {
@@ -323,12 +323,12 @@ impl AcmeRuntime {
           .collect()
     }
 
-    fn next_expiring_secs(&self) -> Result<Option<i64>> {
+    fn next_renewable_secs(&self) -> Result<Option<i64>> {
         let next = self.acme_hosts.iter()
             .map(|ah| {
                 let renew = ah.renewal.read()
                     .map_err(|e| anyhow!("Failed to read renewal: {e}"))?;
-                let exp_in = renew.expires_in_secs();
+                let exp_in = renew.renewable_in_secs();
                 Ok::<i64, anyhow::Error>(exp_in.max(0))
             })
             .process_results(|iter| iter.sorted())?

@@ -3,11 +3,8 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
-use boring::{
-    asn1::{Asn1Time, Asn1TimeRef},
-    x509::GeneralNameRef,
-};
+use anyhow::{bail, Context, Result};
+use pingora_boringssl::x509::GeneralNameRef;
 use camino::{Utf8Path, Utf8PathBuf};
 use chrono::{DateTime, Utc};
 
@@ -16,7 +13,9 @@ use pingora_boringssl::{
     pkey::{PKey, Private},
     x509::X509,
 };
+use time::OffsetDateTime;
 use tracing_log::log::info;
+use x509_parser::prelude::{FromDer, X509Certificate};
 
 use crate::errors::VicarianError;
 
@@ -55,8 +54,7 @@ impl HostCertificate {
             .unique() // Subject may also appear in aliases
             .collect();
 
-        let not_after = certs[0].not_after();
-        let expires = asn1time_to_datetime(not_after)?;
+        let expires = get_not_after(certs[0].to_der()?.as_slice())?;
 
         info!("Loaded certificate {:?}, expires {}", hostnames, expires);
         Ok(HostCertificate {
@@ -77,17 +75,24 @@ impl HostCertificate {
     }
 }
 
-pub(crate) fn asn1time_to_datetime(not_after: &Asn1TimeRef) -> Result<DateTime<Utc>> {
-    let epoch = Asn1Time::from_unix(0)?;
-    let time_diff = not_after.diff(&epoch)?; // Returns -(expected_value)
+pub fn offset_to_chrono(odt: OffsetDateTime) -> DateTime<Utc> {
+    let secs = odt.unix_timestamp();
+    let nanos = odt.nanosecond(); // 0–999_999_999
 
-    // Calculate total seconds and convert to positive
-    let total_seconds = -((time_diff.days as i64 * 86400) + time_diff.secs as i64);
+    // from_timestamp returns Option; unwrap if you trust the input
+    DateTime::<Utc>::from_timestamp(secs, nanos)
+        .expect("Valid timestamp")
+}
 
-    let datetime = DateTime::<Utc>::from_timestamp(total_seconds, 0)
-        .ok_or(anyhow!("Failed to create DateTime from timestamp"))?;
+// When parsing a certificate, validity dates are already available as Asn1DateTime
+pub(crate) fn get_not_after(der_data: &[u8]) -> Result<DateTime<Utc>> {
+    let (_, cert) = X509Certificate::from_der(der_data)?;
+    let validity = cert.validity();
 
-    Ok(datetime)
+    // Asn1DateTime has to_datetime() that returns chrono::DateTime<Utc>
+    let not_after = offset_to_chrono(validity.not_after.to_datetime());
+
+    Ok(not_after)
 }
 
 impl PartialEq<HostCertificate> for HostCertificate {

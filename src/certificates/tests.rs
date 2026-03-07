@@ -8,9 +8,7 @@ use std::{
 };
 
 use anyhow::Result;
-use boring::asn1::Asn1Time;
 use camino::{Utf8Path, Utf8PathBuf};
-use chrono::TimeZone;
 use tempfile::{NamedTempFile, tempdir};
 use test_log::test;
 use tracing_log::log::info;
@@ -18,7 +16,7 @@ use tracing_log::log::info;
 use crate::{
     RunContext,
     certificates::{
-        HostCertificate, acme::to_txt_name, host::asn1time_to_datetime, host::load_hostcert, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}
+        HostCertificate, acme::to_txt_name, host::load_hostcert, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}
     },
     config::Config,
     errors::VicarianError,
@@ -256,40 +254,40 @@ async fn test_file_update_success() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_asn1time_to_datetime() -> Result<()> {
-    let past = chrono::DateTime::parse_from_rfc3339("2023-01-01 00:00:00+00:00")? // Jan 1, 2023
-        .timestamp();
-    let asn1_time = Asn1Time::from_unix(past).expect("Failed to create ASN.1 time");
-    let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
+// #[test]
+// fn test_asn1time_to_datetime() -> Result<()> {
+//     let past = chrono::DateTime::parse_from_rfc3339("2023-01-01 00:00:00+00:00")? // Jan 1, 2023
+//         .timestamp();
+//     let asn1_time = Asn1Time::from_unix(past).expect("Failed to create ASN.1 time");
+//     let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
-    let expected = chrono::Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).single().expect("Invalid date");
-    assert_eq!(datetime, expected);
-    Ok(())
-}
+//     let expected = chrono::Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).single().expect("Invalid date");
+//     assert_eq!(datetime, expected);
+//     Ok(())
+// }
 
-#[test]
-fn test_asn1time_to_datetime_epoch() {
-    // Test conversion of ASN.1 time at Unix epoch
-    let asn1_time = Asn1Time::from_unix(0).expect("Failed to create ASN.1 time");
-    let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
+// #[test]
+// fn test_asn1time_to_datetime_epoch() {
+//     // Test conversion of ASN.1 time at Unix epoch
+//     let asn1_time = Asn1Time::from_unix(0).expect("Failed to create ASN.1 time");
+//     let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
-    let expected = chrono::Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).single().expect("Invalid date");
-    assert_eq!(datetime, expected);
-}
+//     let expected = chrono::Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).single().expect("Invalid date");
+//     assert_eq!(datetime, expected);
+// }
 
-#[test]
-fn test_asn1time_to_datetime_future() -> Result<()> {
-    let datetime = chrono::DateTime::parse_from_rfc3339("2038-01-19 03:14:07+00:00")? // Jan 1, 2023
-        .timestamp();
-    let asn1_time = Asn1Time::from_unix(datetime).expect("Failed to create ASN.1 time"); // Year 2038
-    let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
+// #[test]
+// fn test_asn1time_to_datetime_future() -> Result<()> {
+//     let datetime = chrono::DateTime::parse_from_rfc3339("2038-01-19 03:14:07+00:00")? // Jan 1, 2023
+//         .timestamp();
+//     let asn1_time = Asn1Time::from_unix(datetime).expect("Failed to create ASN.1 time"); // Year 2038
+//     let datetime = asn1time_to_datetime(asn1_time.as_ref()).expect("Failed to convert ASN.1 time");
 
-    let expected = chrono::Utc.with_ymd_and_hms(2038, 1, 19, 3, 14, 7).single().expect("Invalid date");
-    assert_eq!(datetime, expected);
+//     let expected = chrono::Utc.with_ymd_and_hms(2038, 1, 19, 3, 14, 7).single().expect("Invalid date");
+//     assert_eq!(datetime, expected);
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[test]
 fn test_to_txt_name() {

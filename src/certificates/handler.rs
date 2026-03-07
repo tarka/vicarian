@@ -25,7 +25,7 @@ impl TlsAccept for CertHandler {
 
     // NOTE:This is all boringssl specific as pingora doesn't
     // currently support dynamic certs with rustls.
-    async fn certificate_callback(&self, ssl: &mut TlsRef) -> () {
+    async fn certificate_callback(&self, ssl: &mut TlsRef) {
         let host = ssl.servername(NameType::HOST_NAME)
             .map(str::to_string)
             .expect("No servername in TLS handshake");

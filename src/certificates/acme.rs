@@ -1,6 +1,6 @@
 use std::{fs::create_dir_all, iter, net::SocketAddr, sync::{Arc, RwLock}};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use camino::Utf8PathBuf;
 use dnsclient::{UpstreamServer, r#async::DNSClient};
 use futures_lite::{stream, StreamExt};
@@ -389,7 +389,7 @@ impl AcmeRuntime {
                 // It's technically possibly to pick up an old auth order here
                 // which returns ::Valid?
                 AuthorizationStatus::Valid => break,
-                _ => todo!(),
+                _ => bail!("Failed to renew {} due to unexpected upstream status {:?}", acme_host.fqdn, auth.status),
             }
 
             info!("Creating challenge");

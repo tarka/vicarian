@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3](https://github.com/tarka/vicarian/compare/v0.2.2...v0.2.3) - 2026-03-07
+
+### Other
+
+- Fixes and cleanups for renewal time logic.
+- Remove redundant unit return
+- Return an error rather than panicing on unexpected Acme status.
+- Fix clippy warning in test utils.
+- Convert to using time crate and std for datetime
+- Add doc to HostCertificate
+- Impl Clone for HostCert and remove all Arc wrappers.
+- Add some error clarifications.
+- Start of converting HostCert to us an inner arc.
+- Remove dependency on boring to avoid clashes with pingora-boringssl
+- Bump dependencies
+
 ## [0.2.2](https://github.com/tarka/vicarian/compare/v0.2.1...v0.2.2) - 2026-03-07
 
 ### <!-- 1 -->Bug Fixes

@@ -2,7 +2,6 @@ use std::{fs::create_dir_all, iter, net::SocketAddr, sync::{Arc, RwLock}};
 
 use anyhow::{Context, Result, anyhow};
 use camino::Utf8PathBuf;
-use chrono::{DateTime, Local, TimeDelta, Utc};
 use dnsclient::{UpstreamServer, r#async::DNSClient};
 use futures_lite::{stream, StreamExt};
 use instant_acme::{
@@ -15,6 +14,7 @@ use tokio::{
     fs::{self, File, read_to_string},
     io::AsyncWriteExt,
 };
+use time::{Duration, OffsetDateTime};
 use tracing_log::log::{debug, error, info, warn};
 use zone_update::async_impl::AsyncDnsProvider;
 
@@ -27,7 +27,7 @@ use crate::{
 const DAYS_TO_SECS: i64 =  24 * 60 * 60;
 // TODO: Fuzz range calculated from profile
 const FUZZY_RANGE: (i64, i64) = (30, 120);
-const ONE_SECOND: TimeDelta = TimeDelta::new(1, 0).unwrap();
+const ONE_SECOND: Duration = Duration::seconds(1);
 
 #[derive(Debug)]
 struct LeProfile {
@@ -80,14 +80,14 @@ impl AcmeHost {
 
 #[derive(Debug)]
 struct Renewal {
-    renew_at: DateTime<Utc>,
+    renew_at: OffsetDateTime,
     tries: u64,
 }
 
 impl Renewal {
-    const BACKOFF: TimeDelta = TimeDelta::hours(1);
+    const BACKOFF: Duration = Duration::hours(1);
 
-    fn new(renew_at: DateTime<Utc>) -> Self {
+    fn new(renew_at: OffsetDateTime) -> Self {
         Self {
             renew_at,
             tries: 0,
@@ -95,14 +95,14 @@ impl Renewal {
     }
 
     fn is_renewable_in(&self, secs: i64) -> bool {
-        let in_secs = Utc::now() + TimeDelta::seconds(secs);
+        let in_secs = OffsetDateTime::now_utc() + Duration::seconds(secs);
         in_secs >= self.renew_at
     }
 
     pub fn renewable_in_secs(&self) -> i64 {
-        let now = Utc::now();
+        let now = OffsetDateTime::now_utc();
         let diff = self.renew_at - now;
-        diff.num_seconds()
+        diff.whole_seconds()
     }
 
     fn backoff(&self) -> Self {
@@ -110,7 +110,7 @@ impl Renewal {
         // backoff is probably fine assuming the errors are due to
         // upstream issues with DNS providers or LetsEncrypt.
         Self {
-            renew_at: Utc::now() + Self::BACKOFF,
+            renew_at: OffsetDateTime::now_utc() + Self::BACKOFF,
             tries: self.tries + 1,
         }
     }
@@ -188,7 +188,7 @@ impl AcmeRuntime {
                 let profile = LE_PROFILES.get(aconf.profile.into())
                         .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;
 
-                let renewal = RwLock::new(Renewal::new(DateTime::<Utc>::MIN_UTC));
+                let renewal = RwLock::new(Renewal::new(OffsetDateTime::UNIX_EPOCH));
 
                 let acme_host = AcmeHost {
                     fqdn: cert_hostname,
@@ -251,16 +251,15 @@ impl AcmeRuntime {
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
             let next_secs = self.next_renewable_secs()?;
-            let next_secs = next_secs.and_then(|s| TimeDelta::new(s, 0));
+            let next_secs = next_secs.map(Duration::seconds);
 
             let expiring_secs = if let Some(seconds) = next_secs {
                 let fuzzy = {
                     let rand = fastrand::i64(FUZZY_RANGE.0..FUZZY_RANGE.1);
-                    seconds + TimeDelta::seconds(rand)
+                    seconds + Duration::seconds(rand)
                 };
-                let local: DateTime<Local> = DateTime::from(Utc::now() + fuzzy);
-                let fmt = local.format("%Y-%m-%d %H:%M:%S %z");
-                info!("Wait for next expiry at {fmt}");
+                let renew_at = OffsetDateTime::now_utc() + fuzzy;
+                info!("Wait for next expiry at {renew_at}");
 
                 fuzzy
 
@@ -271,7 +270,7 @@ impl AcmeRuntime {
             };
 
             tokio::select! {
-                _ = tokio::time::sleep(expiring_secs.to_std()?) => {
+                _ = tokio::time::sleep(expiring_secs.try_into()?) => {
                     info!("Woken up for ACME renewal; processing all pending certs");
                     self.renew_all_pending().await?;
                 }
@@ -294,7 +293,7 @@ impl AcmeRuntime {
                 Ok(hc) => {
                     let mut lock = ahost.renewal.write()
                         .map_err(|e| anyhow!("Failed to lock renewal for {}: {e}", ahost.fqdn))?;
-                    *lock = Renewal::new(*hc.expires() - TimeDelta::seconds(ahost.profile.exp_window_secs));
+                    *lock = Renewal::new(*hc.expires() - Duration::seconds(ahost.profile.exp_window_secs));
                 },
                 // TODO: Differentiate network vs local errors?
                 Err(e) => {
@@ -587,7 +586,7 @@ async fn wait_for_dns(txt_fqdn: &String) -> Result<()> {
             info!("Found {txt_fqdn}");
             return Ok(());
         }
-        tokio::time::sleep(ONE_SECOND.to_std()?).await;
+        tokio::time::sleep(ONE_SECOND.try_into()?).await;
     }
 
     Err(anyhow!("Failed to find record {txt_fqdn} in public DNS"))

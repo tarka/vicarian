@@ -3,10 +3,9 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use pingora_boringssl::x509::GeneralNameRef;
 use camino::{Utf8Path, Utf8PathBuf};
-use chrono::{DateTime, Utc};
 
 use itertools::Itertools;
 use pingora_boringssl::{
@@ -26,7 +25,7 @@ pub struct HostCertificateInner {
     key: PKey<Private>,
     certfile: Utf8PathBuf,
     certs: Vec<X509>,
-    expires: DateTime<Utc>,
+    expires: OffsetDateTime,
     watch: bool,
 }
 
@@ -121,7 +120,7 @@ impl HostCertificate {
         &self.inner.certs
     }
 
-    pub fn expires(&self) -> &DateTime<Utc> {
+    pub fn expires(&self) -> &OffsetDateTime {
         &self.inner.expires
     }
 
@@ -139,22 +138,12 @@ impl Clone for HostCertificate {
     }
 }
 
-pub fn offset_to_chrono(odt: OffsetDateTime) -> Result<DateTime<Utc>> {
-    let secs = odt.unix_timestamp();
-    let nanos = odt.nanosecond();
-
-    DateTime::<Utc>::from_timestamp(secs, nanos)
-        .ok_or(anyhow!("Failed to convert OffsetDateTime: {odt:?}"))
-
-}
-
 // When parsing a certificate, validity dates are already available as Asn1DateTime
-pub(crate) fn get_not_after(der_data: &[u8]) -> Result<DateTime<Utc>> {
+pub(crate) fn get_not_after(der_data: &[u8]) -> Result<OffsetDateTime> {
     let (_, cert) = X509Certificate::from_der(der_data)?;
     let validity = cert.validity();
 
-    // Asn1DateTime has to_datetime() that returns chrono::DateTime<Utc>
-    let not_after = offset_to_chrono(validity.not_after.to_datetime())?;
+    let not_after = validity.not_after.to_datetime();
 
     Ok(not_after)
 }

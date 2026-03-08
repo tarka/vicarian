@@ -14,6 +14,7 @@ use tokio::sync::watch;
 use tracing::level_filters::LevelFilter;
 use tracing_log::log::info;
 
+use crate::metrics::Metrics;
 use crate::{
     certificates::CertificateRuntime,
     config::{Config, DEFAULT_CONFIG_FILE},
@@ -83,11 +84,16 @@ fn main() -> Result<()> {
 
     let context = Arc::new(RunContext::new(config));
 
-    ///// Runtime start
+    // Runtime start
 
     let cert_runtime = Arc::new(CertificateRuntime::new(context.clone())?);
-    let cert_handle = {
+    let metrics = Arc::new(Metrics::new(context.clone())?);
+
+    // Pingora starts its own tokio runtimes, so we create one here to
+    // handle certificate and support tasks.
+    let maint_handle = {
         let crt = cert_runtime.clone();
+        let mrt = metrics.clone();
 
         thread::spawn(move || -> Result<()> {
             info!("Starting Certificate Management runtime");
@@ -95,6 +101,10 @@ fn main() -> Result<()> {
                 .enable_time()
                 .enable_io()
                 .build()?;
+
+            trt.spawn(async move {
+                mrt.run().await
+            });
 
             trt.block_on(
                 crt.run_indefinitely()
@@ -105,10 +115,10 @@ fn main() -> Result<()> {
     };
 
     info!("Starting Vicarian");
-    proxy::run_indefinitely(cert_runtime.clone(), context.clone())?;
+    proxy::run_indefinitely(cert_runtime.clone(), metrics.clone(), context.clone())?;
 
     context.quit()?;
-    cert_handle.join()
+    maint_handle.join()
         .expect("Failed to finalise certificate management tasks")?;
 
     info!("Vicarian finished.");

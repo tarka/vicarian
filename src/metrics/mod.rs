@@ -8,7 +8,7 @@ use crate::RunContext;
 
 const UPKEEP_TIMEOUT: Duration = Duration::from_secs(60);
 
-struct Metrics {
+pub struct Metrics {
     handle: PrometheusHandle,
     context: Arc<RunContext>,
 }
@@ -25,7 +25,7 @@ impl Metrics {
         })
     }
 
-    async fn run(&self) -> Result<()> {
+    pub async fn run(&self) {
         info!("Starting Metrics runtime");
 
         let mut quit_rx = self.context.quit_rx.clone();
@@ -43,7 +43,6 @@ impl Metrics {
                 },
             };
         }
-        Ok(())
     }
 
 }

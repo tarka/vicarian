@@ -1,9 +1,10 @@
 mod certificates;
 mod config;
 mod errors;
+mod metrics;
 mod proxy;
 
-use std::sync::Arc;
+use std::{sync::Arc, thread::JoinHandle};
 use std::thread;
 
 use anyhow::Result;
@@ -66,6 +67,7 @@ fn system_setup() -> Result<()> {
 
     Ok(())
 }
+
 
 fn main() -> Result<()> {
     let cli = config::CliOptions::from_args();

@@ -102,8 +102,8 @@ fn test_tls_example_interface() -> Result<()> {
 fn test_no_optionals() -> Result<()> {
     let file = Utf8PathBuf::from("tests/data/config/no-optionals.corn");
     let config = Config::from_file(&file)?;
-    assert_eq!("host01.example.com", config.vhosts[0].hostname);
 
+    assert_eq!("host01.example.com", config.vhosts[0].hostname);
     assert_eq!(443, config.listen.tls_port);
     assert!(matches!(&config.vhosts[0].tls, TlsConfig::Files(
         TlsFilesConfig {
@@ -111,6 +111,18 @@ fn test_no_optionals() -> Result<()> {
             certfile: _,
             reload: true,
         })));
+
+    Ok(())
+}
+
+#[test]
+fn test_component_backend() -> Result<()> {
+    let file = Utf8PathBuf::from("tests/data/config/component-backend.corn");
+    let config = Config::from_file(&file)?;
+
+    let url = &config.vhosts[0].backends[0].url;
+    assert_eq!("component", url.scheme_str().unwrap());
+    assert_eq!("metrics", url.authority().unwrap());
 
     Ok(())
 }

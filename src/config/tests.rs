@@ -116,12 +116,12 @@ fn test_no_optionals() -> Result<()> {
 }
 
 #[test]
-fn test_component_backend() -> Result<()> {
-    let file = Utf8PathBuf::from("tests/data/config/component-backend.corn");
+fn test_module_backend() -> Result<()> {
+    let file = Utf8PathBuf::from("tests/data/config/module-backend.corn");
     let config = Config::from_file(&file)?;
 
     let url = &config.vhosts[0].backends[0].url;
-    assert_eq!("component", url.scheme_str().unwrap());
+    assert_eq!("module", url.scheme_str().unwrap());
     assert_eq!("metrics", url.authority().unwrap());
 
     Ok(())

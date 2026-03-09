@@ -11,7 +11,7 @@
             }
             backends = [
                 {
-                    url = "component://metrics"
+                    url = "module://metrics"
                 }
             ]
         }

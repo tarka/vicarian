@@ -1,12 +1,14 @@
 use std::{iter, sync::Arc};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use http::{
     HeaderValue, Response, StatusCode, Uri,
     header::{self, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
     uri::{Builder, Scheme},
 };
 
+use metrics::counter;
 use pingora_core::{
     ErrorType, OkOrErr, OrErr, apps::http_app::ServeHttp, prelude::HttpPeer,
     protocols::http::ServerSession, upstreams::peer::Peer,
@@ -16,7 +18,7 @@ use pingora_proxy::{ProxyHttp, Session};
 use tracing::{debug, info};
 
 use crate::{
-    RunContext, certificates::{acme::AcmeRuntime, store::CertStore}, config::Backend, proxy::{rewrite_port, router::Router, strip_port}
+    RunContext, certificates::{acme::AcmeRuntime, store::CertStore}, config::Backend, metrics::Metrics, proxy::{rewrite_port, router::Router, strip_port}
 };
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
@@ -178,6 +180,22 @@ impl Vicarian {
             routes_by_host,
         }
     }
+
+    async fn metrics_reply(&self, session: &mut Session) -> pingora_core::Result<()> {
+        counter!("http_metrics_scrape_total").increment(1);
+
+        info!("Replying to metrics endpoint");
+        let metrics = Metrics::get();
+        let scraped = metrics.handle.render();
+        let body = Bytes::copy_from_slice(scraped.as_bytes());
+
+        let mut header = ResponseHeader::build(200, Some(body.len()))?;
+        header.insert_header(header::CONTENT_TYPE, "text/plain")?;
+        session.write_response_header(Box::new(header), false).await?;
+        session.write_response_body(Some(body), true).await?;
+
+        Ok(())
+    }
 }
 
 const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
@@ -204,12 +222,14 @@ impl ProxyHttp for Vicarian {
 
         let components = to_components(session)?;
 
-        let pinned = self.routes_by_host.pin();
-        let router = pinned.get(&components.host.to_string())
-            .or_err(E404, "Hostname not found in backends")?;
-        let backend = router.lookup(components.path)
-            .or_err(E404, "Path not found in host backends")?
-            .backend;
+        let backend = {
+            let pinned = self.routes_by_host.pin();
+            let router = pinned.get(&components.host.to_string())
+                .or_err(E404, "Hostname not found in backends")?;
+            router.lookup(components.path)
+                .or_err(E404, "Path not found in host backends")?
+                .backend
+        };
         let url = &backend.url;
 
         let scheme = url.scheme_str()
@@ -230,7 +250,7 @@ impl ProxyHttp for Vicarian {
 
                 match module.as_str() {
                     "metrics" => {
-
+                        self.metrics_reply(session).await?;
                     }
                     _ => {
                         let desc = format!("Unknown URL scheme: {scheme}");

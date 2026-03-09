@@ -13,7 +13,7 @@ static METRICS: OnceCell<Metrics> = OnceCell::const_new();
 
 #[derive(Debug)]
 pub struct Metrics {
-    handle: PrometheusHandle,
+    pub handle: PrometheusHandle,
     context: Arc<RunContext>,
 }
 
@@ -30,6 +30,10 @@ impl Metrics {
         METRICS.set(metrics)?;
 
         Ok(METRICS.get().unwrap())
+    }
+
+    pub fn get() -> &'static Metrics {
+        METRICS.get().unwrap()
     }
 
     pub async fn run(&self) {

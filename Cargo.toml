@@ -16,6 +16,7 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0.102"
 async-trait = "0.1.89"
+bytes = "1.11.1"
 camino = { version = "1.2.2", features = ["serde1"] }
 clap = { version = "4.5.60", features = ["derive"] }
 dnsclient = "0.2.0"

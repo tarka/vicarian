@@ -2,27 +2,34 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use tokio::sync::OnceCell;
 use tracing_log::log::info;
 
 use crate::RunContext;
 
 const UPKEEP_TIMEOUT: Duration = Duration::from_secs(60);
 
+static METRICS: OnceCell<Metrics> = OnceCell::const_new();
+
+#[derive(Debug)]
 pub struct Metrics {
     handle: PrometheusHandle,
     context: Arc<RunContext>,
 }
 
 impl Metrics {
-    pub fn new(context: Arc<RunContext>) -> Result<Self> {
+    pub fn install_global(context: Arc<RunContext>) -> Result<&'static Self> {
         let handle = PrometheusBuilder::new()
             .with_recommended_naming(true)
             .install_recorder()?;
-
-        Ok(Self {
+        let metrics = Self {
             handle,
             context,
-        })
+        };
+
+        METRICS.set(metrics)?;
+
+        Ok(METRICS.get().unwrap())
     }
 
     pub async fn run(&self) {

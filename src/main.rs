@@ -36,6 +36,7 @@ fn init_logging(level: u8) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct RunContext {
     pub config: Config,
     pub quit_rx: watch::Receiver<bool>,
@@ -69,7 +70,6 @@ fn system_setup() -> Result<()> {
     Ok(())
 }
 
-
 fn main() -> Result<()> {
     let cli = config::CliOptions::from_args();
 
@@ -87,13 +87,12 @@ fn main() -> Result<()> {
     // Runtime start
 
     let cert_runtime = Arc::new(CertificateRuntime::new(context.clone())?);
-    let metrics = Arc::new(Metrics::new(context.clone())?);
+    let metrics = Metrics::install_global(context.clone())?;
 
     // Pingora starts its own tokio runtimes, so we create one here to
     // handle certificate and support tasks.
     let maint_handle = {
         let crt = cert_runtime.clone();
-        let mrt = metrics.clone();
 
         thread::spawn(move || -> Result<()> {
             info!("Starting Certificate Management runtime");
@@ -103,7 +102,7 @@ fn main() -> Result<()> {
                 .build()?;
 
             trt.spawn(async move {
-                mrt.run().await
+                metrics.run().await
             });
 
             trt.block_on(

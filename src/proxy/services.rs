@@ -206,16 +206,48 @@ impl ProxyHttp for Vicarian {
 
         let pinned = self.routes_by_host.pin();
         let router = pinned.get(&components.host.to_string())
-            .or_err(E404, "UP: Hostname not found in backends")?;
+            .or_err(E404, "Hostname not found in backends")?;
         let backend = router.lookup(components.path)
-            .or_err(E404, "UP: Path not found in host backends")?
+            .or_err(E404, "Path not found in host backends")?
             .backend;
+        let url = &backend.url;
 
-        *ctx = Some(VicarianCtx {
-            backend: backend.clone()
-        });
+        let scheme = url.scheme_str()
+            .or_err(E500, "Failed to parse backed URL scheme")?;
 
-        Ok(false)
+        match scheme {
+            "http" | "https" => {
+                *ctx = Some(VicarianCtx {
+                    backend: backend.clone()
+                });
+                Ok(false)
+            }
+
+            // url => module:://<module_name>
+            "module" => {
+                let module = url.authority()
+                    .or_err(E404, "Module name not found in host backends")?;
+
+                match module.as_str() {
+                    "metrics" => {
+
+                    }
+                    _ => {
+                        let desc = format!("Unknown URL scheme: {scheme}");
+                        return Err(pingora_core::Error::explain(E500, desc))
+                    }
+                }
+
+                Ok(true)
+            }
+
+            &_ => {
+                let desc = format!("Unknown URL scheme: {scheme}");
+                Err(pingora_core::Error::explain(E500, desc))
+            }
+        }
+
+
     }
 
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {

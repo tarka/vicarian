@@ -16,9 +16,7 @@ use pingora_proxy::{ProxyHttp, Session};
 use tracing::{debug, info};
 
 use crate::{
-    RunContext,
-    certificates::{acme::AcmeRuntime, store::CertStore},
-    proxy::{rewrite_port, router::Router, strip_port},
+    RunContext, certificates::{acme::AcmeRuntime, store::CertStore}, config::Backend, proxy::{rewrite_port, router::Router, strip_port}
 };
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
@@ -189,7 +187,7 @@ const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL
 impl ProxyHttp for Vicarian {
     type CTX = ();
 
-    fn new_ctx(&self) -> () {
+    fn new_ctx(&self) -> Self::CTX {
         ()
     }
 
@@ -202,15 +200,15 @@ impl ProxyHttp for Vicarian {
         let backend = router.lookup(components.path)
             .or_err(E404, "UP: Path not found in host backends")?
             .backend;
-
         let url = &backend.url;
-        let tls = url.scheme() == Some(&Scheme::HTTPS);
+
         let host = url.host()
             .or_err(E500, "Backend host lookup failed")?;
         let port = url.port()  // TODO: Can default this? Or should be required?
             .or_err(E500, "Backend port lookup failed")?
             .as_u16();
 
+        let tls = url.scheme() == Some(&Scheme::HTTPS);
         let mut peer = HttpPeer::new((host, port), tls, host.to_string());
         if backend.trust && let Some(opts) = peer.get_mut_peer_options() {
             opts.verify_cert = false;

@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use tokio::sync::OnceCell;
 use tracing_log::log::info;
@@ -29,11 +29,16 @@ impl Metrics {
 
         METRICS.set(metrics)?;
 
-        Ok(METRICS.get().unwrap())
+        let mref = METRICS.get()
+            .ok_or(anyhow!("Failed to get metrics after setting"))?;
+
+        Ok(mref)
     }
 
     pub fn get() -> &'static Metrics {
-        METRICS.get().unwrap()
+        METRICS.get()
+            // Almost certainly a startup-order bug, so panic
+            .expect("Attempt to retreived metrics before setup")
     }
 
     pub async fn run(&self) {

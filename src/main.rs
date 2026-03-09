@@ -4,7 +4,7 @@ mod errors;
 mod metrics;
 mod proxy;
 
-use std::{sync::Arc, thread::JoinHandle};
+use std::sync::Arc;
 use std::thread;
 
 use anyhow::Result;
@@ -115,7 +115,7 @@ fn main() -> Result<()> {
     };
 
     info!("Starting Vicarian");
-    proxy::run_indefinitely(cert_runtime.clone(), metrics.clone(), context.clone())?;
+    proxy::run_indefinitely(cert_runtime.clone(), context.clone())?;
 
     context.quit()?;
     maint_handle.join()

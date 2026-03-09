@@ -183,15 +183,25 @@ impl Vicarian {
 const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
 const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
 
+#[derive(Clone)]
+pub struct VicarianCtx {
+    backend: Arc<Backend>,
+}
+
 #[async_trait]
 impl ProxyHttp for Vicarian {
-    type CTX = ();
+    type CTX = Option<VicarianCtx>;
 
     fn new_ctx(&self) -> Self::CTX {
-        ()
+        None
     }
 
-    async fn upstream_peer(&self, session: &mut Session, _ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {
+    async fn request_filter(&self, session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<bool>
+    where
+        Self::CTX: Send + Sync,
+    {
+        debug!("Req: {}", session.req_header().uri);
+
         let components = to_components(session)?;
 
         let pinned = self.routes_by_host.pin();
@@ -199,6 +209,18 @@ impl ProxyHttp for Vicarian {
             .or_err(E404, "UP: Hostname not found in backends")?;
         let backend = router.lookup(components.path)
             .or_err(E404, "UP: Path not found in host backends")?
+            .backend;
+
+        *ctx = Some(VicarianCtx {
+            backend: backend.clone()
+        });
+
+        Ok(false)
+    }
+
+    async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {
+        let backend = ctx.clone()
+            .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
         let url = &backend.url;
 
@@ -220,18 +242,11 @@ impl ProxyHttp for Vicarian {
 
     async fn upstream_request_filter(&self, session: &mut Session,
                                      upstream_request: &mut RequestHeader,
-                                     _ctx: &mut Self::CTX,)
+                                     ctx: &mut Self::CTX,)
                                      -> pingora_core::Result<()>
     {
-        debug!("Req: {}", session.req_header().uri);
-        let components = to_components(session)?;
-
-        let pinned = self.routes_by_host.pin();
-        let router = pinned.get(&components.host.to_string())
-            .or_err(E404, "URF: Hostname not found in backends")?;
-
-        let backend = router.lookup(components.path)
-            .or_err(E404, "URF: Path not found in host backends")?
+        let backend = ctx.clone()
+            .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
         if let Some(context) = &backend.context
@@ -268,17 +283,12 @@ impl ProxyHttp for Vicarian {
 
     async fn upstream_response_filter(&self, session: &mut Session,
                                       upstream_response: &mut ResponseHeader,
-                                      _ctx: &mut Self::CTX)
+                                      ctx: &mut Self::CTX)
                                       -> pingora_core::Result<()>
     {
-        let components = to_components(session)?;
 
-        let pinned = self.routes_by_host.pin();
-        let router = pinned.get(&components.host.to_string())
-            .or_err(E404, "Hostname not found in backends")?;
-
-        let backend = router.lookup(components.path)
-            .or_err(E404, "Path not found in host backends")?
+        let backend = ctx.clone()
+            .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
         if let Some(context) = &backend.context

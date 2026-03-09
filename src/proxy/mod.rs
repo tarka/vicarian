@@ -16,13 +16,13 @@ use tracing::info;
 use crate::{
     RunContext, certificates::{
         CertificateRuntime, handler::CertHandler,
-    }, config::{AcmeChallenge, TlsAcmeConfig, TlsConfig}, metrics::Metrics, proxy::services::{
+    }, config::{AcmeChallenge, TlsAcmeConfig, TlsConfig}, proxy::services::{
         CleartextHandler, Vicarian
     }
 };
 
 
-pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, metrics: Arc<Metrics>, context: Arc<RunContext>) -> Result<()> {
+pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunContext>) -> Result<()> {
     info!("Starting Proxy");
 
     let mut pingora_server = PingoraServer::new(None)?;

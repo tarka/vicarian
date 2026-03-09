@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
-use tracing_log::log::{debug, error, info, warn};
+use tracing_log::log::info;
 
 use crate::RunContext;
 

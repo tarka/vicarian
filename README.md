@@ -223,7 +223,7 @@ The number of metrics is quite small at the moment, but will added over
 time. Most of them are standard request/error counters, but there is also
 `vicarian_acme_next_renewal_timestamp_secs`, which is the (future) timestamp for
 the next ACME/LetsEncrypt renewal. To consume this in e.g. Grafana you should
-subtract the current timestamp from it, and possible scale it to days:
+subtract the current timestamp from it, and possibly scale it to days:
 
     (vicarian_acme_next_renewal_timestamp_secs - time()) / 86400
 

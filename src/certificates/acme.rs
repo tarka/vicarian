@@ -263,7 +263,7 @@ impl AcmeRuntime {
             let fuzzy = fastrand::i64(FUZZY_RANGE.0..FUZZY_RANGE.1);
             let expiring_secs = next_secs + Duration::seconds(fuzzy);
             let expiring_unix = (OffsetDateTime::now_utc() + expiring_secs).unix_timestamp();
-            gauge!("vicarian_acme_next_renwal_timestamp_secs").set(expiring_unix as f64);
+            gauge!("vicarian_acme_next_renewal_timestamp_secs").set(expiring_unix as f64);
 
             info!("Wait for next expiry at {}", OffsetDateTime::now_utc() + expiring_secs);
             tokio::select! {

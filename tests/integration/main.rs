@@ -342,3 +342,27 @@ async fn test_no_wildcard() {
 
     assert!(response.is_err());
 }
+
+
+#[tokio::test]
+#[serial]
+async fn test_metrics() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_metrics")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http2_prior_knowledge()
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+
+    assert!(response.text().await.unwrap().contains("vicarian_metrics_scrape_total"));
+}

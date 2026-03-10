@@ -1,17 +1,19 @@
+use std::sync::Arc;
+
 use path_tree::PathTree;
 use tracing::info;
 
 use crate::config::Backend;
 
 
-pub struct Match<'a> {
-    pub backend: &'a Backend,
+pub struct Match {
+    pub backend: Arc<Backend>,
     pub _path: String,
 }
 
 #[derive(Debug)]
 pub struct Router {
-    tree: PathTree<Backend>,
+    tree: PathTree<Arc<Backend>>,
 }
 
 const PATHVAR: &str = "subpath";
@@ -22,8 +24,7 @@ impl Router {
         let mut tree = PathTree::new();
 
         for b in backends {
-            // FIXME: Backend could be Arc, but probably not worth it?
-            let backend = b.clone();
+            let backend = Arc::new(b.clone());
             info!("Inserting path {:?}", b.context);
             match b.context {
                 Some(ref path) => {
@@ -47,11 +48,11 @@ impl Router {
         }
     }
 
-    pub fn lookup(&self, path: &str) -> Option<Match<'_>> {
+    pub fn lookup(&self, path: &str) -> Option<Match> {
         let (backend, matched) = self.tree.find(path)?;
         let rest = matched.params()[0].1.to_string();
         Some(Match {
-            backend,
+            backend: backend.clone(),
             _path: rest,
         })
     }

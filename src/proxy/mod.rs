@@ -30,7 +30,7 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
 
     let addrs = context.config.listen.addrs()?;
 
-    let tls_proxy = {
+    let vicarian_service = {
         let vicarian = Vicarian::new(cert_runtime.certstore().clone(), context.clone());
 
         let mut pingora_proxy = pingora_proxy::http_proxy_service(
@@ -51,7 +51,7 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
         }
         pingora_proxy
     };
-    pingora_server.add_service(tls_proxy);
+    pingora_server.add_service(vicarian_service);
 
     let has_http01 = context.config.vhosts.iter()
         .any(|vh| matches!(vh.tls, TlsConfig::Acme(

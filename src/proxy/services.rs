@@ -1,12 +1,14 @@
 use std::{iter, sync::Arc};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use http::{
     HeaderValue, Response, StatusCode, Uri,
     header::{self, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
     uri::{Builder, Scheme},
 };
 
+use metrics::counter;
 use pingora_core::{
     ErrorType, OkOrErr, OrErr, apps::http_app::ServeHttp, prelude::HttpPeer,
     protocols::http::ServerSession, upstreams::peer::Peer,
@@ -16,9 +18,7 @@ use pingora_proxy::{ProxyHttp, Session};
 use tracing::{debug, info};
 
 use crate::{
-    RunContext,
-    certificates::{acme::AcmeRuntime, store::CertStore},
-    proxy::{rewrite_port, router::Router, strip_port},
+    RunContext, certificates::{acme::AcmeRuntime, store::CertStore}, config::Backend, metrics::Metrics, proxy::{rewrite_port, router::Router, strip_port}
 };
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
@@ -27,7 +27,9 @@ const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 
 const YEAR_IN_SECS: u64 = 31536000;
 
+
 fn token_not_found() -> Response<Vec<u8>> {
+    counter!("vicarian_acme_http01_notfound_total").increment(1);
     Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(TOKEN_NOT_FOUND.to_vec())
@@ -82,6 +84,8 @@ impl CleartextHandler {
 impl CleartextHandler {
 
     async fn redirect_to_tls(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+        counter!("vicarian_http_redirects_total").increment(1);
+
         let host = session.get_header(header::HOST)
             .expect("Failed to get host header on HTTP service")
             .to_str()
@@ -111,6 +115,8 @@ impl CleartextHandler {
     }
 
     async fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+        counter!("vicarian_acme_http01_endpoint_total").increment(1);
+
         let fqdn = session.get_header(header::HOST)
             .expect("Failed to get host header on HTTP service")
             .to_str()
@@ -145,6 +151,8 @@ impl CleartextHandler {
 #[async_trait]
 impl ServeHttp for CleartextHandler {
     async fn response(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+        counter!("vicarian_http_requests_total").increment(1);
+
         // URI in practice == /the/path/to/resource
         let path_p = session.req_header().uri.path_and_query();
         if let Some(pq) = path_p
@@ -180,37 +188,110 @@ impl Vicarian {
             routes_by_host,
         }
     }
+
+    async fn metrics_reply(&self, session: &mut Session) -> pingora_core::Result<()> {
+        counter!("vicarian_metrics_scrape_total").increment(1);
+        debug!("Replying to metrics endpoint");
+
+        let metrics = Metrics::get();
+        let scraped = metrics.handle.render();
+        let body = Bytes::copy_from_slice(scraped.as_bytes());
+
+        let mut header = ResponseHeader::build(200, Some(body.len()))?;
+        header.insert_header(header::CONTENT_TYPE, "text/plain")?;
+        session.write_response_header(Box::new(header), false).await?;
+        session.write_response_body(Some(body), true).await?;
+
+        Ok(())
+    }
 }
 
 const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
 const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
 
+#[derive(Clone)]
+pub struct VicarianCtx {
+    backend: Arc<Backend>,
+}
+
 #[async_trait]
 impl ProxyHttp for Vicarian {
-    type CTX = ();
+    type CTX = Option<VicarianCtx>;
 
-    fn new_ctx(&self) -> () {
-        ()
+    fn new_ctx(&self) -> Self::CTX {
+        None
     }
 
-    async fn upstream_peer(&self, session: &mut Session, _ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {
+    async fn request_filter(&self, session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<bool>
+    where
+        Self::CTX: Send + Sync,
+    {
+        debug!("Reques: {}", session.req_header().uri);
+        counter!("vicarian_tls_requests_total").increment(1);
+
         let components = to_components(session)?;
 
-        let pinned = self.routes_by_host.pin();
-        let router = pinned.get(&components.host.to_string())
-            .or_err(E404, "UP: Hostname not found in backends")?;
-        let backend = router.lookup(components.path)
-            .or_err(E404, "UP: Path not found in host backends")?
-            .backend;
-
+        let backend = {
+            let pinned = self.routes_by_host.pin();
+            let router = pinned.get(&components.host.to_string())
+                .or_err(E404, "Hostname not found in backends")?;
+            router.lookup(components.path)
+                .or_err(E404, "Path not found in host backends")?
+                .backend
+        };
         let url = &backend.url;
-        let tls = url.scheme() == Some(&Scheme::HTTPS);
+
+        let scheme = url.scheme_str()
+            .or_err(E500, "Failed to parse backed URL scheme")?;
+
+        match scheme {
+            "http" | "https" => {
+                *ctx = Some(VicarianCtx {
+                    backend: backend.clone()
+                });
+                Ok(false)
+            }
+
+            // url => module:://<module_name>
+            "module" => {
+                let module = url.authority()
+                    .or_err(E404, "Module name not found in host backends")?;
+
+                match module.as_str() {
+                    "metrics" => {
+                        self.metrics_reply(session).await?;
+                    }
+                    _ => {
+                        let desc = format!("Unknown URL scheme: {scheme}");
+                        return Err(pingora_core::Error::explain(E500, desc))
+                    }
+                }
+
+                Ok(true)
+            }
+
+            &_ => {
+                let desc = format!("Unknown URL scheme: {scheme}");
+                Err(pingora_core::Error::explain(E500, desc))
+            }
+        }
+
+
+    }
+
+    async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {
+        let backend = ctx.clone()
+            .or_err(E500, "Request context not initialised; shouldn't happen?")?
+            .backend;
+        let url = &backend.url;
+
         let host = url.host()
             .or_err(E500, "Backend host lookup failed")?;
         let port = url.port()  // TODO: Can default this? Or should be required?
             .or_err(E500, "Backend port lookup failed")?
             .as_u16();
 
+        let tls = url.scheme() == Some(&Scheme::HTTPS);
         let mut peer = HttpPeer::new((host, port), tls, host.to_string());
         if backend.trust && let Some(opts) = peer.get_mut_peer_options() {
             opts.verify_cert = false;
@@ -222,18 +303,11 @@ impl ProxyHttp for Vicarian {
 
     async fn upstream_request_filter(&self, session: &mut Session,
                                      upstream_request: &mut RequestHeader,
-                                     _ctx: &mut Self::CTX,)
+                                     ctx: &mut Self::CTX,)
                                      -> pingora_core::Result<()>
     {
-        debug!("Req: {}", session.req_header().uri);
-        let components = to_components(session)?;
-
-        let pinned = self.routes_by_host.pin();
-        let router = pinned.get(&components.host.to_string())
-            .or_err(E404, "URF: Hostname not found in backends")?;
-
-        let backend = router.lookup(components.path)
-            .or_err(E404, "URF: Path not found in host backends")?
+        let backend = ctx.clone()
+            .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
         if let Some(context) = &backend.context
@@ -270,17 +344,12 @@ impl ProxyHttp for Vicarian {
 
     async fn upstream_response_filter(&self, session: &mut Session,
                                       upstream_response: &mut ResponseHeader,
-                                      _ctx: &mut Self::CTX)
+                                      ctx: &mut Self::CTX)
                                       -> pingora_core::Result<()>
     {
-        let components = to_components(session)?;
 
-        let pinned = self.routes_by_host.pin();
-        let router = pinned.get(&components.host.to_string())
-            .or_err(E404, "Hostname not found in backends")?;
-
-        let backend = router.lookup(components.path)
-            .or_err(E404, "Path not found in host backends")?
+        let backend = ctx.clone()
+            .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
         if let Some(context) = &backend.context

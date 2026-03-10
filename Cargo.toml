@@ -16,6 +16,7 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0.102"
 async-trait = "0.1.89"
+bytes = "1.11.1"
 camino = { version = "1.2.2", features = ["serde1"] }
 clap = { version = "4.5.60", features = ["derive"] }
 dnsclient = "0.2.0"
@@ -28,6 +29,8 @@ instant-acme = { version = "0.8.5", features = ["time"] }
 
 itertools = "0.14.0"
 libcorn = "0.10.1"
+metrics = "0.24.3"
+metrics-exporter-prometheus = { version = "0.18.1", default-features = false, features = ["tokio", "tracing"] }
 nix = { version = "0.31.2", features = ["net", "resource"] }
 notify = { version = "8.2.0", features = ["crossbeam-channel"] }
 notify-debouncer-full = { version = "0.7.0", features = ["crossbeam-channel"] }

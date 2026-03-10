@@ -48,6 +48,8 @@ platforms is welcome.
   have hardcoded paths.
 - **Virtual hosts**: Hosting of multiple domains and domain aliases is
   supported, along with certificate generation for host aliases.
+- **Bearer authorization**: Basic `Authorization: Bearer <key>` support for
+  protecting backend services.
 - **Separated secrets**: ACME DNS requires DNS-provider secrets to be
   configured. These can be placed in a separate secure file using systemd
   [EnvironmentFile](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
@@ -201,6 +203,8 @@ Let's Encrypt TLS would look like:
                 {
                     context = "/metrics"
                     url = "module://metrics"
+                    // Env variables can be referenced
+                    auth_key = $env_SECRET_KEY
                 }
             ]
         }

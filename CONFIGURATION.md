@@ -42,6 +42,7 @@ A minimal Vicarian configuration file would look something like this:
                 {
                     context = "/metrics"
                     url = "module://metrics"
+                    auth_key = "secret_key"
                 }
            ]
         }
@@ -94,6 +95,7 @@ A minimal Vicarian configuration file would look something like this:
   - context: The URL path prefix this backend handles (default: "/")
   - url: The backend service URL
   - trust: Whether to skip certificate verification for TLS backends (default: false)
+  - auth_key: If set, requires `Authorization: Bearer <key>` to access this backend. (optional)
 
 ## TLS Configuration
 
@@ -186,6 +188,11 @@ Each backend entry has the following fields:
 - **Default**: false
 - **Description**: Set to true if the backend uses a self-signed certificate or certificate that can't be verified by the system's CA store.
 
+### auth_key
+- **Type**: String
+- **Default**: None
+- **Description**: If set, Vicarian will require an `Authorization: Bearer <key>` header with the specified key to allow access to this backend.
+
 ## Special Backend Modules
 
 Vicarian supports builtin backend modules that can be used in place of a standard URL. These are specified using the `module://` scheme.
@@ -199,13 +206,13 @@ backends = [
     {
         context = "/metrics"
         url = "module://metrics"
+        auth_key = "secret_key" // Optional
     }
 ]
 ```
 
 When configured, Vicarian will serve Prometheus metrics at the specified
-context. It is recommended to protect this endpoint using network-level access
-controls if it is exposed to the public internet.
+context.
 
 #### Available Metrics
 
@@ -218,6 +225,8 @@ The following metrics are currently exported:
 - `vicarian_acme_http01_endpoint_total`: Total number of ACME HTTP-01 challenge requests received.
 - `vicarian_acme_http01_notfound_total`: Total number of ACME HTTP-01 challenge requests that were not found.
 - `vicarian_acme_next_renewal_timestamp_secs`: Unix timestamp of the next expected ACME certificate renewal.
+- `vicarian_auth_valid_total`: Total number of requests with a valid authorization header.
+- `vicarian_auth_invalid_total`: Total number of requests with an invalid or missing authorization header (for backends where it's required).
 
 ## Additional Configuration Options
 

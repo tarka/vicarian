@@ -20,6 +20,7 @@
                     // Serve prometheus metrics under /metrics.
                     context = "/metrics"
                     url = "module://metrics"
+                    auth_key = "secret_key"
                 }
             ]
         }

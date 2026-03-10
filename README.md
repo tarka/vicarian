@@ -54,6 +54,8 @@ platforms is welcome.
   and [corn](https://cornlang.dev) environment injection (see
   [vicarian-dns01.corn](examples/vicarian-dns01.corn) for an example).
 - **Wildcards**: Wildcard ACME certificate generation.
+- **Prometheus Metrics**: Built-in support for exporting Prometheus metrics over
+  TLS. See `examples/vicarian-metrics.corn` for an example.
 
 ### To-dos
 
@@ -81,7 +83,6 @@ resources.
 
 - TLS-ALPN-01 ACME support.
 - Other ACME providers (e.g. ZeroSSL)
-- Prometheus stats.
 - HTTP3/Quic support.
 - [h2c](https://httpwg.org/specs/rfc7540.html#versioning) backend support
   (avoids a lot of proxy security corner-cases, but there's not much support in
@@ -195,6 +196,10 @@ Let's Encrypt TLS would look like:
                     context = "/app2"
                     url = "https://localhost:8443"
                     trust = true
+                }
+                {
+                    context = "/metrics"
+                    url = "module://metrics"
                 }
             ]
         }

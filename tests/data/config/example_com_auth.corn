@@ -1,0 +1,27 @@
+{
+    listen = {
+        insecure_port = 18080
+        tls_port = 18443
+    }
+    vhosts = [
+        {
+            hostname = "www.example.com"
+
+            tls = {
+                files = {
+                    keyfile = "target/certs/www.example.com.key"
+                    certfile = "target/certs/www.example.com.crt"
+                    reload = true
+                }
+            }
+
+            backends = [
+                {
+                    context = "/metrics"
+                    url = "module://metrics"
+                    auth_key = "my_auth_key"
+                }
+            ]
+        }
+    ]
+}

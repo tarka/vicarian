@@ -128,6 +128,7 @@ pub struct Backend {
     pub url: Uri,
     #[serde(default = "default_bool::<false>")]
     pub trust: bool,
+    pub auth_key: Option<String>,
 }
 
 #[serde_inline_default]

@@ -51,21 +51,25 @@ fn test_router() -> Result<()> {
             context: None,
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
+            auth_key: None,
         },
         Backend {
             context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
+            auth_key: None,
         },
         Backend {
             context: Some("/service/subservice/".to_string()),
             url: Uri::from_static("http://localhost:3030"),
             trust: false,
+            auth_key: None,
         },
         Backend {
             context: Some("/other_service/".to_string()),
             url: Uri::from_static("http://localhost:4040"),
             trust: false,
+            auth_key: None,
         },
     ];
 

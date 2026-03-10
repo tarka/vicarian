@@ -6,6 +6,7 @@ mod certutils;
 mod proxyutils;
 mod websockets;
 
+use http::header::AUTHORIZATION;
 use reqwest::{Client, redirect, header::{VIA, STRICT_TRANSPORT_SECURITY}};
 use serial_test::serial;
 use wiremock::{
@@ -366,3 +367,52 @@ async fn test_metrics() {
 
     assert!(response.text().await.unwrap().contains("vicarian_metrics_scrape_total"));
 }
+
+
+#[tokio::test]
+#[serial]
+async fn test_auth_valid() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_auth")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http2_prior_knowledge()
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .header(AUTHORIZATION, "Bearer my_auth_key")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    assert!(response.text().await.unwrap().contains("vicarian_metrics_scrape_total"));
+}
+
+
+#[tokio::test]
+#[serial]
+async fn test_auth_invalid() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_auth")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http2_prior_knowledge()
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .header(AUTHORIZATION, "Bearer INVALID_KEY")
+        .send().await.unwrap();
+
+    assert_eq!(401, response.status().as_u16());
+
+}
+

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use http::{
     HeaderValue, Response, StatusCode, Uri,
-    header::{self, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
+    header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
     uri::{Builder, Scheme},
 };
 
@@ -26,7 +26,6 @@ const TOKEN_NOT_FOUND: &[u8] = "<html><body>ACME token not found in request path
 const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 
 const YEAR_IN_SECS: u64 = 31536000;
-
 
 fn token_not_found() -> Response<Vec<u8>> {
     counter!("vicarian_acme_http01_notfound_total").increment(1);
@@ -206,6 +205,7 @@ impl Vicarian {
     }
 }
 
+const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());
 const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
 const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
 
@@ -226,11 +226,10 @@ impl ProxyHttp for Vicarian {
     where
         Self::CTX: Send + Sync,
     {
-        debug!("Reques: {}", session.req_header().uri);
+        debug!("Request: {}", session.req_header().uri);
         counter!("vicarian_tls_requests_total").increment(1);
 
         let components = to_components(session)?;
-
         let backend = {
             let pinned = self.routes_by_host.pin();
             let router = pinned.get(&components.host.to_string())
@@ -239,8 +238,24 @@ impl ProxyHttp for Vicarian {
                 .or_err(E404, "Path not found in host backends")?
                 .backend
         };
-        let url = &backend.url;
 
+        if let Some(key) = &backend.auth_key {
+            let auth = session.req_header().headers.get(AUTHORIZATION)
+                .or_err(E401, "Failed to fetch Authorization header")?
+                .to_str()
+                .or_err(E401, "Failed to read Authorization key")?;
+
+            let expected = format!("Bearer {key}");
+            if auth != expected {
+                counter!("vicarian_auth_invalid_total").increment(1);
+                return Err(pingora_core::Error::explain(E401, "Invalid Authorization header"))
+            }
+
+            counter!("vicarian_auth_valid_total").increment(1);
+            info!("Valid auth received for {:?}", backend.context);
+        }
+
+        let url = &backend.url;
         let scheme = url.scheme_str()
             .or_err(E500, "Failed to parse backed URL scheme")?;
 

@@ -55,7 +55,8 @@ platforms is welcome.
   [vicarian-dns01.corn](examples/vicarian-dns01.corn) for an example).
 - **Wildcards**: Wildcard ACME certificate generation.
 - **Prometheus Metrics**: Built-in support for exporting Prometheus metrics over
-  TLS. See `examples/vicarian-metrics.corn` for an example.
+  TLS. Disabled by default; see `examples/vicarian-metrics.corn` for an for how
+  to configure this.
 
 ### To-dos
 

@@ -27,7 +27,9 @@ const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 
 const YEAR_IN_SECS: u64 = 31536000;
 
+
 fn token_not_found() -> Response<Vec<u8>> {
+    counter!("vicarian_acme_http01_notfound_total").increment(1);
     Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(TOKEN_NOT_FOUND.to_vec())
@@ -82,6 +84,8 @@ impl CleartextHandler {
 impl CleartextHandler {
 
     async fn redirect_to_tls(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+        counter!("vicarian_http_redirects_total").increment(1);
+
         let host = session.get_header(header::HOST)
             .expect("Failed to get host header on HTTP service")
             .to_str()
@@ -111,6 +115,8 @@ impl CleartextHandler {
     }
 
     async fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+        counter!("vicarian_acme_http01_endpoint_total").increment(1);
+
         let fqdn = session.get_header(header::HOST)
             .expect("Failed to get host header on HTTP service")
             .to_str()
@@ -145,6 +151,8 @@ impl CleartextHandler {
 #[async_trait]
 impl ServeHttp for CleartextHandler {
     async fn response(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+        counter!("vicarian_http_requests_total").increment(1);
+
         // URI in practice == /the/path/to/resource
         let path_p = session.req_header().uri.path_and_query();
         if let Some(pq) = path_p
@@ -182,9 +190,9 @@ impl Vicarian {
     }
 
     async fn metrics_reply(&self, session: &mut Session) -> pingora_core::Result<()> {
-        counter!("http_metrics_scrape_total").increment(1);
+        counter!("vicarian_metrics_scrape_total").increment(1);
+        debug!("Replying to metrics endpoint");
 
-        info!("Replying to metrics endpoint");
         let metrics = Metrics::get();
         let scraped = metrics.handle.render();
         let body = Bytes::copy_from_slice(scraped.as_bytes());
@@ -218,7 +226,8 @@ impl ProxyHttp for Vicarian {
     where
         Self::CTX: Send + Sync,
     {
-        debug!("Req: {}", session.req_header().uri);
+        debug!("Reques: {}", session.req_header().uri);
+        counter!("vicarian_tls_requests_total").increment(1);
 
         let components = to_components(session)?;
 

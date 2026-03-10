@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use anyhow::{Result, anyhow};
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use tokio::sync::OnceCell;
-use tracing_log::log::info;
+use tracing_log::log::{debug, info};
 
 use crate::RunContext;
 
@@ -38,17 +38,17 @@ impl Metrics {
     pub fn get() -> &'static Metrics {
         METRICS.get()
             // Almost certainly a startup-order bug, so panic
-            .expect("Attempt to retreived metrics before setup")
+            .expect("Attempt to retreive metrics before setup")
     }
 
     pub async fn run(&self) {
-        info!("Starting Metrics runtime");
+        debug!("Starting Metrics runtime");
 
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(UPKEEP_TIMEOUT) => {
-                    info!("Running metrics upkeep task"); // FIXME: Move to trace level
+                    debug!("Running metrics upkeep task"); // FIXME: Move to trace level
                     let handle = self.handle.clone(); // Uses inner-arc pattern
                     tokio::task::spawn_blocking(move || handle.run_upkeep());
                 }

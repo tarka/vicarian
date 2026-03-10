@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 0 -->Features
 
-- Add prometheus metrics to HTTP & ACME modules.
+- Add support for Prometheus metrics, including serving over TLS.
 
 ### <!-- 1 -->Bug Fixes
 

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4](https://github.com/tarka/vicarian/compare/v0.2.3...v0.2.4) - 2026-03-10
+
+### <!-- 0 -->Features
+
+- Add prometheus metrics to HTTP & ACME modules.
+
+### <!-- 1 -->Bug Fixes
+
+- Fix metric name
+
+### <!-- 3 -->Documentation
+
+- Update docs and add examples for metrics.
+
+### Other
+
+- Minor readme update
+- Move generic headers to response_filter()
+- Add simple test for metrics endpoint
+- Small comment update
+- Cleanup some errors.
+- Initial prometheus response
+- Make metrics global (as the recorder is anyway) and start wiring up request
+- Move backend lookup to the initial request and store in the context.
+- Convert Backend router storage to be arc.
+- Rename module URL test
+- Add test for using URI scheme to direct to component backends
+- Start of wiring up metrics to HTTPS.
+- Start setting up metrics runtime
+
 ## [0.2.3](https://github.com/tarka/vicarian/compare/v0.2.2...v0.2.3) - 2026-03-07
 
 ### Other

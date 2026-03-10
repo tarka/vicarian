@@ -48,7 +48,7 @@ impl Metrics {
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(UPKEEP_TIMEOUT) => {
-                    debug!("Running metrics upkeep task"); // FIXME: Move to trace level
+                    debug!("Running metrics upkeep task");
                     let handle = self.handle.clone(); // Uses inner-arc pattern
                     tokio::task::spawn_blocking(move || handle.run_upkeep());
                 }

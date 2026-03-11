@@ -392,7 +392,6 @@ impl ProxyHttp for Vicarian {
                              _ctx: &mut Self::CTX)
                              -> pingora_core::Result<()>
     {
-        info!("CALLING RESPONSE FILTER");
         let hsts = format!("max-age={YEAR_IN_SECS}; includeSubDomains");
         upstream_response.insert_header(STRICT_TRANSPORT_SECURITY, hsts)?;
 

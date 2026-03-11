@@ -15,7 +15,7 @@ use tokio::{
     fs::{self, File, read_to_string},
     io::AsyncWriteExt,
 };
-use time::{Duration, OffsetDateTime};
+use time::{Duration, OffsetDateTime, UtcOffset};
 use tracing_log::log::{debug, error, info, warn};
 use zone_update::async_impl::AsyncDnsProvider;
 
@@ -262,10 +262,12 @@ impl AcmeRuntime {
 
             let fuzzy = fastrand::i64(FUZZY_RANGE.0..FUZZY_RANGE.1);
             let expiring_secs = next_secs + Duration::seconds(fuzzy);
-            let expiring_unix = (OffsetDateTime::now_utc() + expiring_secs).unix_timestamp();
-            gauge!("vicarian_acme_next_renewal_timestamp_secs").set(expiring_unix as f64);
+            let local_offset = UtcOffset::current_local_offset()
+                .unwrap_or(UtcOffset::UTC);
+            let expiring_abs = OffsetDateTime::now_utc() + expiring_secs;
+            gauge!("vicarian_acme_next_renewal_timestamp_secs").set(expiring_abs.unix_timestamp() as f64);
 
-            info!("Wait for next expiry at {}", OffsetDateTime::now_utc() + expiring_secs);
+            info!("Wait for next expiry at {}", expiring_abs.to_offset(local_offset));
             tokio::select! {
                 _ = tokio::time::sleep(expiring_secs.try_into()?) => {
                     info!("Woken up for ACME renewal; processing all pending certs");

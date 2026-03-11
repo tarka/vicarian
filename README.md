@@ -203,7 +203,7 @@ Let's Encrypt TLS would look like:
                 {
                     context = "/metrics"
                     url = "module://metrics"
-                    // Env variables can be referenced
+                    // Optional. Env variables can be referenced.
                     auth_key = $env_SECRET_KEY
                 }
             ]
@@ -227,11 +227,11 @@ The number of metrics is quite small at the moment, but will added over
 time. Most of them are standard request/error counters, but there is also
 `vicarian_acme_next_renewal_timestamp_secs`, which is the (future) timestamp for
 the next ACME/LetsEncrypt renewal. To consume this in e.g. Grafana you should
-subtract the current timestamp from it, and possibly scale it to days:
+subtract the current timestamp from it to give time to renewal:
 
-    (vicarian_acme_next_renewal_timestamp_secs - time()) / 86400
+    vicarian_acme_next_renewal_timestamp_secs - time()
 
-This can be used as e.g. a Bar Gauge:
+This can be used as e.g. a Bar Gauge, setting the unit to `duration`:
 
 ![Bar gauge showing multiple host countdowns](docs/grafana-acme-bars.png)
 

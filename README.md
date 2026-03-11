@@ -56,9 +56,8 @@ platforms is welcome.
   and [corn](https://cornlang.dev) environment injection (see
   [vicarian-dns01.corn](examples/vicarian-dns01.corn) for an example).
 - **Wildcards**: Wildcard ACME certificate generation.
-- **Prometheus Metrics**: Built-in support for exporting Prometheus metrics over
-  TLS. Disabled by default; see `examples/vicarian-metrics.corn` for an for how
-  to configure this.
+- **Prometheus Metrics**: Built-in support for exporting Prometheus metrics.
+  See [METRICS.md](METRICS.md) for configuration and visualization details.
 
 ### To-dos
 
@@ -212,28 +211,6 @@ Let's Encrypt TLS would look like:
 }
 ```
 
-### Using metrics
-
-Once enabled the metrics can be scraped by Prometheus as-so: 
-
-```yaml
-  - job_name: files.vicarian'
-    scheme: https
-    static_configs:
-      - targets: [files.mynetwork.net:443']
-```
-
-The number of metrics is quite small at the moment, but will added over
-time. Most of them are standard request/error counters, but there is also
-`vicarian_acme_next_renewal_timestamp_secs`, which is the (future) timestamp for
-the next ACME/LetsEncrypt renewal. To consume this in e.g. Grafana you should
-subtract the current timestamp from it to give time to renewal:
-
-    vicarian_acme_next_renewal_timestamp_secs - time()
-
-This can be used as e.g. a Bar Gauge, setting the unit to `duration`:
-
-![Bar gauge showing multiple host countdowns](docs/grafana-acme-bars.png)
 
 ## Contributing
 

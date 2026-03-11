@@ -200,6 +200,7 @@ Vicarian supports builtin backend modules that can be used in place of a standar
 ### Metrics Module
 
 The `metrics` module provides a Prometheus-compatible metrics endpoint.
+See [METRICS.md](METRICS.md) for configuration details and available metrics.
 
 ```corn
 backends = [
@@ -210,23 +211,6 @@ backends = [
     }
 ]
 ```
-
-When configured, Vicarian will serve Prometheus metrics at the specified
-context.
-
-#### Available Metrics
-
-The following metrics are currently exported:
-
-- `vicarian_http_requests_total`: Total number of HTTP requests received.
-- `vicarian_tls_requests_total`: Total number of TLS requests received.
-- `vicarian_http_redirects_total`: Total number of HTTP to HTTPS redirects.
-- `vicarian_metrics_scrape_total`: Total number of times the metrics endpoint has been scraped.
-- `vicarian_acme_http01_endpoint_total`: Total number of ACME HTTP-01 challenge requests received.
-- `vicarian_acme_http01_notfound_total`: Total number of ACME HTTP-01 challenge requests that were not found.
-- `vicarian_acme_next_renewal_timestamp_secs`: Unix timestamp of the next expected ACME certificate renewal.
-- `vicarian_auth_valid_total`: Total number of requests with a valid authorization header.
-- `vicarian_auth_invalid_total`: Total number of requests with an invalid or missing authorization header (for backends where it's required).
 
 ## Additional Configuration Options
 

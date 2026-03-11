@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5](https://github.com/tarka/vicarian/compare/v0.2.4...v0.2.5) - 2026-03-11
+
+### <!-- 0 -->Features
+
+- Add support for simple `Bearer <key>` authorisiation
+
+### <!-- 1 -->Bug Fixes
+
+- Print next expirng in local timezone.
+
+### <!-- 3 -->Documentation
+
+- Add docs for auth_key
+- Typo
+- Add note about using metrics and ACME timeout in prometheus/grafana
+
+### Other
+
+- Remove old debugging log
+- Move metrics documentation to own file.
+- Better Grafana tips.
+
 ## [0.2.4](https://github.com/tarka/vicarian/compare/v0.2.3...v0.2.4) - 2026-03-10
 
 ### <!-- 0 -->Features

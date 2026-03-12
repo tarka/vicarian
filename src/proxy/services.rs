@@ -18,7 +18,16 @@ use pingora_proxy::{ProxyHttp, Session};
 use tracing::{debug, info};
 
 use crate::{
-    RunContext, certificates::{acme::AcmeRuntime, store::CertStore}, config::Backend, metrics::Metrics, proxy::{rewrite_port, router::Router, strip_port}
+    RunContext,
+    certificates::{acme::AcmeRuntime, store::CertStore},
+    config::Backend,
+    metrics::{
+        METRIC_ACME_HTTP01_ENDPOINT_TOTAL, METRIC_ACME_HTTP01_NOTFOUND_TOTAL,
+        METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_HTTP_REDIRECTS_TOTAL,
+        METRIC_HTTP_REQUESTS_TOTAL, METRIC_METRICS_SCRAPE_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
+    },
+    metrics::Metrics,
+    proxy::{rewrite_port, router::Router, strip_port},
 };
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
@@ -28,7 +37,7 @@ const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 const YEAR_IN_SECS: u64 = 31536000;
 
 fn token_not_found() -> Response<Vec<u8>> {
-    counter!("vicarian_acme_http01_notfound_total").increment(1);
+    counter!(METRIC_ACME_HTTP01_NOTFOUND_TOTAL).increment(1);
     Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(TOKEN_NOT_FOUND.to_vec())
@@ -83,7 +92,7 @@ impl CleartextHandler {
 impl CleartextHandler {
 
     async fn redirect_to_tls(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
-        counter!("vicarian_http_redirects_total").increment(1);
+        counter!(METRIC_HTTP_REDIRECTS_TOTAL).increment(1);
 
         let host = session.get_header(header::HOST)
             .expect("Failed to get host header on HTTP service")
@@ -114,7 +123,7 @@ impl CleartextHandler {
     }
 
     async fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
-        counter!("vicarian_acme_http01_endpoint_total").increment(1);
+        counter!(METRIC_ACME_HTTP01_ENDPOINT_TOTAL).increment(1);
 
         let fqdn = session.get_header(header::HOST)
             .expect("Failed to get host header on HTTP service")
@@ -150,7 +159,7 @@ impl CleartextHandler {
 #[async_trait]
 impl ServeHttp for CleartextHandler {
     async fn response(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
-        counter!("vicarian_http_requests_total").increment(1);
+        counter!(METRIC_HTTP_REQUESTS_TOTAL).increment(1);
 
         // URI in practice == /the/path/to/resource
         let path_p = session.req_header().uri.path_and_query();
@@ -189,7 +198,7 @@ impl Vicarian {
     }
 
     async fn metrics_reply(&self, session: &mut Session) -> pingora_core::Result<()> {
-        counter!("vicarian_metrics_scrape_total").increment(1);
+        counter!(METRIC_METRICS_SCRAPE_TOTAL).increment(1);
         debug!("Replying to metrics endpoint");
 
         let metrics = Metrics::get();
@@ -227,7 +236,7 @@ impl ProxyHttp for Vicarian {
         Self::CTX: Send + Sync,
     {
         debug!("Request: {}", session.req_header().uri);
-        counter!("vicarian_tls_requests_total").increment(1);
+        counter!(METRIC_TLS_REQUESTS_TOTAL).increment(1);
 
         let components = to_components(session)?;
         let backend = {
@@ -247,11 +256,11 @@ impl ProxyHttp for Vicarian {
 
             let expected = format!("Bearer {key}");
             if auth != expected {
-                counter!("vicarian_auth_invalid_total").increment(1);
+                counter!(METRIC_AUTH_INVALID_TOTAL).increment(1);
                 return Err(pingora_core::Error::explain(E401, "Invalid Authorization header"))
             }
 
-            counter!("vicarian_auth_valid_total").increment(1);
+            counter!(METRIC_AUTH_VALID_TOTAL).increment(1);
             info!("Valid auth received for {:?}", backend.context);
         }
 

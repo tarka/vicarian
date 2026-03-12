@@ -23,6 +23,7 @@ use crate::{
     RunContext,
     certificates::{HostCertificate, store::CertStore},
     config::{AcmeChallenge, DnsProvider, TlsConfig},
+    metrics::METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS,
 };
 
 const DAYS_TO_SECS: i64 =  24 * 60 * 60;
@@ -265,7 +266,7 @@ impl AcmeRuntime {
             let local_offset = UtcOffset::current_local_offset()
                 .unwrap_or(UtcOffset::UTC);
             let expiring_abs = OffsetDateTime::now_utc() + expiring_secs;
-            gauge!("vicarian_acme_next_renewal_timestamp_secs").set(expiring_abs.unix_timestamp() as f64);
+            gauge!(METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS).set(expiring_abs.unix_timestamp() as f64);
 
             info!("Wait for next expiry at {}", expiring_abs.to_offset(local_offset));
             tokio::select! {

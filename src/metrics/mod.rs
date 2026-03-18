@@ -11,6 +11,8 @@ use crate::RunContext;
 const UPKEEP_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub const METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS: &str = "vicarian_acme_next_renewal_timestamp_secs";
+pub const METRIC_ACME_RENEW_ERROR_TOTAL: &str = "vicarian_acme_renew_error_total";
+pub const METRIC_ACME_RENEW_SUCCESS_TOTAL: &str = "vicarian_acme_renew_success_total";
 pub const METRIC_ACME_HTTP01_ENDPOINT_TOTAL: &str = "vicarian_acme_http01_endpoint_total";
 pub const METRIC_ACME_HTTP01_NOTFOUND_TOTAL: &str = "vicarian_acme_http01_notfound_total";
 pub const METRIC_AUTH_INVALID_TOTAL: &str = "vicarian_auth_invalid_total";

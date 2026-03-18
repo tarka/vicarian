@@ -9,7 +9,7 @@ use instant_acme::{
     LetsEncrypt, NewOrder, OrderStatus, RetryPolicy,
 };
 use itertools::Itertools;
-use metrics::gauge;
+use metrics::{counter, gauge};
 use phf_macros::phf_map;
 use tokio::{
     fs::{self, File, read_to_string},
@@ -23,7 +23,7 @@ use crate::{
     RunContext,
     certificates::{HostCertificate, store::CertStore},
     config::{AcmeChallenge, DnsProvider, TlsConfig},
-    metrics::METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS,
+    metrics::{METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, METRIC_ACME_RENEW_ERROR_TOTAL, METRIC_ACME_RENEW_SUCCESS_TOTAL},
 };
 
 const DAYS_TO_SECS: i64 =  24 * 60 * 60;
@@ -266,7 +266,8 @@ impl AcmeRuntime {
             let local_offset = UtcOffset::current_local_offset()
                 .unwrap_or(UtcOffset::UTC);
             let expiring_abs = OffsetDateTime::now_utc() + expiring_secs;
-            gauge!(METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS).set(expiring_abs.unix_timestamp() as f64);
+            gauge!(METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS)
+                .set(expiring_abs.unix_timestamp() as f64);
 
             info!("Wait for next expiry at {}", expiring_abs.to_offset(local_offset));
             tokio::select! {
@@ -346,10 +347,12 @@ impl AcmeRuntime {
         let pem_certificate = match certificate_r {
             Ok(cert) => cert,
             Err(err) => {
+                counter!(METRIC_ACME_RENEW_ERROR_TOTAL).increment(1);
                 error!("Error renewing certificate: {err}");
                 return Err(err)
             }
         };
+        counter!(METRIC_ACME_RENEW_SUCCESS_TOTAL).increment(1);
 
         debug!("====== Cert Chain ======\n{}", pem_certificate.cert_chain);
 

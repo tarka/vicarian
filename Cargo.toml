@@ -18,7 +18,7 @@ anyhow = "1.0.102"
 async-trait = "0.1.89"
 bytes = "1.11.1"
 camino = { version = "1.2.2", features = ["serde1"] }
-clap = { version = "4.5.60", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive"] }
 dnsclient = "0.2.0"
 fastrand = "2.3.0"
 futures = "0.3.32"
@@ -42,7 +42,7 @@ pingora-boringssl = "0.8.0"
 pingora-core = { version = "0.8.0", features = ["boringssl"] }
 pingora-http = "0.8.0"
 pingora-proxy = "0.8.0"
-psl = "2.1.198"
+psl = "2.1.199"
 rustls = "0.23.37"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
@@ -53,7 +53,7 @@ time = { version = "0.3.47", features = ["local-offset"] }
 tokio = { version = "1.50.0", features = ["macros", "rt", "sync"] }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 x509-parser = "0.18.1"
 zone-update = { version = "0.11.0", features = ["async"] }
 
@@ -72,7 +72,7 @@ tempfile = "3.27.0"
 test-log = { version = "0.2.19", features = ["trace"] }
 time = { version = "0.3.47", features = ["macros"] }
 tokio = { version = "1.50.0", features = ["fs"] }
-tokio-tungstenite = { version = "0.28.0", features = ["rustls", "rustls-tls-webpki-roots", "tokio-rustls"] }
+tokio-tungstenite = { version = "0.29.0", features = ["rustls", "rustls-tls-webpki-roots", "tokio-rustls"] }
 wiremock = "0.6.5"
 wiremocket = "0.3.1"
 

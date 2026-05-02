@@ -18,9 +18,9 @@ anyhow = "1.0.102"
 async-trait = "0.1.89"
 bytes = "1.11.1"
 camino = { version = "1.2.2", features = ["serde1"] }
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 dnsclient = "0.2.0"
-fastrand = "2.3.0"
+fastrand = "2.4.1"
 futures = "0.3.32"
 futures-lite = "2.6.1"
 http = "1.4.0"
@@ -29,12 +29,12 @@ instant-acme = { version = "0.8.5", features = ["time"] }
 
 itertools = "0.14.0"
 libcorn = "0.10.1"
-metrics = "0.24.3"
-metrics-exporter-prometheus = { version = "0.18.1", default-features = false, features = ["tokio", "tracing"] }
+metrics = "0.24.5"
+metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["tokio", "tracing"] }
 nix = { version = "0.31.2", features = ["net", "resource"] }
 notify = { version = "8.2.0", features = ["crossbeam-channel"] }
 notify-debouncer-full = { version = "0.7.0", features = ["crossbeam-channel"] }
-papaya = "0.2.3"
+papaya = "0.2.4"
 path-tree = "0.8.3"
 phf = { version = "0.13.1", features = ["phf_macros"] }
 phf_macros = "0.13.1"
@@ -42,15 +42,15 @@ pingora-boringssl = "0.8.0"
 pingora-core = { version = "0.8.0", features = ["boringssl"] }
 pingora-http = "0.8.0"
 pingora-proxy = "0.8.0"
-psl = "2.1.199"
-rustls = "0.23.37"
+psl = "2.1.206"
+rustls = "0.23.40"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
 serde_json = "1.0.149"
 strum_macros = "0.28.0"
 thiserror = "2.0.18"
 time = { version = "0.3.47", features = ["local-offset"] }
-tokio = { version = "1.50.0", features = ["macros", "rt", "sync"] }
+tokio = { version = "1.52.1", features = ["macros", "rt", "sync"] }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
@@ -66,15 +66,15 @@ fslock = "0.2.1"
 nix = { version = "0.31.2", features = ["process", "signal", "term"] }
 pem = "3.0.6"
 rcgen = { version = "0.14.7", features = ["x509-parser"] }
-reqwest = { version = "0.13.2", default-features = false, features = ["http2", "rustls"] }
+reqwest = { version = "0.13.3", default-features = false, features = ["http2", "rustls"] }
 serial_test = "3.4.0"
 tempfile = "3.27.0"
-test-log = { version = "0.2.19", features = ["trace"] }
+test-log = { version = "0.2.20", features = ["trace"] }
 time = { version = "0.3.47", features = ["macros"] }
-tokio = { version = "1.50.0", features = ["fs"] }
+tokio = { version = "1.52.1", features = ["fs"] }
 tokio-tungstenite = { version = "0.29.0", features = ["rustls", "rustls-tls-webpki-roots", "tokio-rustls"] }
 wiremock = "0.6.5"
-wiremocket = "0.3.1"
+wiremocket = "0.3.2"
 
 [profile.release]
 strip = true

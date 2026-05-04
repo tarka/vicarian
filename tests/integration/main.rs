@@ -416,3 +416,31 @@ async fn test_auth_invalid() {
 
 }
 
+/// Regression test: HTTP/2 clients sending h2c (cleartext HTTP/2) to the
+/// insecure port would panic because CleartextHandler uses
+/// `session.get_header(HOST)` which returns None for HTTP/2 (where :authority
+/// is used instead). See bug report in services.rs:97-100 and services.rs:128-131.
+#[tokio::test]
+#[serial]
+async fn test_redirect_http2() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    // Send an HTTP/2 request to the cleartext (insecure) port.
+    // In HTTP/2, the Host header is not sent — instead :authority is used.
+    // CleartextHandler::redirect_to_tls uses get_header(HOST) which returns
+    // None for HTTP/2, triggering a panic via expect().
+    let result = Client::builder()
+        .redirect(redirect::Policy::none())
+        .http2_prior_knowledge()
+        .build()
+        .unwrap()
+        .get(format!("http://localhost:{INSECURE_PORT}/status"))
+        .send()
+        .await;
+
+    // The server panics handling this request, so the connection is reset.
+    assert!(result.is_ok(), "HTTP/2 h2c request to insecure port failed");
+}
+

@@ -180,6 +180,21 @@ async fn test_by_host() {
 }
 
 #[tokio::test]
+async fn test_by_host_is_case_insensitive() {
+    let context = Arc::new(RunContext::new(Config::default()));
+    let store = CertStore::new(context).unwrap();
+    let cert = TEST_HOST_CERTS.snakeoil_1.clone();
+    store.upsert(cert.clone()).unwrap();
+
+    let mixed_case_host = cert.hostnames()[0].to_ascii_uppercase();
+    let found = store
+        .by_host(&mixed_case_host)
+        .expect("host certificate lookup should ignore DNS hostname case");
+
+    assert_eq!(found, cert);
+}
+
+#[tokio::test]
 async fn test_by_file() {
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context).unwrap();

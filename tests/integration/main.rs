@@ -6,7 +6,7 @@ mod certutils;
 mod proxyutils;
 mod websockets;
 
-use http::header::AUTHORIZATION;
+use http::header::{AUTHORIZATION, HOST};
 use reqwest::{Client, redirect, header::{VIA, STRICT_TRANSPORT_SECURITY}};
 use serial_test::serial;
 use wiremock::{
@@ -90,6 +90,37 @@ async fn test_mocked_backend() {
         .add_root_certificate(root_cert)
         .build().unwrap()
         .get(format!("https://localhost:{TLS_PORT}/status"))
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    assert!(response.text().await.unwrap().contains("OK"));
+}
+
+#[tokio::test]
+#[serial]
+async fn test_mixed_case_host_header() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    Mock::given(method("GET"))
+        .and(path("/status"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("OK"))
+        .mount(&backend_server).await;
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http1_only()
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .header(HOST, "WWW.EXAMPLE.COM")
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());

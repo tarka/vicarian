@@ -38,9 +38,9 @@ impl CertStore {
         Ok(certstore)
     }
 
-    pub fn by_host(&self, host: &String) -> Option<HostCertificate> {
+    pub fn by_host(&self, host: &str) -> Option<HostCertificate> {
         let pmap = self.by_host.pin();
-        pmap.get(host)
+        pmap.get(&host.to_lowercase())
             .cloned()
     }
 

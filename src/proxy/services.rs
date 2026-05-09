@@ -187,6 +187,7 @@ impl Vicarian {
                 let router = Arc::new(Router::new(&vhost.backends));
                 iter::once(&vhost.hostname)
                     .chain(vhost.aliases.iter())
+                    .map(|s| s.to_lowercase())
                     .map(move |h| (h.clone(), router.clone()))
             })
             .collect::<papaya::HashMap<String, Arc<Router>>>();
@@ -241,7 +242,8 @@ impl ProxyHttp for Vicarian {
         let components = to_components(session)?;
         let backend = {
             let pinned = self.routes_by_host.pin();
-            let router = pinned.get(&components.host.to_string())
+            let host = components.host.to_string().to_lowercase();
+            let router = pinned.get(&host)
                 .or_err(E404, "Hostname not found in backends")?;
             router.lookup(components.path)
                 .or_err(E404, "Path not found in host backends")?

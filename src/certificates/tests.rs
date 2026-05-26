@@ -295,14 +295,14 @@ async fn test_wildcard() -> Result<()> {
     store.upsert(wildcard.clone())?;
 
     {
-        let by_host = store.by_host(&"otherhost.example.com".to_string());
+        let by_host = store.by_host("otherhost.example.com");
         assert!(by_host.is_none());
         let by_wildcard = store.by_wildcard("otherhost.example.com").unwrap();
         assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames().first());
     }
 
     {
-        let by_host = store.by_host(&"*.example.com".to_string()).unwrap();
+        let by_host = store.by_host("*.example.com").unwrap();
         assert_eq!(Some(&"*.example.com".to_string()), by_host.hostnames().first());
         let by_wildcard = store.by_wildcard("realhost.example.com").unwrap();
         assert_eq!(Some(&"*.example.com".to_string()), by_wildcard.hostnames().first());

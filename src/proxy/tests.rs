@@ -44,6 +44,18 @@ fn test_no_port_strip() -> Result<()> {
     Ok(())
 }
 
+
+#[test]
+fn test_strip_port_ipv6() -> Result<()> {
+    let host = strip_port("[::1]:8080");
+    assert_eq!("[::1]", host);
+
+    let host = strip_port("[::1]");
+    assert_eq!("[::1]", host);
+
+    Ok(())
+}
+
 #[test]
 fn test_router() -> Result<()> {
     let backends = vec![

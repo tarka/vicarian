@@ -95,8 +95,15 @@ fn rewrite_port(host: &str, newport: &str) -> String {
 }
 
 fn strip_port(host_header: &str) -> &str {
-    if let Some(i) = host_header.rfind(':') {
-        &host_header[0..i]
+    if host_header.starts_with('[') {
+        // IPv6-literal special case
+        if let Some(pos) = host_header.find("]:") {
+            &host_header[..pos + 1]
+        } else {
+            host_header
+        }
+    } else if let Some(i) = host_header.rfind(':') {
+        &host_header[..i]
     } else {
         host_header
     }

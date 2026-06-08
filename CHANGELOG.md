@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6](https://github.com/tarka/vicarian/compare/v0.2.5...v0.2.6) - 2026-06-08
+
+### <!-- 1 -->Bug Fixes
+
+- We technically need the tokio  flag, although it's enabled by other dependencies.
+- Add fix for bare-IPv6 port-stripping.
+- Handle hostnames case-insensitively
+
+### <!-- 3 -->Documentation
+
+- Add SECURITY.md
+
+### Other
+
+- Bump dependencies; include Pingora security fixes.
+- We can use OnceLock rather than tokio-specific version
+- Minor test fix
+- Dependency upgrade
+- Dependency bump.
+- Add ACME renewal success/fail counters.
+- Move metrics names into consts in metrics module and register/describe them up front.
+- Minor dependency updates.
+- Update github action version.
+
 ## [0.2.5](https://github.com/tarka/vicarian/compare/v0.2.4...v0.2.5) - 2026-03-11
 
 ### <!-- 0 -->Features

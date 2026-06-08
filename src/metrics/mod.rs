@@ -1,9 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use metrics::{counter, describe_counter, describe_gauge, gauge};
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
-use tokio::sync::OnceCell;
+use std::sync::OnceLock;
 use tracing_log::log::{debug, info};
 
 use crate::RunContext;
@@ -22,31 +22,28 @@ pub const METRIC_HTTP_REQUESTS_TOTAL: &str = "vicarian_http_requests_total";
 pub const METRIC_METRICS_SCRAPE_TOTAL: &str = "vicarian_metrics_scrape_total";
 pub const METRIC_TLS_REQUESTS_TOTAL: &str = "vicarian_tls_requests_total";
 
-static METRICS: OnceCell<Metrics> = OnceCell::const_new();
+static METRICS: OnceLock<Metrics> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Metrics {
     pub handle: PrometheusHandle,
     context: Arc<RunContext>,
 }
+
 impl Metrics {
     pub fn install_global(context: Arc<RunContext>) -> Result<&'static Self> {
         let handle = PrometheusBuilder::new()
             .with_recommended_naming(true)
             .install_recorder()?;
-        let metrics = Self {
+
+        let metrics = METRICS.get_or_init(|| Self {
             handle,
             context,
-        };
+        });
 
-        METRICS.set(metrics)?;
+        metrics.describe_metrics();
 
-        let mref = METRICS.get()
-            .ok_or(anyhow!("Failed to get metrics after setting"))?;
-
-        mref.describe_metrics();
-
-        Ok(mref)
+        Ok(metrics)
     }
 
     pub fn get() -> &'static Metrics {

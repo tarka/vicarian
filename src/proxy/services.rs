@@ -263,7 +263,7 @@ impl ProxyHttp for Vicarian {
             }
 
             counter!(METRIC_AUTH_VALID_TOTAL).increment(1);
-            info!("Valid auth received for {:?}", backend.context);
+            info!("Valid auth received for {:?}", backend.path);
         }
 
         let url = &backend.url;
@@ -336,7 +336,7 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if let Some(context) = &backend.context
+        if let Some(context) = &backend.path
             && context != "/"
             && ! backend.url.path().starts_with(context)
         {
@@ -377,7 +377,7 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if let Some(context) = &backend.context
+        if let Some(context) = &backend.path
             && context != "/"
             && ! backend.url.path().starts_with(context)
         {

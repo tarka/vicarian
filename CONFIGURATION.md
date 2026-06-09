@@ -31,16 +31,16 @@ A minimal Vicarian configuration file would look something like this:
 
             backends = [
                 {
-                    context = "/"
+                    path = "/"
                     url = "http://localhost:8080"
                 }
                 {
-                    context = "/app2"
+                    path = "/app2"
                     url = "https://localhost:8443"
                     trust = true
                 }
                 {
-                    context = "/metrics"
+                    path = "/metrics"
                     url = "module://metrics"
                     auth_key = "secret_key"
                 }
@@ -92,7 +92,7 @@ A minimal Vicarian configuration file would look something like this:
 - **Required**: Yes (within each vhost)
 - **Description**: List of backend services that this virtual host will proxy requests to.
 - **Fields**:
-  - context: The URL path prefix this backend handles (default: "/")
+  - path: The URL path prefix this backend handles (default: "/")
   - url: The backend service URL
   - trust: Whether to skip certificate verification for TLS backends (default: false)
   - auth_key: If set, requires `Authorization: Bearer <key>` to access this backend. (optional)
@@ -173,10 +173,10 @@ tls = {
 
 Each backend entry has the following fields:
 
-### context
+### path
 - **Type**: String
 - **Default**: "/"
-- **Description**: The URL path prefix that this backend will handle. For example, if `context = "/api"`, requests to `/api/endpoint` will be forwarded to the backend.
+- **Description**: The URL path prefix that this backend will handle. For example, if `path = "/api"`, requests to `/api/endpoint` will be forwarded to the backend.
 
 ### url
 - **Type**: String (URI)
@@ -205,7 +205,7 @@ See [METRICS.md](METRICS.md) for configuration details and available metrics.
 ```corn
 backends = [
     {
-        context = "/metrics"
+        path = "/metrics"
         url = "module://metrics"
         auth_key = "secret_key" // Optional
     }

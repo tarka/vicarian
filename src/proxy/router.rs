@@ -25,8 +25,8 @@ impl Router {
 
         for b in backends {
             let backend = Arc::new(b.clone());
-            info!("Inserting path {:?}", b.context);
-            match b.context {
+            info!("Inserting path {:?}", b.path);
+            match b.path {
                 Some(ref path) => {
                     let matcher = format!("{path}:{PATHVAR}*");
                     let _id = tree.insert(&matcher, backend);

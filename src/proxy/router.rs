@@ -28,12 +28,6 @@ impl Router {
             info!("Inserting path {:?}", b.context);
             match b.context {
                 Some(ref path) => {
-                    let path = if path.len() > 1 && path.ends_with("/") {
-                        let len = path.len();
-                        path.as_str()[..len-1].to_string()
-                    } else {
-                        path.clone()
-                    };
                     let matcher = format!("{path}:{PATHVAR}*");
                     let _id = tree.insert(&matcher, backend);
                 }

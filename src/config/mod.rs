@@ -9,6 +9,7 @@ use clap::{ArgAction, Parser};
 use http::Uri;
 use itertools::Itertools;
 use nix::sys::socket::SockaddrStorage;
+use nutype::nutype;
 use serde::{Deserialize, Deserializer};
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
@@ -120,10 +121,29 @@ pub enum TlsConfig {
     Acme(TlsAcmeConfig),
 }
 
+fn strip_trailing_slashes(s: String) -> String {
+    if s.len() > 1 {
+        s.trim_end_matches('/').to_string()
+    } else {
+        s
+    }
+}
+
+#[nutype(
+    derive(AsRef, Clone, Debug, Deserialize, Display),
+    sanitize(with = strip_trailing_slashes),
+    validate(
+        not_empty,
+        predicate = |s| s.starts_with('/'),
+    ),
+)]
+pub struct UrlPath(String);
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Backend {
-    pub context: Option<String>,
+    // TODO: Change this to path and alias to `context` for backwards compatibility.
+    pub context: Option<UrlPath>,
     #[serde(with = "http_serde::uri")]
     pub url: Uri,
     #[serde(default = "default_bool::<false>")]

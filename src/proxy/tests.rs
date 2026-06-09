@@ -3,7 +3,7 @@ use http::{uri::Builder, Uri};
 use test_log::test;
 
 use crate::{
-    config::Backend,
+    config::{Backend, UrlPath},
     proxy::{rewrite_port, router::Router, strip_port}
 };
 
@@ -44,7 +44,6 @@ fn test_no_port_strip() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn test_strip_port_ipv6() -> Result<()> {
     let host = strip_port("[::1]:8080");
@@ -66,19 +65,19 @@ fn test_router() -> Result<()> {
             auth_key: None,
         },
         Backend {
-            context: Some("/service".to_string()),
+            context: Some(UrlPath::try_new("/service")?),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some("/service/subservice/".to_string()),
+            context: Some(UrlPath::try_new("/service/subservice/")?),
             url: Uri::from_static("http://localhost:3030"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some("/other_service/".to_string()),
+            context: Some(UrlPath::try_new("/other_service/")?),
             url: Uri::from_static("http://localhost:4040"),
             trust: false,
             auth_key: None,

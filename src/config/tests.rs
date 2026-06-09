@@ -16,7 +16,7 @@ fn test_tls_files_example_config() -> Result<()> {
             reload: true,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap());
+    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap().as_ref());
 
     Ok(())
 }
@@ -40,7 +40,7 @@ fn test_dns01_example_config() -> Result<()> {
             profile: AcmeProfile::TlsServer,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap());
+    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap().as_ref());
 
     Ok(())
 }
@@ -61,7 +61,7 @@ fn test_http01_example_config() -> Result<()> {
             profile: AcmeProfile::ShortLived,
         })));
 
-    assert_eq!("/copyparty", config.vhosts[0].backends[1].context.as_ref().unwrap());
+    assert_eq!("/copyparty", config.vhosts[0].backends[1].context.as_ref().unwrap().as_ref());
 
     Ok(())
 }
@@ -93,7 +93,7 @@ fn test_tls_example_interface() -> Result<()> {
             reload: true,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap());
+    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap().as_ref());
 
     Ok(())
 }
@@ -111,6 +111,15 @@ fn test_no_optionals() -> Result<()> {
             certfile: _,
             reload: true,
         })));
+
+    Ok(())
+}
+
+#[test]
+fn test_no_leading_slash() -> Result<()> {
+    let file = Utf8PathBuf::from("tests/data/config/no-leading-slash.corn");
+    let result = Config::from_file(&file);
+    assert!(result.is_err());
 
     Ok(())
 }

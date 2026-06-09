@@ -337,12 +337,12 @@ impl ProxyHttp for Vicarian {
             .backend;
 
         if let Some(context) = &backend.context
-            && context.as_ref() != "/"
-            && ! backend.url.path().starts_with(context.as_ref())
+            && context != "/"
+            && ! backend.url.path().starts_with(context)
         {
             debug!("Modifying {} for context {context}", upstream_request.uri);
             let upath = upstream_request.uri.path()
-                .strip_prefix(context.as_ref())
+                .strip_prefix(context)
                 .unwrap_or("/");
             let uquery = upstream_request.uri.query()
                 .map(|s| format!("?{s}"))
@@ -378,8 +378,8 @@ impl ProxyHttp for Vicarian {
             .backend;
 
         if let Some(context) = &backend.context
-            && context.as_ref() != "/"
-            && ! backend.url.path().starts_with(context.as_ref())
+            && context != "/"
+            && ! backend.url.path().starts_with(context)
         {
             for headername in [LOCATION, REFRESH] {
                 let header_p = upstream_response.headers.get(&headername);

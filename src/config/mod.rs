@@ -4,24 +4,28 @@ mod cli;
 #[cfg(test)]
 mod tests;
 
-pub use cli::CliOptions;
-
 use std::net::{IpAddr, SocketAddr, SocketAddrV6};
 
 use anyhow::{Context, Result, anyhow};
 use camino::{Utf8Path, Utf8PathBuf};
-use clap::{ArgAction, Parser};
 use http::Uri;
 use itertools::Itertools;
 use nix::sys::socket::SockaddrStorage;
-use nutype::nutype;
 use serde::{Deserialize, Deserializer};
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
 use tracing_log::log::info;
 
 
+pub use cli::CliOptions;
+
+
 pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.corn";
+
+// pub for tests
+pub trait ValidateSanitise: Sized {
+    fn validate_and_sanitise(self) -> Result<Self>;
+}
 
 fn deserialize_canonical<'de, D>(deserializer: D) -> std::result::Result<Utf8PathBuf, D::Error>
 where
@@ -109,26 +113,50 @@ fn strip_trailing_slashes(s: String) -> String {
     }
 }
 
-#[nutype(
-    derive(AsRef, Clone, Debug, Deserialize, Display),
-    sanitize(with = strip_trailing_slashes),
-    validate(
-        not_empty,
-        predicate = |s| s.starts_with('/'),
-    ),
-)]
-pub struct UrlPath(String);
+fn validate_path(s: &String) -> Result<()> {
+    s.starts_with('/').then_some(())
+        .ok_or(anyhow!("No leading slash in context path: {s}"))?;
+    (!s.is_empty()).then_some(())
+        .ok_or(anyhow!("Context path cannot be empty"))?;
+
+    Ok(())
+}
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Backend {
     // TODO: Change this to path and alias to `context` for backwards compatibility.
-    pub context: Option<UrlPath>,
+    pub context: Option<String>,
     #[serde(with = "http_serde::uri")]
     pub url: Uri,
     #[serde(default = "default_bool::<false>")]
     pub trust: bool,
     pub auth_key: Option<String>,
+}
+
+impl ValidateSanitise for Backend {
+    fn validate_and_sanitise(self) -> Result<Self> {
+        // None -> OK, Some -> Result
+        self.context.as_ref()
+            .map_or(Ok(()), validate_path)?;
+
+        let clean = Backend {
+            context: self.context.map(strip_trailing_slashes),
+            ..self
+        };
+
+        Ok(clean)
+    }
+}
+
+impl ValidateSanitise for Vec<Backend> {
+    fn validate_and_sanitise(self) -> Result<Self> {
+        let backends = self.into_iter()
+            .map(ValidateSanitise::validate_and_sanitise)
+            .collect::<Result<Vec<Backend>>>()?;
+
+        Ok(backends)
+    }
 }
 
 #[serde_inline_default]
@@ -144,6 +172,16 @@ pub struct Vhost {
     pub listen: String,
     pub tls: TlsConfig,
     pub backends: Vec<Backend>,
+}
+
+impl ValidateSanitise for Vhost {
+    fn validate_and_sanitise(self) -> Result<Self> {
+
+        Ok(Self {
+            backends: self.backends.validate_and_sanitise()?,
+            ..self
+        })
+    }
 }
 
 #[serde_inline_default]
@@ -195,13 +233,29 @@ impl Default for Config {
     }
 }
 
+impl ValidateSanitise for Config {
+    fn validate_and_sanitise(self) -> Result<Self> {
+        let vhosts = self.vhosts.into_iter()
+            .map(ValidateSanitise::validate_and_sanitise)
+            .collect::<Result<Vec<Vhost>>>()?;
+
+        Ok(Self {
+            vhosts,
+            ..self
+        })
+    }
+}
+
 impl Config {
 
     pub fn from_file(file: &Utf8Path) -> Result<Self> {
         info!("Loading config {file}");
         let key = std::fs::read_to_string(file)
             .context("Error loading config file {file}")?;
-        let config = corn::from_str(&key)?;
+        let config: Config = corn::from_str(&key)?;
+
+        let config = config.validate_and_sanitise()?;
+
         Ok(config)
     }
 

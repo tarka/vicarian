@@ -3,7 +3,7 @@ use http::{uri::Builder, Uri};
 use test_log::test;
 
 use crate::{
-    config::{Backend, UrlPath},
+    config::{Backend, ValidateSanitise},
     proxy::{rewrite_port, router::Router, strip_port}
 };
 
@@ -65,24 +65,24 @@ fn test_router() -> Result<()> {
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/service/subservice/")?),
+            context: Some("/service/subservice/".to_string()),
             url: Uri::from_static("http://localhost:3030"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/other_service/")?),
+            context: Some("/other_service/".to_string()),
             url: Uri::from_static("http://localhost:4040"),
             trust: false,
             auth_key: None,
         },
-    ];
+    ].validate_and_sanitise()?;
 
     let router = Router::new(&backends);
 
@@ -130,13 +130,13 @@ fn test_router() -> Result<()> {
 fn test_router_overlapping_prefixes() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/api")?),
+            context: Some("/api".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/api/v2")?),
+            context: Some("/api/v2".to_string()),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
             auth_key: None,
@@ -147,7 +147,7 @@ fn test_router_overlapping_prefixes() -> Result<()> {
             trust: false,
             auth_key: None,
         },
-    ];
+    ].validate_and_sanitise()?;
 
     let router = Router::new(&backends);
 
@@ -182,19 +182,19 @@ fn test_router_overlapping_prefixes() -> Result<()> {
 fn test_router_prefix_ambiguity() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/api")?),
+            context: Some("/api".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/api2")?),
+            context: Some("/api2".to_string()),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/api1")?),
+            context: Some("/api1".to_string()),
             url: Uri::from_static("http://localhost:3030"),
             trust: false,
             auth_key: None,
@@ -264,12 +264,12 @@ fn test_router_empty_backends() -> Result<()> {
 fn test_router_no_default_backend() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
-    ];
+    ].validate_and_sanitise()?;
     let router = Router::new(&backends);
     assert!(router.lookup("/service").is_some());
 
@@ -279,23 +279,23 @@ fn test_router_no_default_backend() -> Result<()> {
 }
 
 #[test]
-#[should_panic]
 fn test_router_empty_context() {
-    let _backends = [
+    let result = vec![
         Backend {
-            context: Some(UrlPath::try_new("").unwrap()),
+            context: Some("".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
-    ];
+    ].validate_and_sanitise();
+    assert!(result.is_err());
 }
 
 #[test]
 fn test_router_single_slash_context() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/")?),
+            context: Some("/".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -329,13 +329,13 @@ fn test_router_none_context_is_root() -> Result<()> {
 fn test_router_duplicate_contexts() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/x")?),
+            context: Some("/x".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/x")?),
+            context: Some("/x".to_string()),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
             auth_key: None,
@@ -352,19 +352,19 @@ fn test_router_duplicate_contexts() -> Result<()> {
 fn test_router_three_level_overlap() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/api")?),
+            context: Some("/api".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/api/v2")?),
+            context: Some("/api/v2".to_string()),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/api/v2/deep")?),
+            context: Some("/api/v2/deep".to_string()),
             url: Uri::from_static("http://localhost:3030"),
             trust: false,
             auth_key: None,
@@ -405,7 +405,7 @@ fn test_router_three_level_overlap() -> Result<()> {
 fn test_router_query_string() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -422,7 +422,7 @@ fn test_router_query_string() -> Result<()> {
 fn test_router_fragment() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -439,7 +439,7 @@ fn test_router_fragment() -> Result<()> {
 fn test_router_path_traversal() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -495,7 +495,7 @@ fn test_router_empty_path() -> Result<()> {
 fn test_router_double_slash_prefix() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -519,7 +519,7 @@ fn test_router_double_slash_prefix() -> Result<()> {
 fn test_router_double_slash_in_path() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -536,7 +536,7 @@ fn test_router_double_slash_in_path() -> Result<()> {
 fn test_router_multiple_trailing_slashes() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service///")?),
+            context: Some("/service///".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -547,7 +547,7 @@ fn test_router_multiple_trailing_slashes() -> Result<()> {
             trust: false,
             auth_key: None,
         },
-    ];
+    ].validate_and_sanitise()?;
     let router = Router::new(&backends);
     let matched = router.lookup("/service/foo").unwrap();
     assert_eq!(Uri::from_static("http://localhost:1010"), matched.backend.url);
@@ -559,7 +559,7 @@ fn test_router_multiple_trailing_slashes() -> Result<()> {
 fn test_router_case_sensitivity() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/Service")?),
+            context: Some("/Service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -584,7 +584,7 @@ fn test_router_case_sensitivity() -> Result<()> {
 fn test_router_url_encoded_path() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service")?),
+            context: Some("/service".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -601,7 +601,7 @@ fn test_router_url_encoded_path() -> Result<()> {
 fn test_router_context_with_dot() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/api.v2")?),
+            context: Some("/api.v2".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -626,13 +626,13 @@ fn test_router_context_with_dot() -> Result<()> {
 fn test_router_context_dot_and_dotdot() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/.")?),
+            context: Some("/.".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
         Backend {
-            context: Some(UrlPath::try_new("/..")?),
+            context: Some("/..".to_string()),
             url: Uri::from_static("http://localhost:2020"),
             trust: false,
             auth_key: None,
@@ -650,7 +650,7 @@ fn test_router_context_dot_and_dotdot() -> Result<()> {
 fn test_router_context_whitespace() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/service ")?),
+            context: Some("/service ".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
@@ -675,12 +675,12 @@ fn test_router_context_whitespace() -> Result<()> {
 fn test_router_params_empty_match() -> Result<()> {
     let backends = vec![
         Backend {
-            context: Some(UrlPath::try_new("/exact")?),
+            context: Some("/exact".to_string()),
             url: Uri::from_static("http://localhost:1010"),
             trust: false,
             auth_key: None,
         },
-    ];
+    ].validate_and_sanitise()?;
     let router = Router::new(&backends);
     let matched = router.lookup("/exact").unwrap();
     assert_eq!(Uri::from_static("http://localhost:1010"), matched.backend.url);

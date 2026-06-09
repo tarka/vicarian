@@ -16,7 +16,7 @@ fn test_tls_files_example_config() -> Result<()> {
             reload: true,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap().as_ref());
+    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap());
 
     Ok(())
 }
@@ -40,7 +40,7 @@ fn test_dns01_example_config() -> Result<()> {
             profile: AcmeProfile::TlsServer,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap().as_ref());
+    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap());
 
     Ok(())
 }
@@ -61,7 +61,7 @@ fn test_http01_example_config() -> Result<()> {
             profile: AcmeProfile::ShortLived,
         })));
 
-    assert_eq!("/copyparty", config.vhosts[0].backends[1].context.as_ref().unwrap().as_ref());
+    assert_eq!("/copyparty", config.vhosts[0].backends[1].context.as_ref().unwrap());
 
     Ok(())
 }
@@ -93,7 +93,7 @@ fn test_tls_example_interface() -> Result<()> {
             reload: true,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap().as_ref());
+    assert_eq!("/", config.vhosts[0].backends[0].context.as_ref().unwrap());
 
     Ok(())
 }

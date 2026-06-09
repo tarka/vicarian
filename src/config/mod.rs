@@ -1,5 +1,10 @@
+
+mod cli;
+
 #[cfg(test)]
 mod tests;
+
+pub use cli::CliOptions;
 
 use std::net::{IpAddr, SocketAddr, SocketAddrV6};
 
@@ -15,31 +20,6 @@ use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
 use tracing_log::log::info;
 
-#[derive(Clone, Debug, Parser)]
-#[command(
-    name = "vicarian",
-    about = "A reverse proxy.",
-    version,
-)]
-pub struct CliOptions {
-    /// Verbosity.
-    ///
-    /// Can be specified multiple times to increase logging.
-    #[arg(short = 'v', long, action = ArgAction::Count)]
-    pub verbose: u8,
-
-    /// Config file
-    ///
-    /// Override the config file location
-    #[arg(short = 'c', long)]
-    pub config: Option<Utf8PathBuf>,
-}
-
-impl CliOptions {
-    pub fn from_args() -> CliOptions {
-        CliOptions::parse()
-    }
-}
 
 pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.corn";
 

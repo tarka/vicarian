@@ -35,7 +35,6 @@ nix = { version = "0.31.3", features = ["net", "resource"] }
 notify = { version = "8.2.0", features = ["crossbeam-channel"] }
 notify-debouncer-full = { version = "0.7.0", features = ["crossbeam-channel"] }
 papaya = "0.2.4"
-path-tree = "0.8.3"
 phf = { version = "0.13.1", features = ["phf_macros"] }
 phf_macros = "0.13.1"
 pingora-boringssl = "0.8.1"

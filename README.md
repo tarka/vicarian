@@ -229,7 +229,6 @@ As well as the usual dependencies Vicarian also uses:
 
 - [Pingora](https://github.com/cloudflare/pingora) for HTTP/TLS proxying.
 - [instant-acme](https://github.com/djc/instant-acme) for ACME/LetEncrypt support.
-- [path-tree](https://github.com/viz-rs/path-tree) for routing.
 - [corn](https://cornlang.dev) for configuration.
 
 ### AI Contribution Policy

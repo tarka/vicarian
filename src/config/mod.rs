@@ -122,11 +122,16 @@ fn validate_path(s: &String) -> Result<()> {
     Ok(())
 }
 
+fn default_path() -> String {
+    "/".to_string()
+}
+
 #[derive(Clone, Debug, Deserialize)]
+#[serde_inline_default]
 #[serde(deny_unknown_fields)]
 pub struct Backend {
-    #[serde(alias = "context")]
-    pub path: Option<String>,
+    #[serde(alias = "context", default = "default_path")]
+    pub path: String,
     #[serde(with = "http_serde::uri")]
     pub url: Uri,
     #[serde(default = "default_bool::<false>")]
@@ -136,12 +141,9 @@ pub struct Backend {
 
 impl ValidateSanitise for Backend {
     fn validate_and_sanitise(self) -> Result<Self> {
-        // None -> OK, Some -> Result
-        self.path.as_ref()
-            .map_or(Ok(()), validate_path)?;
-
+        validate_path(&self.path)?;
         let clean = Backend {
-            path: self.path.map(strip_trailing_slashes),
+            path: strip_trailing_slashes(self.path),
             ..self
         };
 

@@ -16,7 +16,7 @@ fn test_tls_files_example_config() -> Result<()> {
             reload: true,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].path.as_ref().unwrap());
+    assert_eq!("/", config.vhosts[0].backends[0].path);
 
     Ok(())
 }
@@ -40,7 +40,7 @@ fn test_dns01_example_config() -> Result<()> {
             profile: AcmeProfile::TlsServer,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].path.as_ref().unwrap());
+    assert_eq!("/", config.vhosts[0].backends[0].path);
 
     Ok(())
 }
@@ -61,7 +61,7 @@ fn test_http01_example_config() -> Result<()> {
             profile: AcmeProfile::ShortLived,
         })));
 
-    assert_eq!("/copyparty", config.vhosts[0].backends[1].path.as_ref().unwrap());
+    assert_eq!("/copyparty", config.vhosts[0].backends[1].path);
 
     Ok(())
 }
@@ -93,7 +93,7 @@ fn test_tls_example_interface() -> Result<()> {
             reload: true,
         })));
 
-    assert_eq!("/", config.vhosts[0].backends[0].path.as_ref().unwrap());
+    assert_eq!("/", config.vhosts[0].backends[0].path);
 
     Ok(())
 }
@@ -140,7 +140,6 @@ fn test_module_backend() -> Result<()> {
 fn test_extract_files() -> Result<()> {
     let file = Utf8PathBuf::from("tests/data/config/no-optionals.corn");
     let config = Config::from_file(&file)?;
-
 
     let files = if let TlsConfig::Files(tfc) = &config.vhosts[0].tls {
         tfc

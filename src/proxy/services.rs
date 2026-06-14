@@ -336,13 +336,12 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if let Some(context) = &backend.path
-            && context != "/"
-            && ! backend.url.path().starts_with(context)
+        if backend.path != "/"
+            && ! backend.url.path().starts_with(&backend.path)
         {
-            debug!("Modifying {} for context {context}", upstream_request.uri);
+            debug!("Modifying {} for context {}", upstream_request.uri, backend.path);
             let upath = upstream_request.uri.path()
-                .strip_prefix(context)
+                .strip_prefix(&backend.path)
                 .unwrap_or("/");
             let uquery = upstream_request.uri.query()
                 .map(|s| format!("?{s}"))
@@ -377,16 +376,15 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if let Some(context) = &backend.path
-            && context != "/"
-            && ! backend.url.path().starts_with(context)
+        if backend.path != "/"
+            && ! backend.url.path().starts_with(&backend.path)
         {
             for headername in [LOCATION, REFRESH] {
                 let header_p = upstream_response.headers.get(&headername);
                 if let Some(header) = header_p {
                     let oldloc = header.to_str()
                         .or_err(E500, "Failed to rewrite location header")?;
-                    let newloc = HeaderValue::from_str(&format!("{context}{oldloc}"))
+                    let newloc = HeaderValue::from_str(&format!("{}{oldloc}", backend.path))
                         .or_err(E500, "Failed to rewrite location header")?;
 
                     debug!("Modifying Location to {newloc:?}");

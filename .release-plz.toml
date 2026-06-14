@@ -1,3 +1,6 @@
+[workspace]
+always_bump_minor = true
+
 [changelog]
 
 commit_parsers = [

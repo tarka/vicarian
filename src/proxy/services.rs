@@ -44,6 +44,16 @@ fn token_not_found() -> Response<Vec<u8>> {
             .expect("Failed to send 404 response to token")
 }
 
+fn bad_request(msg: &str) -> Response<Vec<u8>> {
+    let body = format!("<html><body><h1>400 Bad Request</h1><p>{msg}</p></body></html>").into_bytes();
+    Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .header(header::CONTENT_TYPE, "text/html")
+        .header(header::CONTENT_LENGTH, body.len())
+        .body(body)
+        .expect("Failed to send 400 response")
+}
+
 struct RequestComponents<'a> {
     host: &'a str,
     path: &'a str,
@@ -94,10 +104,12 @@ impl CleartextHandler {
     async fn redirect_to_tls(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
         counter!(METRIC_HTTP_REDIRECTS_TOTAL).increment(1);
 
-        let host = session.get_header(header::HOST)
-            .expect("Failed to get host header on HTTP service")
-            .to_str()
-            .expect("Failed to convert host header to str");
+        let Some(host_header) = session.get_header(header::HOST) else {
+            return bad_request("Missing Host header");
+        };
+        let Ok(host) = host_header.to_str() else {
+            return bad_request("Invalid Host header");
+        };
         let path = session.req_header().uri.clone();
 
         // Uri::Authority doesn't allow port overrides, so mangle the string
@@ -125,10 +137,12 @@ impl CleartextHandler {
     async fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
         counter!(METRIC_ACME_HTTP01_ENDPOINT_TOTAL).increment(1);
 
-        let fqdn = session.get_header(header::HOST)
-            .expect("Failed to get host header on HTTP service")
-            .to_str()
-            .expect("Failed to convert host header to str");
+        let Some(host_header) = session.get_header(header::HOST) else {
+            return bad_request("Missing Host header");
+        };
+        let Ok(fqdn) = host_header.to_str() else {
+            return bad_request("Invalid Host header");
+        };
 
         let path = session.req_header().uri.path_and_query()
             .expect("Failed to find already matched path?");

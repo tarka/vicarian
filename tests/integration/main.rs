@@ -447,3 +447,132 @@ async fn test_auth_invalid() {
 
 }
 
+#[tokio::test]
+#[serial]
+async fn test_auth_missing_header() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_auth")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http2_prior_knowledge()
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .send().await.unwrap();
+
+    // No Authorization header: should return 401
+    assert_eq!(401, response.status().as_u16());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_auth_malformed_headers() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_auth")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let client = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http2_prior_knowledge()
+        .build().unwrap();
+
+    // lowercase bearer prefix: expected to fail since the code checks exact match `Bearer {key}`
+    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .header(AUTHORIZATION, "bearer my_auth_key")
+        .send().await.unwrap();
+    assert_eq!(401, response.status().as_u16());
+
+    // Basic auth: should fail
+    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .header(AUTHORIZATION, "Basic my_auth_key")
+        .send().await.unwrap();
+    assert_eq!(401, response.status().as_u16());
+
+    // Just Bearer without key: should fail
+    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .header(AUTHORIZATION, "Bearer")
+        .send().await.unwrap();
+    assert_eq!(401, response.status().as_u16());
+
+    // Bearer with double spaces: should fail
+    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .header(AUTHORIZATION, "Bearer  my_auth_key")
+        .send().await.unwrap();
+    assert_eq!(401, response.status().as_u16());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_unknown_host_header() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .danger_accept_invalid_certs(true)
+        .http1_only()
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .header(HOST, "unknown.example.com")
+        .send().await.unwrap();
+
+    // Host header doesn't match any registered vhost
+    assert_eq!(404, response.status().as_u16());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_unknown_backend_path() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/invalid-path"))
+        .send().await.unwrap();
+
+    // The host is valid, but the backend is only configured for context "/" which should match anything.
+    // Since there is no mock server running on 19090 (BACKEND_PORT),
+    // it should fail to connect to backend and return 502 Bad Gateway.
+    assert_eq!(502, response.status().as_u16());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_http_to_https_redirect_preserves_path_and_query() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let ready = Client::builder()
+        .redirect(redirect::Policy::none())
+        .build().unwrap()
+        .get(format!("http://localhost:{INSECURE_PORT}/foo/bar?baz=qux"))
+        .send().await.unwrap();
+
+    assert_eq!(301, ready.status().as_u16());
+    let loc = ready.headers().get("Location").unwrap()
+        .to_str().unwrap().to_string();
+    let expected_tls = format!("https://localhost:{TLS_PORT}/foo/bar?baz=qux");
+    assert_eq!(expected_tls, loc);
+}

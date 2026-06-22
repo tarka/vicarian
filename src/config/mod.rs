@@ -113,15 +113,6 @@ fn strip_trailing_slashes(s: String) -> String {
     }
 }
 
-fn validate_path(s: &String) -> Result<()> {
-    s.starts_with('/').then_some(())
-        .ok_or(anyhow!("No leading slash in context path: {s}"))?;
-    (!s.is_empty()).then_some(())
-        .ok_or(anyhow!("Context path cannot be empty"))?;
-
-    Ok(())
-}
-
 fn default_path() -> String {
     "/".to_string()
 }
@@ -137,6 +128,15 @@ pub struct Backend {
     #[serde(default = "default_bool::<false>")]
     pub trust: bool,
     pub auth_key: Option<String>,
+}
+
+fn validate_path(s: &String) -> Result<()> {
+    s.starts_with('/').then_some(())
+        .ok_or(anyhow!("No leading slash in context path: {s}"))?;
+    (!s.is_empty()).then_some(())
+        .ok_or(anyhow!("Context path cannot be empty"))?;
+
+    Ok(())
 }
 
 impl ValidateSanitise for Backend {
@@ -156,6 +156,13 @@ impl ValidateSanitise for Vec<Backend> {
         let backends = self.into_iter()
             .map(ValidateSanitise::validate_and_sanitise)
             .collect::<Result<Vec<Backend>>>()?;
+
+        let dup_paths = backends.iter()
+            .unique_by(|b| &b.path)
+            .count() != backends.len();
+        if dup_paths {
+            return Err(anyhow!("Duplicate paths in backend"))
+        }
 
         Ok(backends)
     }

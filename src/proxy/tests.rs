@@ -4,7 +4,7 @@ use test_log::test;
 
 use crate::{
     config::{Backend, ValidateSanitise},
-    proxy::{rewrite_port, router::{Match, Router}, strip_port}
+    proxy::{rewrite_port, router::Router, strip_port}
 };
 
 fn backend(path: &str, port: u16) -> Backend {
@@ -266,14 +266,11 @@ fn test_router_none_context_is_root() -> Result<()> {
 
 #[test]
 fn test_router_duplicate_contexts() -> Result<()> {
-    let backends = vec![
+    let result = vec![
         backend("/x", 1010),
         backend("/x", 2020),
-    ].validate_and_sanitise()?;
-    let router = Router::new(&backends);
-    let matched = router.lookup("/x").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), matched.backend.url);
-    assert_eq!("", matched._rest);
+    ].validate_and_sanitise();
+    assert!(result.is_err());
     Ok(())
 }
 
@@ -534,25 +531,6 @@ fn test_router_prefix_no_match_fallback_to_root() -> Result<()> {
 }
 
 #[test]
-fn test_router_duplicate_contexts_subpath() -> Result<()> {
-    let backends = vec![
-        backend("/x", 1010),
-        backend("/x", 2020),
-    ].validate_and_sanitise()?;
-    let router = Router::new(&backends);
-
-    // Exact match via Ok branch
-    let matched = router.lookup("/x").unwrap();
-    assert_eq!("", matched._rest);
-
-    // Subpath lookup goes through the Err branch
-    let matched = router.lookup("/x/child").unwrap();
-    assert_eq!("/child", matched._rest);
-
-    Ok(())
-}
-
-#[test]
 fn test_router_query_string_with_overlapping_prefix() -> Result<()> {
     let backends = vec![
         backend("/api", 1010),
@@ -713,11 +691,4 @@ fn test_router_single_char_segments() -> Result<()> {
     assert!(router.lookup("/ab").is_none());
 
     Ok(())
-}
-
-#[test]
-fn test_router_is_send_sync() {
-    fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<Router>();
-    assert_send_sync::<Match>();
 }

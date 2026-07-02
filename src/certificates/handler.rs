@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use pingora_boringssl::ssl::NameType;
-use pingora_core::{listeners::TlsAccept, protocols::tls::TlsRef};
-use tracing_log::log::debug;
+use pingora_core::listeners::TlsAccept;
+use pingora_rustls::{ClientHello, ResolvesServerCert};
+use rustls::sign::CertifiedKey;
+use tracing_log::log::{debug, info};
 
 use crate::certificates::store::CertStore;
 
 
+#[derive(Debug)]
 pub struct CertHandler {
     certstore: Arc<CertStore>,
 }
@@ -20,34 +22,57 @@ impl CertHandler {
     }
 }
 
-#[async_trait]
-impl TlsAccept for CertHandler {
 
-    // NOTE:This is all boringssl specific as pingora doesn't
-    // currently support dynamic certs with rustls.
-    async fn certificate_callback(&self, ssl: &mut TlsRef) {
-        let host = ssl.servername(NameType::HOST_NAME)
-            .map(str::to_string)
-            .expect("No servername in TLS handshake");
+impl ResolvesServerCert for CertHandler {
+    fn resolve(&self, hello: ClientHello<'_>) -> Option<Arc<CertifiedKey>> {
+        let host = hello.server_name()?.to_string();
+        info!("TLS Host is {host}; loading certs with Rustls");
 
-        debug!("TLS Host is {host}; loading certs");
-
-        let cert = self.certstore.by_host(&host)
+        // FIXME: This should be a `get()` in CertStore, but papaya
+        // guard lifetimes make it pointless (we'd have to generate a
+        // guard here anyway). There may be another way to do it
+        // cleanly?
+        let host_cert = self.certstore.by_host(&host)
             .or_else(|| self.certstore.by_wildcard(&host))
             .expect("Certificate for host not found");
         debug!("Found certificate for {host}");
 
-        ssl.set_private_key(cert.key())
-            .expect("Failed to set private key");
-        ssl.set_certificate(&cert.certs()[0])
-            .expect("Failed to set certificate");
-
-        if cert.certs().len() > 1 {
-            for c in cert.certs().iter().skip(1) {
-                ssl.add_chain_cert(c)
-                    .expect("Failed to add chain certificate");
-            }
-        }
+        info!("Found {host} cert");
+        Some(host_cert.cert())
     }
+
+}
+
+pub struct DummyCallbackHandler {}
+
+#[async_trait]
+impl TlsAccept for DummyCallbackHandler {
+
+    // // NOTE:This is all boringssl specific as pingora doesn't
+    // // currently support dynamic certs with rustls.
+    // async fn certificate_callback(&self, ssl: &mut TlsRef) {
+    //     let host = ssl.servername(NameType::HOST_NAME)
+    //         .map(str::to_string)
+    //         .expect("No servername in TLS handshake");
+
+    //     debug!("TLS Host is {host}; loading certs");
+
+    //     let cert = self.certstore.by_host(&host)
+    //         .or_else(|| self.certstore.by_wildcard(&host))
+    //         .expect("Certificate for host not found");
+    //     debug!("Found certificate for {host}");
+
+    //     ssl.set_private_key(cert.key())
+    //         .expect("Failed to set private key");
+    //     ssl.set_certificate(&cert.cert()[0])
+    //         .expect("Failed to set certificate");
+
+    //     if cert.cert().len() > 1 {
+    //         for c in cert.cert().iter().skip(1) {
+    //             ssl.add_chain_cert(c)
+    //                 .expect("Failed to add chain certificate");
+    //         }
+    //     }
+    // }
 
 }

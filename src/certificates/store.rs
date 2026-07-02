@@ -19,6 +19,7 @@ use crate::{
 // TODO: It _might_ be possible to return references rather than Arcs
 // here, which would enforce the store as being the source of
 // truth. But a bit fiddly for MVP version.
+#[derive(Debug)]
 pub struct CertStore {
     _context: Arc<RunContext>,
     by_host: Papaya<String, HostCertificate>,

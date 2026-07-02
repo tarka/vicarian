@@ -8,14 +8,14 @@ use std::sync::Arc;
 use anyhow::Result;
 use pingora_core::{
     listeners::tls::TlsSettings,
-    services::listening::Service,
     server::Server as PingoraServer,
+    services::listening::Service,
 };
 use tracing::info;
 
 use crate::{
     RunContext, certificates::{
-        CertificateRuntime, handler::CertHandler,
+        CertificateRuntime, handler::{CertHandler, DummyCallbackHandler},
     }, config::{AcmeChallenge, TlsAcmeConfig, TlsConfig}, proxy::services::{
         CleartextHandler, Vicarian
     }
@@ -39,8 +39,10 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
 
         for addr in &addrs {
             let cert_handler = CertHandler::new(cert_runtime.certstore().clone());
-            let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
+            let dummy_callbacks = DummyCallbackHandler {};
+            let mut tls_settings = TlsSettings::with_callbacks(Box::new(dummy_callbacks))?;
             tls_settings.enable_h2();
+            tls_settings.set_cert_resolver(Arc::new(cert_handler));
 
             let mut addr_port = *addr;
             addr_port.set_port(context.config.listen.tls_port);

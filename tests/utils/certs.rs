@@ -5,15 +5,12 @@ use std::{fs::{self, create_dir_all}, sync::LazyLock};
 use anyhow::{Context, Result, bail};
 use camino::{Utf8Path, Utf8PathBuf};
 use fslock::LockFile;
-use pingora_boringssl::{
-    pkey::{PKey, Private},
-    x509::X509,
-};
+use pingora_rustls::PrivateKeyDer;
 use rcgen::{
     BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, Issuer, KeyPair,
     KeyUsagePurpose, PKCS_ECDSA_P256_SHA256,
 };
-use rustls::{RootCertStore, pki_types::{CertificateDer, pem::{PemObject, SectionKind}}};
+use rustls::{RootCertStore, pki_types::{CertificateDer, pem::{PemObject, SectionKind}}, sign::CertifiedKey};
 
 pub const CERT_BASE: &str = "target/certs";
 pub static CERT_DIR: LazyLock<Utf8PathBuf> = LazyLock::new(|| Utf8PathBuf::from(CERT_BASE));
@@ -84,9 +81,9 @@ pub struct CaCert {
 
 pub struct LocalCert {
     pub keyfile: Utf8PathBuf,
-    pub key: PKey<Private>,
     pub certfile: Utf8PathBuf,
-    pub certs: Vec<X509>,
+    pub key: PrivateKeyDer<'static>,
+    pub certs: Vec<CertificateDer<'static>>,
 }
 
 fn gen_ca() -> Result<()> {
@@ -202,8 +199,10 @@ fn load_cert(keyfile: Utf8PathBuf, certfile: Utf8PathBuf) -> Result<LocalCert> {
     let cdata = fs::read(&certfile)
         .context("Failed to load certfile {certfile}")?;
 
-    let key = PKey::private_key_from_pem(&kdata)?;
-    let certs = X509::stack_from_pem(&cdata)?;
+    let key = PrivateKeyDer::from_pem_slice(&kdata)?;
+    let certs = CertificateDer::pem_slice_iter(&cdata)
+        .collect::<Result<Vec<_>, _>>()?;
+
     if certs.is_empty() {
         bail!("No certificates found in TLS .crt file");
     }

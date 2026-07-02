@@ -64,7 +64,6 @@ impl ProxyBuilder {
     async fn run_proxy(&self) -> Result<Child> {
         info!("Starting Test Proxy");
         let exe = env!("CARGO_BIN_EXE_vicarian");
-
         let out_file = self.dir.path().join("stdout");
         let err_file = self.dir.path().join("stderr");
         let stdout = File::create(out_file).await?;

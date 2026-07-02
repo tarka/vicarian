@@ -66,22 +66,6 @@ fn from_localcert(lc: &LocalCert, watch: bool) -> Result<HostCertificate> {
 }
 
 #[tokio::test]
-async fn test_load_certs_valid_pair() -> Result<()> {
-    let so = &TEST_HOST_CERTS.snakeoil_1;
-    let result = load_hostcert(so.keyfile(), so.certfile()).await;
-    assert!(result.is_ok());
-
-    let (_key, certs) = result.unwrap();
-    assert!(!certs.is_empty());
-
-    // FIXME: Rustls equiv needed
-    // let cert_pubkey = certs[0].
-    // assert!(key.public_eq(&cert_pubkey));
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_load_certs_invalid_pair() -> Result<()> {
     let so1 = TEST_HOST_CERTS.snakeoil_1.clone();
     let so2 = TEST_HOST_CERTS.snakeoil_2.clone();

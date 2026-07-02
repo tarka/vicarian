@@ -201,28 +201,3 @@ pub(crate) async fn load_hostcert(keyfile: &Utf8Path, certfile: &Utf8Path) -> Re
 
     Ok((key, certs))
 }
-
-// pub(crate) async fn load_hostcert(keyfile: &Utf8Path, certfile: &Utf8Path) -> Result<(PKey<Private>, Vec<X509>)> {
-//     let kdata = tokio::fs::read(keyfile).await
-//         .context("Failed to load keyfile {keyfile}")?;
-//     let cdata = tokio::fs::read(certfile).await
-//         .context("Failed to load certfile {certfile}")?;
-
-//     let key = PKey::private_key_from_pem(&kdata)?;
-//     let certs = X509::stack_from_pem(&cdata)?;
-//     if certs.is_empty() {
-//         bail!("No certificates found in TLS .crt file");
-//     }
-
-//     // Verify that the private key and cert match
-//     let cert_pubkey = certs[0].public_key()?;
-//     if !key.public_eq(&cert_pubkey) {
-//         let err = VicarianError::CertificateMismatch(
-//             keyfile.to_path_buf(),
-//             certfile.to_path_buf())
-//             .into();
-//         return Err(err)
-//     }
-
-//     Ok((key, certs))
-// }

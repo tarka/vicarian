@@ -7,7 +7,7 @@ mod proxyutils;
 mod websockets;
 
 use http::header::{AUTHORIZATION, HOST};
-use reqwest::{Client, redirect, header::{VIA, STRICT_TRANSPORT_SECURITY}};
+use reqwest::{Client, redirect, header::{VIA, LOCATION, STRICT_TRANSPORT_SECURITY}};
 use serial_test::serial;
 use wiremock::{
     Mock, ResponseTemplate,
@@ -575,4 +575,195 @@ async fn test_http_to_https_redirect_preserves_path_and_query() {
         .to_str().unwrap().to_string();
     let expected_tls = format!("https://localhost:{TLS_PORT}/foo/bar?baz=qux");
     assert_eq!(expected_tls, loc);
+}
+
+#[tokio::test]
+#[serial]
+async fn test_http01_not_found() {
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let response = Client::builder()
+        .redirect(redirect::Policy::none())
+        .build().unwrap()
+        .get(format!("http://localhost:{INSECURE_PORT}/.well-known/acme-challenge/nonexistent"))
+        .header(HOST, "www.example.com")
+        .send().await.unwrap();
+
+    assert_eq!(404, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert!(body.contains("ACME token not found"));
+}
+
+#[tokio::test]
+#[serial]
+async fn test_context_path_rewriting() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    Mock::given(method("GET"))
+        .and(path("/some/path"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("rewritten"))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("backend_context")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/api/some/path"))
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert_eq!("rewritten", body);
+}
+
+#[tokio::test]
+#[serial]
+async fn test_method_passthrough() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    Mock::given(method("POST"))
+        .and(path("/status"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("POST"))
+        .mount(&backend_server).await;
+
+    Mock::given(method("PUT"))
+        .and(path("/status"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("PUT"))
+        .mount(&backend_server).await;
+
+    Mock::given(method("DELETE"))
+        .and(path("/status"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("DELETE"))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", example_com)
+        .add_root_certificate(root_cert.clone())
+        .build().unwrap()
+        .post(format!("https://localhost:{TLS_PORT}/status"))
+        .body("test-body")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert_eq!("POST", body);
+
+    let response = Client::builder()
+        .resolve("localhost", example_com)
+        .add_root_certificate(root_cert.clone())
+        .build().unwrap()
+        .put(format!("https://localhost:{TLS_PORT}/status"))
+        .body("put-body")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert_eq!("PUT", body);
+
+    let response = Client::builder()
+        .resolve("localhost", example_com)
+        .add_root_certificate(root_cert.clone())
+        .build().unwrap()
+        .delete(format!("https://localhost:{TLS_PORT}/status"))
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert_eq!("DELETE", body);
+}
+
+#[tokio::test]
+#[serial]
+async fn test_location_header_rewriting() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    Mock::given(method("GET"))
+        .and(path("/some/path"))
+        .respond_with(ResponseTemplate::new(301)
+                      .insert_header(LOCATION, "/new-path"))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("backend_context")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .redirect(redirect::Policy::none())
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://www.example.com:{TLS_PORT}/api/some/path"))
+        .send().await.unwrap();
+
+    assert_eq!(301, response.status().as_u16());
+    let loc = response.headers().get(LOCATION).unwrap()
+        .to_str().unwrap();
+    assert!(loc.contains("/api/"));
+}
+
+#[tokio::test]
+#[serial]
+async fn test_x_forwarded_headers() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    Mock::given(method("GET"))
+        .and(path("/"))
+        .respond_with(|request: &wiremock::Request| {
+            let xff = request.headers.get("X-Forwarded-For")
+                .map(|v| v.to_str().unwrap_or(""))
+                .unwrap_or("");
+            let xri = request.headers.get("X-Real-IP")
+                .map(|v| v.to_str().unwrap_or(""))
+                .unwrap_or("");
+            ResponseTemplate::new(200)
+                .set_body_string(format!("xff={xff},xri={xri}"))
+        })
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", example_com)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/"))
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    println!("RESP: {body}");
+
+    assert!(body.contains("xff=127.0.0.1")
+            || body.contains("xff=::ffff:127.0.0.1"));
+    assert!(body.contains("xri=127.0.0.1")
+            || body.contains("xri=::ffff:127.0.0.1"));
+
 }

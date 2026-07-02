@@ -48,31 +48,4 @@ pub struct DummyCallbackHandler {}
 #[async_trait]
 impl TlsAccept for DummyCallbackHandler {
 
-    // // NOTE:This is all boringssl specific as pingora doesn't
-    // // currently support dynamic certs with rustls.
-    // async fn certificate_callback(&self, ssl: &mut TlsRef) {
-    //     let host = ssl.servername(NameType::HOST_NAME)
-    //         .map(str::to_string)
-    //         .expect("No servername in TLS handshake");
-
-    //     debug!("TLS Host is {host}; loading certs");
-
-    //     let cert = self.certstore.by_host(&host)
-    //         .or_else(|| self.certstore.by_wildcard(&host))
-    //         .expect("Certificate for host not found");
-    //     debug!("Found certificate for {host}");
-
-    //     ssl.set_private_key(cert.key())
-    //         .expect("Failed to set private key");
-    //     ssl.set_certificate(&cert.cert()[0])
-    //         .expect("Failed to set certificate");
-
-    //     if cert.cert().len() > 1 {
-    //         for c in cert.cert().iter().skip(1) {
-    //             ssl.add_chain_cert(c)
-    //                 .expect("Failed to add chain certificate");
-    //         }
-    //     }
-    // }
-
 }

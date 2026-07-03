@@ -17,7 +17,7 @@ pub struct Router {
 
 impl Router {
 
-    pub fn new(backends: &Vec<Backend>) -> Self {
+    pub fn new(backends: &[Backend]) -> Self {
         // We store the lookups as a sorted vec and do a binary search
         // through it below. This is simpler than using a radix-trie,
         // and faster with a small numbers of entries (< ~1k).

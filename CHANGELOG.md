@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 0 -->Features
 
 - Add client compression handling.
-- *(config)* [**breaking**] Change backend path into a newtype and
+- *(config)* [**breaking**] `context` is now `path`; `context` will remain as an alias for the time being but is deprecated.
 
 ### <!-- 1 -->Bug Fixes
 

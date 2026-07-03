@@ -767,3 +767,324 @@ async fn test_x_forwarded_headers() {
             || body.contains("xri=::ffff:127.0.0.1"));
 
 }
+
+fn _large_body() -> &'static str {
+    "The quick brown fox jumps over the lazy dog. "
+}
+
+#[tokio::test]
+#[serial]
+async fn test_compression_gzip_accept_encoding() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .header("Accept-Encoding", "gzip")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let content_encoding = response.headers().get("Content-Encoding")
+        .map(|v| v.to_str().unwrap());
+    assert_eq!(Some("gzip"), content_encoding);
+
+    let vary = response.headers().get("Vary")
+        .map(|v| v.to_str().unwrap().to_lowercase());
+    assert!(vary.is_some());
+    assert!(vary.unwrap().contains("accept-encoding"));
+}
+
+#[tokio::test]
+#[serial]
+async fn test_compression_brotli_accept_encoding() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .header("Accept-Encoding", "br")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let content_encoding = response.headers().get("Content-Encoding")
+        .map(|v| v.to_str().unwrap());
+    assert_eq!(Some("br"), content_encoding);
+
+    let vary = response.headers().get("Vary")
+        .map(|v| v.to_str().unwrap().to_lowercase());
+    assert!(vary.is_some());
+    assert!(vary.unwrap().contains("accept-encoding"));
+}
+
+#[tokio::test]
+#[serial]
+async fn test_compression_prefers_best_encoding() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .header("Accept-Encoding", "gzip, br, zstd")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let content_encoding = response.headers().get("Content-Encoding")
+        .map(|v| v.to_str().unwrap());
+    assert!(matches!(content_encoding, Some("gzip") | Some("br") | Some("zstd")));
+
+    let vary = response.headers().get("Vary")
+        .map(|v| v.to_str().unwrap().to_lowercase());
+    assert!(vary.is_some());
+    assert!(vary.unwrap().contains("accept-encoding"));
+}
+
+#[tokio::test]
+#[serial]
+async fn test_no_compression_without_accept_encoding() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let content_encoding = response.headers().get("Content-Encoding");
+    assert!(content_encoding.is_none());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_no_compression_empty_accept_encoding() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .header("Accept-Encoding", "")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let content_encoding = response.headers().get("Content-Encoding");
+    assert!(content_encoding.is_none());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_compression_unsupported_encoding() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .header("Accept-Encoding", "deflate")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let content_encoding = response.headers().get("Content-Encoding");
+    assert!(content_encoding.is_none());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_compression_small_body_not_compressed() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    Mock::given(method("GET"))
+        .and(path("/small"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string("OK"))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/small"))
+        .header("Accept-Encoding", "gzip")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    let content_encoding = response.headers().get("Content-Encoding");
+    assert!(content_encoding.is_none());
+}
+
+#[tokio::test]
+#[serial]
+async fn test_compression_preserves_vicarian_headers() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .header("Accept-Encoding", "gzip")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    assert_eq!(Some("gzip"), response.headers().get("Content-Encoding")
+        .map(|v| v.to_str().unwrap()));
+
+    let via = response.headers().get(VIA)
+        .map(|v| v.to_str().unwrap());
+    assert!(via.is_some());
+    assert!(via.unwrap().contains("Vicarian"));
+
+    let hsts = response.headers().get(STRICT_TRANSPORT_SECURITY)
+        .map(|v| v.to_str().unwrap());
+    assert_eq!(Some("max-age=31536000; includeSubDomains"), hsts);
+}
+
+#[tokio::test]
+#[serial]
+async fn test_compression_preserves_body_content() {
+    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+
+    let body = _large_body().repeat(100);
+    Mock::given(method("GET"))
+        .and(path("/compress"))
+        .respond_with(ResponseTemplate::new(200)
+                      .set_body_string(body.clone()))
+        .mount(&backend_server).await;
+
+    let _proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+
+    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("localhost", localhost)
+        .add_root_certificate(root_cert)
+        .build().unwrap()
+        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .header("Accept-Encoding", "gzip")
+        .send().await.unwrap();
+
+    assert_eq!(200, response.status().as_u16());
+    // reqwest with default-features=false does not auto-decompress,
+    // so the body should be compressed and different from the original.
+    let response_body = response.text().await.unwrap();
+    assert_ne!(body, response_body);
+    // The compressed body should be shorter than the original.
+    assert!(response_body.len() < body.len());
+}

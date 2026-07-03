@@ -10,8 +10,15 @@ use http::{
 
 use metrics::counter;
 use pingora_core::{
-    ErrorType, OkOrErr, OrErr, apps::http_app::ServeHttp, prelude::HttpPeer,
-    protocols::http::ServerSession, upstreams::peer::Peer,
+    ErrorType, OkOrErr, OrErr,
+    apps::http_app::ServeHttp,
+    modules::http::{
+        HttpModules,
+        compression::ResponseCompressionBuilder,
+    },
+    prelude::HttpPeer,
+    protocols::http::ServerSession,
+    upstreams::peer::Peer
 };
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
@@ -408,6 +415,11 @@ impl ProxyHttp for Vicarian {
         }
 
         Ok(())
+    }
+
+    fn init_downstream_modules(&self, mods: &mut HttpModules) {
+        // Enable compression
+        mods.add_module(ResponseCompressionBuilder::enable(3));
     }
 
     async fn response_filter(&self, session: &mut Session,

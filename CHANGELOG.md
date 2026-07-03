@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/tarka/vicarian/compare/v0.2.6...v0.3.0) - 2026-07-03
+
+### <!-- 0 -->Features
+
+- Add client compression handling.
+- *(config)* [**breaking**] Change backend path into a newtype and
+
+### <!-- 1 -->Bug Fixes
+
+- Disallow duplicate paths in backends.
+- Handle missing or malformed Host: headers
+- *(router)* Testing and fixes for path-matching corner cases.
+
+### <!-- 2 -->Refactor
+
+- *(config)* Backend path is no longer an option but defaults to "/" up-front rather than overriding in the router.
+- *(config)* context is now path (but remains backwards compatible.
+- *(config)* Use manual validation and sanitising; nutype is a bit overkill.
+- *(config)* Split CLI parsing into submodule.
+
+### <!-- 6 -->Testing
+
+- Add more integration test corner cases.
+- Always call validation on test backends.
+- Add more generated test corner-cases.
+- *(router)* Add more tests coverage for the router.
+
+### Other
+
+- Minor clippy fix
+- Fix release-plz config
+- Bump minor version for prerelease breaks.
+
 ## [0.2.6](https://github.com/tarka/vicarian/compare/v0.2.5...v0.2.6) - 2026-06-08
 
 ### <!-- 1 -->Bug Fixes

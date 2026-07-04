@@ -61,6 +61,52 @@ impl ProxyBuilder {
         })
     }
 
+    pub async fn run_with_static(self) -> Result<StaticProxy> {
+        if self.config.is_none() {
+            bail!("No config provided")
+        }
+
+        let static_root = self.dir.path().join("public");
+        create_dir_all(&static_root).await?;
+
+        let index_path = static_root.join("index.html");
+        tokio::fs::write(&index_path, "<html><body><h1>Welcome to the static server</h1></body></html>").await?;
+
+        let css_dir = static_root.join("css");
+        create_dir_all(&css_dir).await?;
+        let css_path = css_dir.join("style.css");
+        tokio::fs::write(&css_path, "body { background: #fff; color: #333; }").await?;
+
+        let js_dir = static_root.join("js");
+        create_dir_all(&js_dir).await?;
+        let js_path = js_dir.join("app.js");
+        tokio::fs::write(&js_path, "console.log('static server');").await?;
+
+        let assets_dir = static_root.join("assets");
+        create_dir_all(&assets_dir).await?;
+        let png_path = assets_dir.join("logo.png");
+        tokio::fs::write(&png_path, vec![0u8; 200]).await?;
+
+        let subdir = static_root.join("subdir");
+        create_dir_all(&subdir).await?;
+        let sub_path = subdir.join("page.html");
+        tokio::fs::write(&sub_path, "<html><body>Subdir page</body></html>").await?;
+
+        let large_path = static_root.join("large.html");
+        let large_body = "The quick brown fox jumps over the lazy dog. ".repeat(200);
+        tokio::fs::write(&large_path, large_body).await?;
+
+        // Force creation of the test certs.
+        let _ = LazyLock::force(&certs::TEST_CERTS);
+
+        let process = self.run_proxy().await?;
+        Ok(StaticProxy {
+            dir: self.dir,
+            static_root: static_root.try_into().unwrap(),
+            process,
+        })
+    }
+
     async fn run_proxy(&self) -> Result<Child> {
         info!("Starting Test Proxy");
         let exe = env!("CARGO_BIN_EXE_vicarian");
@@ -106,6 +152,29 @@ impl Proxy {
 }
 
 impl Drop for Proxy {
+    fn drop(&mut self) {
+        if panicking() {
+            self.dir.disable_cleanup(true);
+        }
+        self.child_cleanup();
+    }
+}
+
+pub struct StaticProxy {
+    pub dir: TempDir,
+    pub static_root: Utf8PathBuf,
+    pub process: Child,
+}
+
+impl StaticProxy {
+    fn child_cleanup(&self) {
+        let pid = Pid::from_raw(self.process.id().unwrap().try_into().unwrap());
+        kill(pid, Signal::SIGINT).unwrap();
+        println!("Killed process {}", pid);
+    }
+}
+
+impl Drop for StaticProxy {
     fn drop(&mut self) {
         if panicking() {
             self.dir.disable_cleanup(true);

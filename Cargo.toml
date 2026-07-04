@@ -14,20 +14,20 @@ categories = ["web-programming::http-server", "network-programming"]
 license = "Apache-2.0"
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.103"
 async-trait = "0.1.89"
-bytes = "1.11.1"
-camino = { version = "1.2.2", features = ["serde1"] }
+bytes = "1.12.0"
+camino = { version = "1.2.4", features = ["serde1"] }
 clap = { version = "4.6.1", features = ["derive"] }
 dnsclient = "0.2.0"
 fastrand = "2.4.1"
 futures = "0.3.32"
 futures-lite = "2.6.1"
-http = "1.4.1"
+http = "1.4.2"
 http-serde = "2.1.1"
 instant-acme = { version = "0.8.5", features = ["time"] }
 
-itertools = "0.14.0"
+itertools = "0.15.0"
 libcorn = "0.10.1"
 metrics = "0.24.6"
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["tokio", "tracing"] }
@@ -35,20 +35,20 @@ nix = { version = "0.31.3", features = ["net", "resource"] }
 notify = { version = "8.2.0", features = ["crossbeam-channel"] }
 notify-debouncer-full = { version = "0.7.0", features = ["crossbeam-channel"] }
 papaya = "0.2.4"
-phf = { version = "0.13.1", features = ["phf_macros"] }
-phf_macros = "0.13.1"
+phf = { version = "0.14.0", features = ["phf_macros"] }
+phf_macros = "0.14.0"
 pingora-boringssl = "0.8.1"
 pingora-core = { version = "0.8.1", features = ["boringssl"] }
 pingora-http = "0.8.1"
 pingora-proxy = "0.8.1"
-psl = "2.1.212"
-rustls = "0.23.40"
+psl = "2.1.216"
+rustls = "0.23.41"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
 serde_json = "1.0.150"
 strum_macros = "0.28.0"
 thiserror = "2.0.18"
-time = { version = "0.3.47", features = ["local-offset"] }
+time = { version = "0.3.53", features = ["local-offset"] }
 tokio = { version = "1.52.3", features = ["macros", "rt", "sync", "fs"] }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
@@ -69,7 +69,7 @@ reqwest = { version = "0.13.4", default-features = false, features = ["http2", "
 serial_test = "3.5.0"
 tempfile = "3.27.0"
 test-log = { version = "0.2.21", features = ["trace"] }
-time = { version = "0.3.47", features = ["macros"] }
+time = { version = "0.3.53", features = ["macros"] }
 tokio = { version = "1.52.3", features = ["fs"] }
 tokio-tungstenite = { version = "0.29.0", features = ["rustls", "rustls-tls-webpki-roots", "tokio-rustls"] }
 wiremock = "0.6.5"

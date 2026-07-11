@@ -3,37 +3,35 @@ use std::{iter, sync::Arc};
 use async_trait::async_trait;
 use bytes::Bytes;
 use http::{
-    HeaderValue, Response, StatusCode, Uri,
-    header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
-    uri::{Builder, Scheme},
+    HeaderValue, Request, Response, StatusCode, Uri, header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA}, uri::{Builder, Scheme}
 };
-
+use http_body_util::BodyExt;
 use metrics::counter;
 use pingora_core::{
     ErrorType, OkOrErr, OrErr,
     apps::http_app::ServeHttp,
-    modules::http::{
-        HttpModules,
-        compression::ResponseCompressionBuilder,
-    },
+    modules::http::{HttpModules, compression::ResponseCompressionBuilder},
     prelude::HttpPeer,
     protocols::http::ServerSession,
-    upstreams::peer::Peer
+    upstreams::peer::Peer,
 };
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
+use static_web_server::{handler::{
+    RequestHandler as StaticHandler, RequestHandlerOpts as StaticOpts,
+}};
 use tracing::{debug, info};
 
 use crate::{
     RunContext,
     certificates::{acme::AcmeRuntime, store::CertStore},
     config::Backend,
+    metrics::Metrics,
     metrics::{
         METRIC_ACME_HTTP01_ENDPOINT_TOTAL, METRIC_ACME_HTTP01_NOTFOUND_TOTAL,
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_HTTP_REDIRECTS_TOTAL,
         METRIC_HTTP_REQUESTS_TOTAL, METRIC_METRICS_SCRAPE_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
     },
-    metrics::Metrics,
     proxy::{rewrite_port, router::Router, strip_port},
 };
 
@@ -308,6 +306,39 @@ impl ProxyHttp for Vicarian {
                     "metrics" => {
                         self.metrics_reply(session).await?;
                     }
+
+                    "static" => {
+                        let opts: Arc<StaticOpts> = StaticOpts {
+                            root_dir: "./docs/website".into(),
+                            compression: false,
+                            ..Default::default()
+                        }.into();
+                        let handler = StaticHandler {
+                            opts,
+                        };
+
+                        // FIXME: Check length
+                        let parts = session.req_header().as_owned_parts();
+
+                        let mut req = hyper::Request::from_parts(parts, static_web_server::body::empty());
+                        let resp = handler.handle(&mut req, None).await
+                            .or_err(E500, "Failed to retrieve static file")?;
+
+                        let (rparts, mut body) = resp.into_parts();
+                        let header = ResponseHeader::from(rparts);
+                        session.write_response_header(Box::new(header), false).await?;
+
+                        while let Some(frame) = body.frame().await {
+                            let data = frame.or_err(E500, "Failed to read static body")?;
+                            if let Some(bref) = data.data_ref() {
+                                let bytes = bref.to_owned();
+                                session.write_response_body(bytes.into(), false).await?;
+                            }
+                        }
+                        session.write_response_body(Bytes::new().into(), true).await?;
+
+                    }
+
                     _ => {
                         let desc = format!("Unknown URL scheme: {scheme}");
                         return Err(pingora_core::Error::explain(E500, desc))
@@ -316,7 +347,6 @@ impl ProxyHttp for Vicarian {
 
                 Ok(true)
             }
-
             &_ => {
                 let desc = format!("Unknown URL scheme: {scheme}");
                 Err(pingora_core::Error::explain(E500, desc))

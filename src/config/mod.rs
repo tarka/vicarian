@@ -1,4 +1,3 @@
-
 mod cli;
 
 #[cfg(test)]

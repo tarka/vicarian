@@ -1,3 +1,4 @@
+mod cleartext;
 mod router;
 mod services;
 mod r#static;
@@ -20,7 +21,7 @@ use crate::{
     RunContext,
     certificates::{CertificateRuntime, handler::CertHandler},
     config::{AcmeChallenge, TlsAcmeConfig, TlsConfig},
-    proxy::services::{CleartextHandler, Vicarian},
+    proxy::{cleartext::CleartextHandler, services::Vicarian},
 };
 
 pub const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());

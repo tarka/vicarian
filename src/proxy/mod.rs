@@ -6,11 +6,13 @@ mod tests;
 use std::sync::Arc;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use pingora_core::{
     listeners::tls::TlsSettings,
     services::listening::Service,
     server::Server as PingoraServer,
 };
+use pingora_proxy::Session;
 use tracing::info;
 
 use crate::{
@@ -20,6 +22,11 @@ use crate::{
         CleartextHandler, Vicarian
     }
 };
+
+#[async_trait]
+pub trait Handler: Send + Sync {
+    async fn handle(&self, session: &mut Session) -> Result<()>;
+}
 
 
 pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunContext>) -> Result<()> {

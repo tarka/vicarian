@@ -5,9 +5,10 @@ mod tests;
 
 use std::net::{IpAddr, SocketAddr, SocketAddrV6};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use camino::{Utf8Path, Utf8PathBuf};
 use http::Uri;
+use http_serde::option::authority;
 use itertools::Itertools;
 use nix::sys::socket::SockaddrStorage;
 use serde::{Deserialize, Deserializer};
@@ -127,6 +128,7 @@ pub struct Backend {
     #[serde(default = "default_bool::<false>")]
     pub trust: bool,
     pub auth_key: Option<String>,
+    pub static_root: Option<Utf8PathBuf>
 }
 
 fn validate_path(s: &String) -> Result<()> {
@@ -141,6 +143,19 @@ fn validate_path(s: &String) -> Result<()> {
 impl ValidateSanitise for Backend {
     fn validate_and_sanitise(self) -> Result<Self> {
         validate_path(&self.path)?;
+        let uri = &self.url;
+        let scheme = uri.scheme_str()
+            .ok_or(anyhow!("No scheme (`http`, `https`, or `module`) in URI {uri}"))?;
+        let authority = uri.authority()
+            .ok_or(anyhow!("No scheme (`http`, `https`, or `module`) in URI {uri}"))?
+            .as_str();
+
+        if scheme == "module"
+            && authority == "static"
+            && self.static_root.is_none()
+        {
+            bail!("Static backends must supply a `static_root`")
+        }
         let clean = Backend {
             path: strip_trailing_slashes(self.path),
             ..self

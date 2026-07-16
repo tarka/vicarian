@@ -1,11 +1,14 @@
 use std::{iter, sync::Arc};
 
+use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
+use camino::Utf8PathBuf;
 use http::{
-    HeaderValue, Request, Response, StatusCode, Uri, header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA}, uri::{Builder, Scheme}
+    HeaderValue, Response, StatusCode, Uri, header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA}, uri::{Authority, Builder, Scheme},
 };
 use http_body_util::BodyExt;
+use itertools::Itertools;
 use metrics::counter;
 use pingora_core::{
     ErrorType, OkOrErr, OrErr,
@@ -17,22 +20,18 @@ use pingora_core::{
 };
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
-use static_web_server::{handler::{
-    RequestHandler as StaticHandler, RequestHandlerOpts as StaticOpts,
-}};
+use static_web_server::handler::{
+    RequestHandler as SWSHandler, RequestHandlerOpts as SWSHandlerOpts,
+};
 use tracing::{debug, info};
 
 use crate::{
-    RunContext,
-    certificates::{acme::AcmeRuntime, store::CertStore},
-    config::Backend,
-    metrics::Metrics,
-    metrics::{
+    RunContext, certificates::{acme::AcmeRuntime, store::CertStore}, config::{Backend, Vhost}, errors::VicarianError, metrics::{
         METRIC_ACME_HTTP01_ENDPOINT_TOTAL, METRIC_ACME_HTTP01_NOTFOUND_TOTAL,
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_HTTP_REDIRECTS_TOTAL,
         METRIC_HTTP_REQUESTS_TOTAL, METRIC_METRICS_SCRAPE_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
-    },
-    proxy::{rewrite_port, router::Router, strip_port},
+        Metrics,
+    }, proxy::{Handler, rewrite_port, router::{Router, RouterBackend}, strip_port},
 };
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
@@ -201,15 +200,17 @@ pub struct Vicarian {
 
 impl Vicarian {
     pub fn new(_certstore: Arc<CertStore>, context: Arc<RunContext>) -> Self {
+
         let routes_by_host = context.config.vhosts.iter()
             .flat_map(|vhost| {
-                let router = Arc::new(Router::new(&vhost.backends));
+                let router = Arc::new(vhost_to_router(vhost));
                 iter::once(&vhost.hostname)
                     .chain(vhost.aliases.iter())
                     .map(|s| s.to_lowercase())
                     .map(move |h| (h.clone(), router.clone()))
             })
             .collect::<papaya::HashMap<String, Arc<Router>>>();
+
         Self {
             _context: context,
             _certstore,
@@ -234,13 +235,104 @@ impl Vicarian {
     }
 }
 
+struct StaticBackend {
+    root: Utf8PathBuf,
+}
+
+impl StaticBackend {
+    fn new(backend: &Backend) -> Self {
+        Self {
+            root: backend.static_root.clone()
+                .expect("No static_root; this should be checked in config")
+        }
+    }
+}
+
+#[async_trait]
+impl Handler for StaticBackend {
+    async fn handle(&self, session: &mut Session) -> Result<()> {
+        let opts = Arc::new(SWSHandlerOpts{
+            root_dir: "./docs/website".into(),
+            compression: false,
+            ..Default::default()
+        });
+        let handler = SWSHandler {
+            opts,
+        };
+
+        // FIXME: Check length
+        let parts = session.req_header().as_owned_parts();
+
+        let mut req = hyper::Request::from_parts(parts, static_web_server::body::empty());
+        let resp = handler.handle(&mut req, None).await
+            .or_err(E500, "Failed to retrieve static file")?;
+
+        let (rparts, mut body) = resp.into_parts();
+        let header = ResponseHeader::from(rparts);
+        session.write_response_header(Box::new(header), false).await?;
+
+        while let Some(frame) = body.frame().await {
+            let data = frame.or_err(E500, "Failed to read static body")?;
+            if let Some(bref) = data.data_ref() {
+                let bytes = bref.to_owned();
+                session.write_response_body(bytes.into(), false).await?;
+            }
+        }
+        session.write_response_body(Bytes::new().into(), true).await?;
+
+        Ok(())
+    }
+}
+
+fn to_module_handler(backend: &Backend) -> Option<Box<dyn Handler>> {
+    // url => module:://<module_name>
+    // The schema/authority is checked in the config module.
+    let url = &backend.url;
+    let _is_module = url.scheme_str()
+        .filter(|&s| s == "module")?;
+
+    let module = url.authority()?
+        .as_str();
+
+    match module {
+        // TODO:
+        // "metrics" => {
+        //     self.metrics_reply(session).await?;
+        // }
+
+        "static" => {
+            Some(Box::new(StaticBackend::new(backend)))
+        }
+
+        _ => {
+            panic!("Unknown module {module}");
+        }
+    }
+}
+
+// FIXME: Refactor amd make RouterBackend::new()
+fn to_router_backend(backend: &Backend) -> RouterBackend {
+    RouterBackend {
+        config: backend.clone(),
+        handler: to_module_handler(backend),
+    }
+}
+
+fn vhost_to_router(vhost: &Vhost) -> Router {
+    let backends = vhost.backends.iter()
+        .map(to_router_backend)
+        .collect();
+    Router::new(backends)
+}
+
+
 const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());
 const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
 const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
 
 #[derive(Clone)]
 pub struct VicarianCtx {
-    backend: Arc<Backend>,
+    backend: Arc<RouterBackend>,
 }
 
 #[async_trait]
@@ -269,7 +361,7 @@ impl ProxyHttp for Vicarian {
                 .backend
         };
 
-        if let Some(key) = &backend.auth_key {
+        if let Some(key) = &backend.config.auth_key {
             let auth = session.req_header().headers.get(AUTHORIZATION)
                 .or_err(E401, "Failed to fetch Authorization header")?
                 .to_str()
@@ -282,10 +374,10 @@ impl ProxyHttp for Vicarian {
             }
 
             counter!(METRIC_AUTH_VALID_TOTAL).increment(1);
-            info!("Valid auth received for {:?}", backend.path);
+            info!("Valid auth received for {:?}", backend.config.path);
         }
 
-        let url = &backend.url;
+        let url = &backend.config.url;
         let scheme = url.scheme_str()
             .or_err(E500, "Failed to parse backed URL scheme")?;
 
@@ -308,34 +400,6 @@ impl ProxyHttp for Vicarian {
                     }
 
                     "static" => {
-                        let opts: Arc<StaticOpts> = StaticOpts {
-                            root_dir: "./docs/website".into(),
-                            compression: false,
-                            ..Default::default()
-                        }.into();
-                        let handler = StaticHandler {
-                            opts,
-                        };
-
-                        // FIXME: Check length
-                        let parts = session.req_header().as_owned_parts();
-
-                        let mut req = hyper::Request::from_parts(parts, static_web_server::body::empty());
-                        let resp = handler.handle(&mut req, None).await
-                            .or_err(E500, "Failed to retrieve static file")?;
-
-                        let (rparts, mut body) = resp.into_parts();
-                        let header = ResponseHeader::from(rparts);
-                        session.write_response_header(Box::new(header), false).await?;
-
-                        while let Some(frame) = body.frame().await {
-                            let data = frame.or_err(E500, "Failed to read static body")?;
-                            if let Some(bref) = data.data_ref() {
-                                let bytes = bref.to_owned();
-                                session.write_response_body(bytes.into(), false).await?;
-                            }
-                        }
-                        session.write_response_body(Bytes::new().into(), true).await?;
 
                     }
 
@@ -360,7 +424,7 @@ impl ProxyHttp for Vicarian {
         let backend = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
-        let url = &backend.url;
+        let url = &backend.config.url;
 
         let host = url.host()
             .or_err(E500, "Backend host lookup failed")?;
@@ -370,7 +434,7 @@ impl ProxyHttp for Vicarian {
 
         let tls = url.scheme() == Some(&Scheme::HTTPS);
         let mut peer = HttpPeer::new((host, port), tls, host.to_string());
-        if backend.trust && let Some(opts) = peer.get_mut_peer_options() {
+        if backend.config.trust && let Some(opts) = peer.get_mut_peer_options() {
             opts.verify_cert = false;
         }
 
@@ -387,12 +451,12 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if backend.path != "/"
-            && ! backend.url.path().starts_with(&backend.path)
+        if backend.config.path != "/"
+            && ! backend.config.url.path().starts_with(&backend.config.path)
         {
-            debug!("Modifying {} for context {}", upstream_request.uri, backend.path);
+            debug!("Modifying {} for context {}", upstream_request.uri, backend.config.path);
             let upath = upstream_request.uri.path()
-                .strip_prefix(&backend.path)
+                .strip_prefix(&backend.config.path)
                 .unwrap_or("/");
             let uquery = upstream_request.uri.query()
                 .map(|s| format!("?{s}"))
@@ -427,15 +491,15 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if backend.path != "/"
-            && ! backend.url.path().starts_with(&backend.path)
+        if backend.config.path != "/"
+            && ! backend.config.url.path().starts_with(&backend.config.path)
         {
             for headername in [LOCATION, REFRESH] {
                 let header_p = upstream_response.headers.get(&headername);
                 if let Some(header) = header_p {
                     let oldloc = header.to_str()
                         .or_err(E500, "Failed to rewrite location header")?;
-                    let newloc = HeaderValue::from_str(&format!("{}{oldloc}", backend.path))
+                    let newloc = HeaderValue::from_str(&format!("{}{oldloc}", backend.config.path))
                         .or_err(E500, "Failed to rewrite location header")?;
 
                     debug!("Modifying Location to {newloc:?}");

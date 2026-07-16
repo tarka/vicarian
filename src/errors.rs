@@ -7,4 +7,7 @@ use camino::Utf8PathBuf;
 pub enum VicarianError {
     #[error("TLS Key & Cert don't match: {0}, {1}")]
     CertificateMismatch(Utf8PathBuf, Utf8PathBuf),
+
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
 }

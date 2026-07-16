@@ -3,32 +3,33 @@ use std::sync::Arc;
 use itertools::Itertools;
 use tracing::debug;
 
-use crate::config::Backend;
+use crate::{config::Backend, proxy::Handler};
 
-// pub trait RouterBackend {
-//     async fn handle(&self, session: &mut Session) -> 
-// }
+
+pub struct RouterBackend {
+    pub config: Backend,
+    pub handler: Option<Box<dyn Handler>>,
+}
+
+pub struct Router {
+    backends: Vec<Arc<RouterBackend>>,
+}
 
 pub struct Match {
-    pub backend: Arc<Backend>,
+    pub backend: Arc<RouterBackend>,
     pub _rest: String,
 }
 
-#[derive(Debug)]
-pub struct Router {
-    backends: Vec<Arc<Backend>>,
-}
 
 impl Router {
 
-    pub fn new(backends: &[Backend]) -> Self {
+    pub fn new(backends: Vec<RouterBackend>) -> Self {
         // We store the lookups as a sorted vec and do a binary search
         // through it below. This is simpler than using a radix-trie,
         // and faster with a small numbers of entries (< ~1k).
-        let sorted = backends.iter()
-            .cloned()
+        let sorted = backends.into_iter()
             .map(Arc::new)
-            .sorted_by(|a, b| a.path.cmp(&b.path))
+            .sorted_by(|a, b| a.config.path.cmp(&b.config.path))
             .collect();
 
         Router {
@@ -38,7 +39,7 @@ impl Router {
 
     fn to_match(&self, pos: usize, uri_path: &str) -> Match {
         let backend = &self.backends[pos];
-        let rest = &uri_path[backend.path.len()..];
+        let rest = &uri_path[backend.config.path.len()..];
         Match {
             backend: backend.clone(),
             _rest: rest.to_string(),
@@ -59,18 +60,18 @@ impl Router {
         // Thus Err(pos) one after the closest partial match, so we
         // walk backwards to find the longest actual match.
         let matched = self.backends
-            .binary_search_by(|b| b.path.as_str().cmp(uri_path));
+            .binary_search_by(|b| b.config.path.as_str().cmp(uri_path));
 
         match matched {
             Ok(pos) => {
-                debug!("Exact match: {}", self.backends[pos].path);
+                debug!("Exact match: {}", self.backends[pos].config.path);
                 Some(self.to_match(pos, uri_path))
             }
 
             Err(pos) => {
                 debug!("Miss; finding closest");
                 for i in (0..pos).rev() {
-                    let prefix = &self.backends[i].path;
+                    let prefix = &self.backends[i].config.path;
 
                     debug!("Comparing {prefix}");
                     if uri_path.starts_with(prefix.as_str()) {

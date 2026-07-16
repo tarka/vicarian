@@ -5,10 +5,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use camino::Utf8PathBuf;
 use http::{
-    HeaderValue, Response, StatusCode, Uri, header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA}, uri::{Authority, Builder, Scheme},
+    HeaderValue, Response, StatusCode, Uri,
+    header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
+    uri::{Builder, Scheme},
 };
 use http_body_util::BodyExt;
-use itertools::Itertools;
 use metrics::counter;
 use pingora_core::{
     ErrorType, OkOrErr, OrErr,
@@ -26,12 +27,20 @@ use static_web_server::handler::{
 use tracing::{debug, info};
 
 use crate::{
-    RunContext, certificates::{acme::AcmeRuntime, store::CertStore}, config::{Backend, Vhost}, errors::VicarianError, metrics::{
+    RunContext,
+    certificates::{acme::AcmeRuntime, store::CertStore},
+    config::{Backend, Vhost},
+    metrics::{
         METRIC_ACME_HTTP01_ENDPOINT_TOTAL, METRIC_ACME_HTTP01_NOTFOUND_TOTAL,
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_HTTP_REDIRECTS_TOTAL,
         METRIC_HTTP_REQUESTS_TOTAL, METRIC_METRICS_SCRAPE_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
         Metrics,
-    }, proxy::{Handler, rewrite_port, router::{Router, RouterBackend}, strip_port},
+    },
+    proxy::{
+        Handler, rewrite_port,
+        router::{Router, RouterBackend},
+        strip_port,
+    },
 };
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
@@ -236,14 +245,22 @@ impl Vicarian {
 }
 
 struct StaticBackend {
-    root: Utf8PathBuf,
+    sws_handler: SWSHandler,
 }
 
 impl StaticBackend {
     fn new(backend: &Backend) -> Self {
+        let opts = Arc::new(SWSHandlerOpts{
+            root_dir: backend.static_root.clone()
+                .expect("No static root; should be caught in config")
+                .into_std_path_buf(),
+            compression: false,
+            ..Default::default()
+        });
         Self {
-            root: backend.static_root.clone()
-                .expect("No static_root; this should be checked in config")
+            sws_handler: SWSHandler {
+                opts,
+            },
         }
     }
 }
@@ -251,20 +268,12 @@ impl StaticBackend {
 #[async_trait]
 impl Handler for StaticBackend {
     async fn handle(&self, session: &mut Session) -> Result<()> {
-        let opts = Arc::new(SWSHandlerOpts{
-            root_dir: "./docs/website".into(),
-            compression: false,
-            ..Default::default()
-        });
-        let handler = SWSHandler {
-            opts,
-        };
 
         // FIXME: Check length
         let parts = session.req_header().as_owned_parts();
 
         let mut req = hyper::Request::from_parts(parts, static_web_server::body::empty());
-        let resp = handler.handle(&mut req, None).await
+        let resp = self.sws_handler.handle(&mut req, None).await
             .or_err(E500, "Failed to retrieve static file")?;
 
         let (rparts, mut body) = resp.into_parts();
@@ -381,39 +390,18 @@ impl ProxyHttp for Vicarian {
         let scheme = url.scheme_str()
             .or_err(E500, "Failed to parse backed URL scheme")?;
 
-        match scheme {
-            "http" | "https" => {
+        match &backend.handler {
+            Some(handler) => {
+                debug!("Calling handler for {}", backend.config.path);
+                handler.handle(session).await
+                    .map_err(|e| pingora_core::Error::explain(E500, format!("Failed to call handler: {e}")))?;
+                Ok(true)
+            }
+            None => {
                 *ctx = Some(VicarianCtx {
                     backend: backend.clone()
                 });
                 Ok(false)
-            }
-
-            // url => module:://<module_name>
-            "module" => {
-                let module = url.authority()
-                    .or_err(E404, "Module name not found in host backends")?;
-
-                match module.as_str() {
-                    "metrics" => {
-                        self.metrics_reply(session).await?;
-                    }
-
-                    "static" => {
-
-                    }
-
-                    _ => {
-                        let desc = format!("Unknown URL scheme: {scheme}");
-                        return Err(pingora_core::Error::explain(E500, desc))
-                    }
-                }
-
-                Ok(true)
-            }
-            &_ => {
-                let desc = format!("Unknown URL scheme: {scheme}");
-                Err(pingora_core::Error::explain(E500, desc))
             }
         }
 

@@ -19,7 +19,7 @@
                 {
                     context = "/"
                     url = "module://static"
-                    root = "public"
+                    static_root = "tests/data/static"
                 }
             ]
         }

@@ -67,34 +67,7 @@ impl ProxyBuilder {
         }
 
         let static_root = self.dir.path().join("public");
-        create_dir_all(&static_root).await?;
-
-        let index_path = static_root.join("index.html");
-        tokio::fs::write(&index_path, "<html><body><h1>Welcome to the static server</h1></body></html>").await?;
-
-        let css_dir = static_root.join("css");
-        create_dir_all(&css_dir).await?;
-        let css_path = css_dir.join("style.css");
-        tokio::fs::write(&css_path, "body { background: #fff; color: #333; }").await?;
-
-        let js_dir = static_root.join("js");
-        create_dir_all(&js_dir).await?;
-        let js_path = js_dir.join("app.js");
-        tokio::fs::write(&js_path, "console.log('static server');").await?;
-
-        let assets_dir = static_root.join("assets");
-        create_dir_all(&assets_dir).await?;
-        let png_path = assets_dir.join("logo.png");
-        tokio::fs::write(&png_path, vec![0u8; 200]).await?;
-
-        let subdir = static_root.join("subdir");
-        create_dir_all(&subdir).await?;
-        let sub_path = subdir.join("page.html");
-        tokio::fs::write(&sub_path, "<html><body>Subdir page</body></html>").await?;
-
-        let large_path = static_root.join("large.html");
-        let large_body = "The quick brown fox jumps over the lazy dog. ".repeat(200);
-        tokio::fs::write(&large_path, large_body).await?;
+        copy_dir_all("tests/data/static", &static_root).await?;
 
         // Force creation of the test certs.
         let _ = LazyLock::force(&certs::TEST_CERTS);
@@ -181,6 +154,21 @@ impl Drop for StaticProxy {
         }
         self.child_cleanup();
     }
+}
+
+async fn copy_dir_all(src: &str, dst: &std::path::Path) -> std::io::Result<()> {
+    tokio::fs::create_dir_all(dst).await?;
+    let mut entries = tokio::fs::read_dir(src).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let entry_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry.file_type().await?.is_dir() {
+            Box::pin(copy_dir_all(entry_path.to_str().unwrap(), &dst_path)).await?;
+        } else {
+            tokio::fs::copy(&entry_path, &dst_path).await?;
+        }
+    }
+    Ok(())
 }
 
 pub async fn mock_server(port: u16) -> Result<MockServer> {

@@ -52,7 +52,8 @@ static-web-server = {
     # Pre-V3; update when upstream releases
     git = "https://github.com/static-web-server/static-web-server.git",
     rev = "3a7a0db",
-    default-features = false
+    default-features = false,
+    features = ["directory-listing", "fallback-page"]
 }
 strum_macros = "0.28.0"
 thiserror = "2.0.18"

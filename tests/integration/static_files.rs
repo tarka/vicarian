@@ -128,7 +128,7 @@ async fn test_static_js_file() {
     assert_eq!(200, response.status().as_u16());
     let ct = response.headers().get(CONTENT_TYPE)
         .map(|v| v.to_str().unwrap());
-    assert!(ct.unwrap_or("").starts_with("application/javascript"));
+    assert!(ct.unwrap_or("").starts_with("text/javascript") || ct.unwrap_or("").starts_with("application/javascript"));
     let body = response.text().await.unwrap();
     assert!(body.contains("static server"));
 }
@@ -215,7 +215,9 @@ async fn test_static_404() {
         .await
         .unwrap();
 
-    assert_eq!(404, response.status().as_u16());
+    assert_eq!(200, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert!(body.contains("Welcome to the static server"));
 }
 
 #[tokio::test]

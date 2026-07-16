@@ -7,7 +7,7 @@ mod proxyutils;
 
 use http::header::AUTHORIZATION;
 use proxyutils::{ProxyBuilder, TLS_PORT};
-use reqwest::{Client, redirect, header::{VIA, CONTENT_TYPE, STRICT_TRANSPORT_SECURITY}};
+use reqwest::{Client, header::{VIA, CONTENT_TYPE, STRICT_TRANSPORT_SECURITY}};
 use serial_test::serial;
 
 use crate::certutils::TEST_CERTS;

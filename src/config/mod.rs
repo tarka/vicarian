@@ -8,7 +8,6 @@ use std::net::{IpAddr, SocketAddr, SocketAddrV6};
 use anyhow::{Context, Result, anyhow, bail};
 use camino::{Utf8Path, Utf8PathBuf};
 use http::Uri;
-use http_serde::option::authority;
 use itertools::Itertools;
 use nix::sys::socket::SockaddrStorage;
 use serde::{Deserialize, Deserializer};

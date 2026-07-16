@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 mod certs;
 
 use std::sync::LazyLock;

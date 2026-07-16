@@ -1,5 +1,6 @@
 mod router;
 mod services;
+mod r#static;
 #[cfg(test)]
 mod tests;
 
@@ -7,21 +8,25 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use http::StatusCode;
 use pingora_core::{
-    listeners::tls::TlsSettings,
+    ErrorType, listeners::tls::TlsSettings, server::Server as PingoraServer,
     services::listening::Service,
-    server::Server as PingoraServer,
 };
 use pingora_proxy::Session;
 use tracing::info;
 
 use crate::{
-    RunContext, certificates::{
-        CertificateRuntime, handler::CertHandler,
-    }, config::{AcmeChallenge, TlsAcmeConfig, TlsConfig}, proxy::services::{
-        CleartextHandler, Vicarian
-    }
+    RunContext,
+    certificates::{CertificateRuntime, handler::CertHandler},
+    config::{AcmeChallenge, TlsAcmeConfig, TlsConfig},
+    proxy::services::{CleartextHandler, Vicarian},
 };
+
+pub const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());
+pub const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
+pub const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
+
 
 #[async_trait]
 pub trait Handler: Send + Sync {

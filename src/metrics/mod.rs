@@ -1,12 +1,17 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
+use async_trait::async_trait;
+use bytes::Bytes;
+use http::header;
 use metrics::{counter, describe_counter, describe_gauge, gauge};
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use pingora_http::ResponseHeader;
+use pingora_proxy::Session;
 use std::sync::OnceLock;
 use tracing_log::log::{debug, info};
 
-use crate::RunContext;
+use crate::{RunContext, config::Backend, proxy::Handler};
 
 const UPKEEP_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -127,5 +132,33 @@ impl Metrics {
             };
         }
     }
+}
 
+pub struct MetricsHandler;
+
+impl MetricsHandler {
+    // Just for consistency
+    pub fn new(_backend: &Backend) -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl Handler for MetricsHandler {
+    async fn handle(&self, session: &mut Session) -> Result<()> {
+        counter!(METRIC_METRICS_SCRAPE_TOTAL).increment(1);
+        debug!("Replying to metrics endpoint");
+
+        let metrics = Metrics::get();
+        let scraped = metrics.handle.render();
+        let body = Bytes::copy_from_slice(scraped.as_bytes());
+
+        let mut header = ResponseHeader::build(200, Some(body.len()))?;
+        header.insert_header(header::CONTENT_TYPE, "text/plain")?;
+        session.write_response_header(Box::new(header), false).await?;
+        session.write_response_body(Some(body), true).await?;
+
+        Ok(())
+
+    }
 }

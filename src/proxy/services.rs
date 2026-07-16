@@ -1,15 +1,11 @@
 use std::{iter, sync::Arc};
 
-use anyhow::Result;
 use async_trait::async_trait;
-use bytes::Bytes;
-use camino::Utf8PathBuf;
 use http::{
     HeaderValue, Response, StatusCode, Uri,
     header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
     uri::{Builder, Scheme},
 };
-use http_body_util::BodyExt;
 use metrics::counter;
 use pingora_core::{
     ErrorType, OkOrErr, OrErr,
@@ -21,9 +17,6 @@ use pingora_core::{
 };
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
-use static_web_server::handler::{
-    RequestHandler as SWSHandler, RequestHandlerOpts as SWSHandlerOpts,
-};
 use tracing::{debug, info};
 
 use crate::{
@@ -33,12 +26,13 @@ use crate::{
     metrics::{
         METRIC_ACME_HTTP01_ENDPOINT_TOTAL, METRIC_ACME_HTTP01_NOTFOUND_TOTAL,
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_HTTP_REDIRECTS_TOTAL,
-        METRIC_HTTP_REQUESTS_TOTAL, METRIC_METRICS_SCRAPE_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
-        Metrics,
+        METRIC_HTTP_REQUESTS_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
+        MetricsHandler,
     },
     proxy::{
-        Handler, rewrite_port,
+        E401, E404, E500, Handler, rewrite_port,
         router::{Router, RouterBackend},
+        r#static::StaticHandler,
         strip_port,
     },
 };
@@ -226,89 +220,12 @@ impl Vicarian {
             routes_by_host,
         }
     }
-
-    async fn metrics_reply(&self, session: &mut Session) -> pingora_core::Result<()> {
-        counter!(METRIC_METRICS_SCRAPE_TOTAL).increment(1);
-        debug!("Replying to metrics endpoint");
-
-        let metrics = Metrics::get();
-        let scraped = metrics.handle.render();
-        let body = Bytes::copy_from_slice(scraped.as_bytes());
-
-        let mut header = ResponseHeader::build(200, Some(body.len()))?;
-        header.insert_header(header::CONTENT_TYPE, "text/plain")?;
-        session.write_response_header(Box::new(header), false).await?;
-        session.write_response_body(Some(body), true).await?;
-
-        Ok(())
-    }
-}
-
-struct StaticBackend {
-    sws_handler: SWSHandler,
-}
-
-impl StaticBackend {
-    fn new(backend: &Backend) -> Self {
-        let static_root = backend.static_root.clone()
-            .expect("No static root; should be caught in config")
-            .join("index.html");
-        let fallback_page = std::fs::read(&static_root)
-            .unwrap_or_else(|_| Vec::new());
-        let opts = Arc::new(SWSHandlerOpts{
-            root_dir: backend.static_root.clone()
-                .expect("No static root; should be caught in config")
-                .into_std_path_buf(),
-            compression: false,
-            dir_listing: true,
-            page_fallback: fallback_page,
-            redirect_trailing_slash: true,
-            ..Default::default()
-        });
-        Self {
-            sws_handler: SWSHandler {
-                opts,
-            },
-        }
-    }
-}
-
-#[async_trait]
-impl Handler for StaticBackend {
-    async fn handle(&self, session: &mut Session) -> Result<()> {
-
-        // FIXME: Check length
-        let parts = session.req_header().as_owned_parts();
-        let is_head = parts.method == http::Method::HEAD;
-
-        let mut req = hyper::Request::from_parts(parts, static_web_server::body::empty());
-        let resp = self.sws_handler.handle(&mut req, None).await
-            .or_err(E500, "Failed to retrieve static file")?;
-
-        let (rparts, mut body) = resp.into_parts();
-        let mut header = ResponseHeader::from(rparts);
-        header.insert_header(VIA, HeaderValue::from_static("1.1 Vicarian"))?;
-        header.insert_header(STRICT_TRANSPORT_SECURITY, HeaderValue::from_static("max-age=31536000; includeSubDomains"))?;
-        session.write_response_header(Box::new(header), false).await?;
-
-        if !is_head {
-            while let Some(frame) = body.frame().await {
-                let data = frame.or_err(E500, "Failed to read static body")?;
-                if let Some(bref) = data.data_ref() {
-                    let bytes = bref.to_owned();
-                    session.write_response_body(bytes.into(), false).await?;
-                }
-            }
-        }
-        session.write_response_body(Bytes::new().into(), true).await?;
-
-        Ok(())
-    }
 }
 
 fn to_module_handler(backend: &Backend) -> Option<Box<dyn Handler>> {
     // url => module:://<module_name>
-    // The schema/authority is checked in the config module.
+    // The schema/authority correctness is checked in the config module.
+
     let url = &backend.url;
     let _is_module = url.scheme_str()
         .filter(|&s| s == "module")?;
@@ -317,13 +234,12 @@ fn to_module_handler(backend: &Backend) -> Option<Box<dyn Handler>> {
         .as_str();
 
     match module {
-        // TODO:
-        // "metrics" => {
-        //     self.metrics_reply(session).await?;
-        // }
+        "metrics" => {
+            Some(Box::new(MetricsHandler::new(backend)))
+        }
 
         "static" => {
-            Some(Box::new(StaticBackend::new(backend)))
+            Some(Box::new(StaticHandler::new(backend)))
         }
 
         _ => {
@@ -347,10 +263,6 @@ fn vhost_to_router(vhost: &Vhost) -> Router {
     Router::new(backends)
 }
 
-
-const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());
-const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
-const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
 
 #[derive(Clone)]
 pub struct VicarianCtx {
@@ -399,13 +311,9 @@ impl ProxyHttp for Vicarian {
             info!("Valid auth received for {:?}", backend.config.path);
         }
 
-        let url = &backend.config.url;
-        let scheme = url.scheme_str()
-            .or_err(E500, "Failed to parse backed URL scheme")?;
-
         match &backend.handler {
             Some(handler) => {
-                debug!("Calling handler for {}", backend.config.path);
+                debug!("Calling custom handler for {}", backend.config.path);
                 handler.handle(session).await
                     .map_err(|e| pingora_core::Error::explain(E500, format!("Failed to call handler: {e}")))?;
                 Ok(true)
@@ -417,8 +325,6 @@ impl ProxyHttp for Vicarian {
                 Ok(false)
             }
         }
-
-
     }
 
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {

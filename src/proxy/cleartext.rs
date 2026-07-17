@@ -16,13 +16,28 @@ use crate::{
         METRIC_HTTP_REDIRECTS_TOTAL,
         METRIC_HTTP_REQUESTS_TOTAL,
     },
-    proxy::rewrite_port,
 };
 
 
 const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
 const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 const TOKEN_NOT_FOUND: &[u8] = "<html><body>ACME token not found in request path</body></html>".as_bytes();
+
+
+pub(crate) fn rewrite_port(host: &str, newport: &str) -> String {
+    let port_i = if let Some(i) = host.rfind(':') {
+        i
+    } else {
+        return host.to_string();
+    };
+    if host[port_i + 1..].parse::<u16>().is_err() {
+        // Not an int, assume not port ':'
+        return host.to_string();
+    }
+    let host_only = &host[0..port_i];
+
+    format!("{host_only}:{newport}")
+}
 
 fn token_not_found() -> Response<Vec<u8>> {
     counter!(METRIC_ACME_HTTP01_NOTFOUND_TOTAL).increment(1);

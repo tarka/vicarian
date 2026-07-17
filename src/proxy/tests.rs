@@ -3,8 +3,7 @@ use http::{uri::Builder, Uri};
 use test_log::test;
 
 use crate::{
-    config::{Backend, ValidateSanitise},
-    proxy::{rewrite_port, router::{Router, RouterBackend}, strip_port}
+    config::{Backend, ValidateSanitise}, proxy::{cleartext::rewrite_port, router::{Router, RouterBackend}, services::strip_port}
 };
 
 fn backend(path: &str, port: u16) -> Backend {

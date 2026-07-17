@@ -28,7 +28,6 @@ use crate::{
     proxy::{
         E401, E404, E500, Handler, router::{Router, RouterBackend},
         r#static::StaticHandler,
-        strip_port,
     },
 };
 
@@ -65,6 +64,21 @@ fn to_components(session: &Session) -> pingora_core::Result<RequestComponents<'_
     })
 }
 
+
+pub(crate) fn strip_port(host_header: &str) -> &str {
+    if host_header.starts_with('[') {
+        // IPv6-literal special case
+        if let Some(pos) = host_header.find("]:") {
+            &host_header[..pos + 1]
+        } else {
+            host_header
+        }
+    } else if let Some(i) = host_header.rfind(':') {
+        &host_header[..i]
+    } else {
+        host_header
+    }
+}
 
 pub struct Vicarian {
     _context: Arc<RunContext>,
@@ -201,7 +215,7 @@ impl ProxyHttp for Vicarian {
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {
         let backend = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
-            .backend;
+ .backend;
         let url = &backend.config.url;
 
         let host = url.host()

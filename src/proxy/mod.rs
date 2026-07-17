@@ -91,33 +91,3 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
 
     Ok(())
 }
-
-fn rewrite_port(host: &str, newport: &str) -> String {
-    let port_i = if let Some(i) = host.rfind(':') {
-        i
-    } else {
-        return host.to_string();
-    };
-    if host[port_i + 1..].parse::<u16>().is_err() {
-        // Not an int, assume not port ':'
-        return host.to_string();
-    }
-    let host_only = &host[0..port_i];
-
-    format!("{host_only}:{newport}")
-}
-
-fn strip_port(host_header: &str) -> &str {
-    if host_header.starts_with('[') {
-        // IPv6-literal special case
-        if let Some(pos) = host_header.find("]:") {
-            &host_header[..pos + 1]
-        } else {
-            host_header
-        }
-    } else if let Some(i) = host_header.rfind(':') {
-        &host_header[..i]
-    } else {
-        host_header
-    }
-}

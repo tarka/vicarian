@@ -82,7 +82,7 @@
 
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 25px;
             margin: 40px 0;
         }
@@ -222,6 +222,7 @@
             .features {
                 grid-template-columns: 1fr;
             }
+
         }
     </style>
 </head>
@@ -273,6 +274,12 @@
                 <i class="fas fa-network-wired"></i>
                 <h3>DNS Integration</h3>
                 <p>Support for multiple DNS providers via the zone-update library. Configure automatic certificate management behind firewalls.</p>
+            </div>
+
+            <div class="feature-card">
+                <i class="fas fa-folder-open"></i>
+                <h3>Static Files</h3>
+                <p>Native static-file serving with directory listing, automatic compression, and SPA fallback support. No external server needed.</p>
             </div>
         </section>
 
@@ -378,6 +385,40 @@ tls = {
     }
   }
 }
+</code></pre>
+                    </div>
+                </div>
+
+                <div class="config-box">
+                    <h3><i class="fas fa-folder-open"></i> Static Files</h3>
+                    <p>Serve files from a local directory natively:</p>
+                    <div class="code-block">
+                        <pre><code class="language-hcl">
+// Static Files (corn format)
+backends = [
+  {
+    context = "/"
+    url = "module://static"
+    static_root = "/var/www/html"
+  }
+]
+</code></pre>
+                    </div>
+                </div>
+
+                <div class="config-box">
+                    <h3><i class="fas fa-chart-line"></i> Prometheus Metrics</h3>
+                    <p>Export built-in Prometheus metrics with optional auth:</p>
+                    <div class="code-block">
+                        <pre><code class="language-hcl">
+// Prometheus Metrics (corn format)
+backends = [
+  {
+    context = "/metrics"
+    url = "module://metrics"
+    auth_key = "secret_key"
+  }
+]
 </code></pre>
                     </div>
                 </div>

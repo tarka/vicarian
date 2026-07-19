@@ -11,9 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 0 -->Features
 
-- Initial very-rough PoC for using static-web-server
+- Support for static-file serving. See CONFIGURATION.md for details.
 - Add client compression handling.
-- *(config)* [**breaking**] Change backend path into a newtype and
 
 ### <!-- 1 -->Bug Fixes
 
@@ -36,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 6 -->Testing
 
-- Generated tests for static functionality. Not passing yet.
+- Generated tests for static functionality.
 - Add more integration test corner cases.
 - Always call validation on test backends.
 - Add more generated test corner-cases.

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 mod certs;
 
 use std::sync::LazyLock;
@@ -61,6 +63,25 @@ impl ProxyBuilder {
         })
     }
 
+    pub async fn run_with_static(self) -> Result<StaticProxy> {
+        if self.config.is_none() {
+            bail!("No config provided")
+        }
+
+        let static_root = self.dir.path().join("public");
+        copy_dir_all("tests/data/static", &static_root).await?;
+
+        // Force creation of the test certs.
+        let _ = LazyLock::force(&certs::TEST_CERTS);
+
+        let process = self.run_proxy().await?;
+        Ok(StaticProxy {
+            dir: self.dir,
+            static_root: static_root.try_into().unwrap(),
+            process,
+        })
+    }
+
     async fn run_proxy(&self) -> Result<Child> {
         info!("Starting Test Proxy");
         let exe = env!("CARGO_BIN_EXE_vicarian");
@@ -112,6 +133,44 @@ impl Drop for Proxy {
         }
         self.child_cleanup();
     }
+}
+
+pub struct StaticProxy {
+    pub dir: TempDir,
+    pub static_root: Utf8PathBuf,
+    pub process: Child,
+}
+
+impl StaticProxy {
+    fn child_cleanup(&self) {
+        let pid = Pid::from_raw(self.process.id().unwrap().try_into().unwrap());
+        kill(pid, Signal::SIGINT).unwrap();
+        println!("Killed process {}", pid);
+    }
+}
+
+impl Drop for StaticProxy {
+    fn drop(&mut self) {
+        if panicking() {
+            self.dir.disable_cleanup(true);
+        }
+        self.child_cleanup();
+    }
+}
+
+async fn copy_dir_all(src: &str, dst: &std::path::Path) -> std::io::Result<()> {
+    tokio::fs::create_dir_all(dst).await?;
+    let mut entries = tokio::fs::read_dir(src).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let entry_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry.file_type().await?.is_dir() {
+            Box::pin(copy_dir_all(entry_path.to_str().unwrap(), &dst_path)).await?;
+        } else {
+            tokio::fs::copy(&entry_path, &dst_path).await?;
+        }
+    }
+    Ok(())
 }
 
 pub async fn mock_server(port: u16) -> Result<MockServer> {

@@ -1,4 +1,3 @@
-
 use camino::Utf8PathBuf;
 use clap::{ArgAction, Parser};
 

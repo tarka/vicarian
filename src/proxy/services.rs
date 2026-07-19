@@ -1,24 +1,17 @@
 use std::{iter, sync::Arc};
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use http::{
-    HeaderValue, Response, StatusCode, Uri,
+    HeaderValue, Uri,
     header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
-    uri::{Builder, Scheme},
+    uri::Scheme,
 };
-
 use metrics::counter;
 use pingora_core::{
     ErrorType, OkOrErr, OrErr,
-    apps::http_app::ServeHttp,
-    modules::http::{
-        HttpModules,
-        compression::ResponseCompressionBuilder,
-    },
+    modules::http::{HttpModules, compression::ResponseCompressionBuilder},
     prelude::HttpPeer,
-    protocols::http::ServerSession,
-    upstreams::peer::Peer
+    upstreams::peer::Peer,
 };
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
@@ -26,40 +19,20 @@ use tracing::{debug, info};
 
 use crate::{
     RunContext,
-    certificates::{acme::AcmeRuntime, store::CertStore},
-    config::Backend,
+    certificates::store::CertStore,
+    config::{Backend, Vhost},
     metrics::{
-        METRIC_ACME_HTTP01_ENDPOINT_TOTAL, METRIC_ACME_HTTP01_NOTFOUND_TOTAL,
-        METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_HTTP_REDIRECTS_TOTAL,
-        METRIC_HTTP_REQUESTS_TOTAL, METRIC_METRICS_SCRAPE_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
+        METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
+        MetricsHandler,
     },
-    metrics::Metrics,
-    proxy::{rewrite_port, router::Router, strip_port},
+    proxy::{
+        E401, E404, E500, Handler, router::{Router, RouterBackend},
+        r#static::StaticHandler,
+    },
 };
 
-const REDIRECT_BODY: &[u8] = "<html><body>301 Moved Permanently</body></html>".as_bytes();
-const TOKEN_NOT_FOUND: &[u8] = "<html><body>ACME token not found in request path</body></html>".as_bytes();
-const ACME_HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 
 const YEAR_IN_SECS: u64 = 31536000;
-
-fn token_not_found() -> Response<Vec<u8>> {
-    counter!(METRIC_ACME_HTTP01_NOTFOUND_TOTAL).increment(1);
-    Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(TOKEN_NOT_FOUND.to_vec())
-            .expect("Failed to send 404 response to token")
-}
-
-fn bad_request(msg: &str) -> Response<Vec<u8>> {
-    let body = format!("<html><body><h1>400 Bad Request</h1><p>{msg}</p></body></html>").into_bytes();
-    Response::builder()
-        .status(StatusCode::BAD_REQUEST)
-        .header(header::CONTENT_TYPE, "text/html")
-        .header(header::CONTENT_LENGTH, body.len())
-        .body(body)
-        .expect("Failed to send 400 response")
-}
 
 struct RequestComponents<'a> {
     host: &'a str,
@@ -92,106 +65,18 @@ fn to_components(session: &Session) -> pingora_core::Result<RequestComponents<'_
 }
 
 
-pub struct CleartextHandler {
-    acme: Arc<AcmeRuntime>,
-    port: String,
-}
-
-impl CleartextHandler {
-    pub fn new(acme: Arc<AcmeRuntime>, tls_port: u16) -> Self {
-        Self {
-            acme,
-            port: tls_port.to_string()
-        }
-    }
-}
-
-impl CleartextHandler {
-
-    async fn redirect_to_tls(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
-        counter!(METRIC_HTTP_REDIRECTS_TOTAL).increment(1);
-
-        let Some(host_header) = session.get_header(header::HOST) else {
-            return bad_request("Missing Host header");
-        };
-        let Ok(host) = host_header.to_str() else {
-            return bad_request("Invalid Host header");
-        };
-        let path = session.req_header().uri.clone();
-
-        // Uri::Authority doesn't allow port overrides, so mangle the string
-        let new_host = rewrite_port(host, &self.port);
-
-        // TODO: `host` may not be full authority (i.e. including
-        // uname:pw section). Does it matter?
-        let location = Builder::from(path)
-            .scheme(Scheme::HTTPS)
-            .authority(new_host)
-            .build()
-            .expect("Failed to convert URI to HTTPS");
-
-        debug!("Redirect to {location}");
-        let body = REDIRECT_BODY.to_owned();
-        Response::builder()
-            .status(StatusCode::MOVED_PERMANENTLY)
-            .header(header::CONTENT_TYPE, "text/html")
-            .header(header::CONTENT_LENGTH, body.len())
-            .header(header::LOCATION, location.to_string())
-            .body(body)
-            .expect("Failed to create HTTP->HTTPS redirect response")
-    }
-
-    async fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
-        counter!(METRIC_ACME_HTTP01_ENDPOINT_TOTAL).increment(1);
-
-        let Some(host_header) = session.get_header(header::HOST) else {
-            return bad_request("Missing Host header");
-        };
-        let Ok(fqdn) = host_header.to_str() else {
-            return bad_request("Invalid Host header");
-        };
-
-        let path = session.req_header().uri.path_and_query()
-            .expect("Failed to find already matched path?");
-
-        let path_token = match path.path().strip_prefix(ACME_HTTP01_PREFIX) {
-            Some(token) => token,
-            None => return token_not_found(),
-        };
-
-        let key_auth = if let Some(toks) = self.acme.challenge_tokens(fqdn)
-            && toks.token == path_token
-        {
-            toks.key_auth
+pub(crate) fn strip_port(host_header: &str) -> &str {
+    if host_header.starts_with('[') {
+        // IPv6-literal special case
+        if let Some(pos) = host_header.find("]:") {
+            &host_header[..pos + 1]
         } else {
-            return token_not_found()
-        };
-
-        let body = key_auth.as_bytes().to_vec();
-        Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "text/plain")
-            .header(header::CONTENT_LENGTH, body.len())
-            .body(body)
-            .expect("Failed to create HTTP->HTTPS redirect response")
-    }
-}
-
-#[async_trait]
-impl ServeHttp for CleartextHandler {
-    async fn response(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
-        counter!(METRIC_HTTP_REQUESTS_TOTAL).increment(1);
-
-        // URI in practice == /the/path/to/resource
-        let path_p = session.req_header().uri.path_and_query();
-        if let Some(pq) = path_p
-            && pq.path().starts_with(ACME_HTTP01_PREFIX)
-        {
-            info!("Received ACME challenge request: {pq}");
-            self.acme_challenge(session).await
-        } else {
-            self.redirect_to_tls(session).await
+            host_header
         }
+    } else if let Some(i) = host_header.rfind(':') {
+        &host_header[..i]
+    } else {
+        host_header
     }
 }
 
@@ -203,46 +88,70 @@ pub struct Vicarian {
 
 impl Vicarian {
     pub fn new(_certstore: Arc<CertStore>, context: Arc<RunContext>) -> Self {
+
         let routes_by_host = context.config.vhosts.iter()
             .flat_map(|vhost| {
-                let router = Arc::new(Router::new(&vhost.backends));
+                let router = Arc::new(vhost_to_router(vhost));
                 iter::once(&vhost.hostname)
                     .chain(vhost.aliases.iter())
                     .map(|s| s.to_lowercase())
                     .map(move |h| (h.clone(), router.clone()))
             })
             .collect::<papaya::HashMap<String, Arc<Router>>>();
+
         Self {
             _context: context,
             _certstore,
             routes_by_host,
         }
     }
+}
 
-    async fn metrics_reply(&self, session: &mut Session) -> pingora_core::Result<()> {
-        counter!(METRIC_METRICS_SCRAPE_TOTAL).increment(1);
-        debug!("Replying to metrics endpoint");
+fn to_module_handler(backend: &Backend) -> Option<Box<dyn Handler>> {
+    // url => module:://<module_name>
+    // The schema/authority correctness is checked in the config module.
 
-        let metrics = Metrics::get();
-        let scraped = metrics.handle.render();
-        let body = Bytes::copy_from_slice(scraped.as_bytes());
+    let url = &backend.url;
+    let _is_module = url.scheme_str()
+        .filter(|&s| s == "module")?;
 
-        let mut header = ResponseHeader::build(200, Some(body.len()))?;
-        header.insert_header(header::CONTENT_TYPE, "text/plain")?;
-        session.write_response_header(Box::new(header), false).await?;
-        session.write_response_body(Some(body), true).await?;
+    let module = url.authority()?
+        .as_str();
 
-        Ok(())
+    match module {
+        "metrics" => {
+            Some(Box::new(MetricsHandler::new(backend)))
+        }
+
+        "static" => {
+            Some(Box::new(StaticHandler::new(backend)))
+        }
+
+        _ => {
+            panic!("Unknown module {module}");
+        }
     }
 }
 
-const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());
-const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
-const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
+// FIXME: Refactor amd make RouterBackend::new()
+fn to_router_backend(backend: &Backend) -> RouterBackend {
+    RouterBackend {
+        config: backend.clone(),
+        handler: to_module_handler(backend),
+    }
+}
+
+fn vhost_to_router(vhost: &Vhost) -> Router {
+    let backends = vhost.backends.iter()
+        .map(to_router_backend)
+        .collect();
+    Router::new(backends)
+}
+
 
 #[derive(Clone)]
 pub struct VicarianCtx {
-    backend: Arc<Backend>,
+    backend: Arc<RouterBackend>,
 }
 
 #[async_trait]
@@ -271,7 +180,7 @@ impl ProxyHttp for Vicarian {
                 .backend
         };
 
-        if let Some(key) = &backend.auth_key {
+        if let Some(key) = &backend.config.auth_key {
             let auth = session.req_header().headers.get(AUTHORIZATION)
                 .or_err(E401, "Failed to fetch Authorization header")?
                 .to_str()
@@ -284,53 +193,30 @@ impl ProxyHttp for Vicarian {
             }
 
             counter!(METRIC_AUTH_VALID_TOTAL).increment(1);
-            info!("Valid auth received for {:?}", backend.path);
+            info!("Valid auth received for {:?}", backend.config.path);
         }
 
-        let url = &backend.url;
-        let scheme = url.scheme_str()
-            .or_err(E500, "Failed to parse backed URL scheme")?;
-
-        match scheme {
-            "http" | "https" => {
+        match &backend.handler {
+            Some(handler) => {
+                debug!("Calling custom handler for {}", backend.config.path);
+                handler.handle(session).await
+                    .map_err(|e| pingora_core::Error::explain(E500, format!("Failed to call handler: {e}")))?;
+                Ok(true)
+            }
+            None => {
                 *ctx = Some(VicarianCtx {
                     backend: backend.clone()
                 });
                 Ok(false)
             }
-
-            // url => module:://<module_name>
-            "module" => {
-                let module = url.authority()
-                    .or_err(E404, "Module name not found in host backends")?;
-
-                match module.as_str() {
-                    "metrics" => {
-                        self.metrics_reply(session).await?;
-                    }
-                    _ => {
-                        let desc = format!("Unknown URL scheme: {scheme}");
-                        return Err(pingora_core::Error::explain(E500, desc))
-                    }
-                }
-
-                Ok(true)
-            }
-
-            &_ => {
-                let desc = format!("Unknown URL scheme: {scheme}");
-                Err(pingora_core::Error::explain(E500, desc))
-            }
         }
-
-
     }
 
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {
         let backend = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
-            .backend;
-        let url = &backend.url;
+ .backend;
+        let url = &backend.config.url;
 
         let host = url.host()
             .or_err(E500, "Backend host lookup failed")?;
@@ -340,7 +226,7 @@ impl ProxyHttp for Vicarian {
 
         let tls = url.scheme() == Some(&Scheme::HTTPS);
         let mut peer = HttpPeer::new((host, port), tls, host.to_string());
-        if backend.trust && let Some(opts) = peer.get_mut_peer_options() {
+        if backend.config.trust && let Some(opts) = peer.get_mut_peer_options() {
             opts.verify_cert = false;
         }
 
@@ -357,12 +243,12 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if backend.path != "/"
-            && ! backend.url.path().starts_with(&backend.path)
+        if backend.config.path != "/"
+            && ! backend.config.url.path().starts_with(&backend.config.path)
         {
-            debug!("Modifying {} for context {}", upstream_request.uri, backend.path);
+            debug!("Modifying {} for context {}", upstream_request.uri, backend.config.path);
             let upath = upstream_request.uri.path()
-                .strip_prefix(&backend.path)
+                .strip_prefix(&backend.config.path)
                 .unwrap_or("/");
             let uquery = upstream_request.uri.query()
                 .map(|s| format!("?{s}"))
@@ -397,15 +283,15 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .backend;
 
-        if backend.path != "/"
-            && ! backend.url.path().starts_with(&backend.path)
+        if backend.config.path != "/"
+            && ! backend.config.url.path().starts_with(&backend.config.path)
         {
             for headername in [LOCATION, REFRESH] {
                 let header_p = upstream_response.headers.get(&headername);
                 if let Some(header) = header_p {
                     let oldloc = header.to_str()
                         .or_err(E500, "Failed to rewrite location header")?;
-                    let newloc = HeaderValue::from_str(&format!("{}{oldloc}", backend.path))
+                    let newloc = HeaderValue::from_str(&format!("{}{oldloc}", backend.config.path))
                         .or_err(E500, "Failed to rewrite location header")?;
 
                     debug!("Modifying Location to {newloc:?}");

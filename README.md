@@ -58,24 +58,13 @@ platforms is welcome.
 - **Wildcards**: Wildcard ACME certificate generation.
 - **Prometheus Metrics**: Built-in support for exporting Prometheus metrics.
   See [METRICS.md](METRICS.md) for configuration and visualization details.
+- **Static Files**: Built-in support for static-file serving, utilising embedded
+  [static-web-server](https://static-web-server.net/).
 
 ### To-dos
 
 - Access & error logs
 - [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) support
-- Static file support. Pingora itself doesn't support static-files. There are
-  3rd-party crates that support this but they appear unmaintained at the moment
-  and will need to be evaluated. If you wish to serve a static website one
-  workaround is to use `static-web-server` to create a static backend:
-
-      static-web-server \
-          --host 127.0.0.1 --port 8080 \
-          --security-headers true \
-          --log-level info \
-          --root .
-
-  This is how [vicarian.org](https://vicarian.org/) and
-  [haltcondition.net](https://haltcondition.net/) are served currently.
 - Docker images.
 
 ### Possible Future Features
@@ -229,6 +218,7 @@ As well as the usual dependencies Vicarian also uses:
 
 - [Pingora](https://github.com/cloudflare/pingora) for HTTP/TLS proxying.
 - [instant-acme](https://github.com/djc/instant-acme) for ACME/LetEncrypt support.
+- [static-web-server](https://static-web-server.net/) for static file support.
 - [corn](https://cornlang.dev) for configuration.
 
 ### AI Contribution Policy

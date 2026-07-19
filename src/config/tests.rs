@@ -254,3 +254,33 @@ fn test_strip_brackets() {
     assert_eq!("2001:db8::1", strip_brackets("[2001:db8::1]"));
     assert_eq!("[invalid", strip_brackets("[invalid"));
 }
+
+#[test]
+fn test_uri_both_scheme_and_authority() {
+    let uri: Uri = "https://example.com/api".parse().unwrap();
+    assert_eq!(Some("https"), uri.scheme_str());
+    assert_eq!(Some("example.com"), uri.authority().map(|a| a.as_str()));
+    assert_eq!("/api", uri.path());
+}
+
+#[test]
+fn test_uri_no_scheme_no_authority() {
+    let uri: Uri = "/api/v1".parse().unwrap();
+    assert!(uri.scheme().is_none());
+    assert!(uri.authority().is_none());
+    assert_eq!("/api/v1", uri.path());
+}
+
+#[test]
+fn test_uri_no_scheme_with_authority() {
+    let uri: Uri = "//example.com/api".parse().unwrap();
+    assert!(uri.scheme().is_none());
+    assert!(uri.authority().is_none());
+    assert_eq!("//example.com/api", uri.path());
+}
+
+#[test]
+fn test_uri_with_scheme_no_authority() {
+    let result: Result<Uri, _> = "unix:///var/run/socket.sock".parse();
+    assert!(result.is_err());
+}

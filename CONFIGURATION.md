@@ -44,6 +44,11 @@ A minimal Vicarian configuration file would look something like this:
                     url = "module://metrics"
                     auth_key = "secret_key"
                 }
+                {
+                    path = "/static"
+                    url = "module://static"
+                    static_root = "/var/www/static"
+                }
            ]
         }
     ]
@@ -92,10 +97,11 @@ A minimal Vicarian configuration file would look something like this:
 - **Required**: Yes (within each vhost)
 - **Description**: List of backend services that this virtual host will proxy requests to.
 - **Fields**:
-  - path: The URL path prefix this backend handles (default: "/")
+  - path (also accepts `context`): The URL path prefix this backend handles (default: "/")
   - url: The backend service URL
   - trust: Whether to skip certificate verification for TLS backends (default: false)
   - auth_key: If set, requires `Authorization: Bearer <key>` to access this backend. (optional)
+  - static_root: Path to the directory containing static files. Required when `url` is `module://static`. (optional)
 
 ## TLS Configuration
 
@@ -193,6 +199,12 @@ Each backend entry has the following fields:
 - **Default**: None
 - **Description**: If set, Vicarian will require an `Authorization: Bearer <key>` header with the specified key to allow access to this backend.
 
+### static_root
+- **Type**: String (filesystem path)
+- **Default**: None
+- **Description**: Path to the directory containing static files to serve. This field is required when using the `module://static` backend. The path is relative to the current working directory when Vicarian starts.
+- **Example**: `static_root = "/var/www/static"`
+
 ## Special Backend Modules
 
 Vicarian supports builtin backend modules that can be used in place of a standard URL. These are specified using the `module://` scheme.
@@ -211,6 +223,35 @@ backends = [
     }
 ]
 ```
+
+### Static Files Module
+
+The `static` module serves files from a local directory as a static file server. It supports directory listing, fallback pages, and automatic compression.
+
+```corn
+backends = [
+    {
+        path = "/"
+        url = "module://static"
+        static_root = "/var/www/html"
+        auth_key = "secret_key" // Optional
+    }
+]
+```
+
+**Fields**:
+- path: The URL path prefix for serving static files (default: "/")
+- url: Must be `module://static` to enable static file serving
+- static_root: Path to the directory containing static files (required)
+- auth_key: If set, requires `Authorization: Bearer <key>` to access files (optional)
+
+**Features**:
+- **Directory listing**: When a directory is requested and no index file exists, a directory listing is generated.
+- **Fallback page**: If an `index.html` file exists in the static root, it is served for requests that don't match any file (useful for SPAs).
+- **Content-Type detection**: File types are automatically determined based on file extension.
+- **Compression**: Responses are compressed when the client supports it (gzip, brotli).
+- **HEAD requests**: Supported—returns headers without a body.
+- **Security headers**: Automatically adds `Strict-Transport-Security` and `Via` headers to all responses.
 
 ## Additional Configuration Options
 

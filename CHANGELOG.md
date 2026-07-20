@@ -11,9 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 0 -->Features
 
-- Initial very-rough PoC for using static-web-server
+- Support for native static-file serving with static-web-server. See CONFIGURATION.md for details.
 - Add client compression handling.
-- *(config)* [**breaking**] Change backend path into a newtype and
 
 ### <!-- 1 -->Bug Fixes
 

@@ -1,0 +1,164 @@
+[general]
+
+#### Address & Root dir
+host = "::"
+port = 4433
+root = "docker/public"
+
+#### Logging
+log-level = "trace"
+
+#### Cache Control headers
+cache-control-headers = true
+
+#### Auto Compression
+compression = true
+
+#### Error pages
+page404 = "./404.html"
+page50x = "./50x.html"
+
+#### HTTP/2 + TLS
+http2 = false
+http2-tls-cert = "tests/tls/local.dev_cert.sec1_ec.pem"
+http2-tls-key = "tests/tls/local.dev_key.sec1_ec.pem"
+https-redirect = false
+https-redirect-host = "localhost"
+https-redirect-from-port = 80
+https-redirect-from-hosts = "localhost, 127.0.0.1"
+
+#### CORS & Security headers
+# security-headers = true
+cors-allow-origins = ""
+
+#### Directory listing
+directory-listing = true
+
+#### Directory listing sorting code
+directory-listing-order = 1
+
+#### Directory listing content format
+directory-listing-format = "html"
+
+#### Basic Authentication
+basic-auth = ""
+
+#### File descriptor binding
+# fd = ""
+
+#### Worker threads
+threads-multiplier = 1
+
+#### Grace period after a graceful shutdown
+grace-period = 0
+
+#### Page fallback for 404s
+page-fallback = ""
+
+#### Log request Remote Address if available
+log-remote-address = false
+
+
+#### Redirect to trailing slash in the requested directory uri
+redirect-trailing-slash = true
+
+#### Check for existing pre-compressed files
+compression-static = false
+
+#### List of index files
+index-files = "index.html, index.htm"
+
+#### Maintenance Mode
+maintenance-mode = false
+# maintenance-mode-status = 503
+# maintenance-mode-file = "maintenance.html"
+
+### Windows Only
+
+#### Run the web server as a Windows Service
+# windows-service = false
+
+
+[advanced]
+
+#### HTTP Headers customization
+
+#### a. Oneline version
+[[advanced.headers]]
+source = "**/*.{js,css}"
+headers = { Access-Control-Allow-Origin = "*" }
+
+# #### b. Multiline version
+[[advanced.headers]]
+source = "/index.html"
+[advanced.headers.headers]
+Cache-Control = "public, max-age=36000"
+Content-Security-Policy = "frame-ancestors 'self'"
+Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+
+#### c. Multiline version with explicit key (dotted)
+[[advanced.headers]]
+source = "**/*.{jpg,jpeg,png,ico,gif}"
+headers.Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+
+
+### URL Redirects
+[[advanced.redirects]]
+host = "127.0.0.1:4433"
+source = "/{*}"
+destination = "https://localhost:4433/$1"
+kind = 301
+
+[[advanced.redirects]]
+source = "**/{*}.{jpg,jpeg}"
+destination = "http://localhost/$1.$2"
+kind = 301
+
+[[advanced.redirects]]
+source = "/index.html"
+destination = "https://static-web-server.net"
+kind = 302
+
+### URL Rewrites
+
+[[advanced.rewrites]]
+source = "/image.ico"
+destination = "/assets/favicon.ico"
+# redirect = 301
+
+[[advanced.rewrites]]
+source = "/{picture}.{ico,webp}"
+destination = "/assets/$1.$2"
+# redirect = 301
+
+[[advanced.rewrites]]
+source = "**/{*}.{png,gif}"
+destination = "/assets/$1.$2"
+# redirect = 301
+
+[[advanced.rewrites]]
+source = "/abc/**/*.{svg,jxl}"
+destination = "/assets/favicon.ico"
+
+[[advanced.rewrites]]
+source = "/files/{*}"
+destination = "/$1"
+
+### Name-based virtual hosting
+
+[[advanced.virtual-hosts]]
+host = "example.com"
+root = "docker"
+
+[[advanced.virtual-hosts]]
+host = "localhost"
+root = "docker/abc"
+
+[advanced.memory-cache]
+capacity = 100
+# 30min
+ttl = 1800
+# 5min
+tti = 300
+# 8mb
+max-file-size = 8192

@@ -1,0 +1,823 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// This file is part of Static Web Server.
+// See https://static-web-server.net/ for more information
+// Copyright (C) 2019-present Jose Quintana <joseluisq.net>
+
+//! Module that provides all settings of SWS.
+//!
+
+use aho_corasick::AhoCorasick;
+use clap::Parser;
+use globset::{Glob, GlobBuilder, GlobMatcher};
+use headers::HeaderMap;
+use hyper::StatusCode;
+use regex_lite::Regex;
+use std::path::{Path, PathBuf};
+
+use crate::{Context, Result, helpers, logger};
+
+pub mod cli;
+#[doc(hidden)]
+pub mod cli_output;
+pub mod file;
+
+pub use cli::Commands;
+
+use cli::General;
+
+use self::file::MemoryCache;
+
+use self::file::{RedirectsKind, Settings as FileSettings};
+
+#[cfg(any(
+    feature = "compression",
+    feature = "compression-gzip",
+    feature = "compression-brotli",
+    feature = "compression-zstd",
+    feature = "compression-deflate"
+))]
+pub use file::CompressionLevel;
+
+/// The `headers` file options.
+pub struct Headers {
+    /// Source pattern glob matcher
+    pub source: GlobMatcher,
+    /// Map of custom HTTP headers
+    pub headers: HeaderMap,
+}
+
+/// The `Rewrites` file options.
+pub struct Rewrites {
+    /// Source pattern Regex matcher
+    pub source: Regex,
+    /// A local file that must exist
+    pub destination: String,
+    /// Optional redirect type either 301 (Moved Permanently) or 302 (Found).
+    pub redirect: Option<RedirectsKind>,
+    /// Pre-compiled Aho-Corasick automaton for placeholder replacement.
+    pub replacer: AhoCorasick,
+}
+
+/// The `Redirects` file options.
+pub struct Redirects {
+    /// Optional host to match against an incoming URI host if specified
+    pub host: Option<String>,
+    /// Source pattern Regex matcher
+    pub source: Regex,
+    /// A local file that must exist
+    pub destination: String,
+    /// Redirection type either 301 (Moved Permanently) or 302 (Found)
+    pub kind: StatusCode,
+    /// Pre-compiled Aho-Corasick automaton for placeholder replacement.
+    pub replacer: AhoCorasick,
+}
+
+/// The `VirtualHosts` file options.
+pub struct VirtualHosts {
+    /// The value to check for in the "Host" header
+    pub host: String,
+    /// The root directory for this virtual host
+    pub root: PathBuf,
+}
+
+/// The `advanced` file options.
+#[derive(Default)]
+pub struct Advanced {
+    /// Headers list.
+    pub headers: Option<Vec<Headers>>,
+    /// Rewrites list.
+    pub rewrites: Option<Vec<Rewrites>>,
+    /// Redirects list.
+    pub redirects: Option<Vec<Redirects>>,
+    /// Name-based virtual hosting
+    pub virtual_hosts: Option<Vec<VirtualHosts>>,
+    /// In-memory cache configuration.
+    pub memory_cache: Option<MemoryCache>,
+}
+
+/// Build an `AhoCorasick` automaton for the placeholder patterns `$0`, `$1`, ..., `$N`
+/// based on the number of capture groups in the given regex.
+pub fn build_placeholder_replacer(regex: &Regex) -> AhoCorasick {
+    let patterns: Vec<String> = (0..regex.captures_len()).map(|i| format!("${i}")).collect();
+    AhoCorasick::new(&patterns).expect("failed to build Aho-Corasick automaton for placeholders")
+}
+
+/// The full server CLI and File options.
+pub struct Settings {
+    /// General server options
+    pub general: General,
+    /// Advanced server options
+    pub advanced: Option<Advanced>,
+}
+
+impl Settings {
+    /// Reads CLI/Env and config file options returning the server settings.
+    /// It also takes care to initialize the logging system with its level
+    /// once the `general` settings are determined.
+    pub fn get(log_init: bool) -> Result<Settings> {
+        Self::parse_from(log_init, None)
+    }
+
+    /// Reads CLI/Env and config file options returning the server settings
+    /// without parsing arguments useful for testing.
+    pub fn get_unparsed(log_init: bool, args: &[&str]) -> Result<Settings> {
+        Self::parse_from(log_init, Some(args))
+    }
+
+    fn parse_from(log_init: bool, args: Option<&[&str]>) -> Result<Settings> {
+        let opts = match args {
+            Some(v) => General::parse_from(v),
+            None => General::parse(),
+        };
+
+        // Define the general CLI/file options
+        let version = opts.version;
+        let mut host = opts.host;
+        let mut port = opts.port;
+        let mut root = opts.root;
+        let mut log_level = opts.log_level;
+        let mut log_with_ansi = opts.log_with_ansi;
+        let mut log_format = opts.log_format;
+        let mut log_file = opts.log_file.clone();
+        let mut config_file = opts.config_file.clone();
+        let mut cache_control_headers = opts.cache_control_headers;
+        let mut etag = opts.etag;
+
+        #[cfg(any(
+            feature = "compression",
+            feature = "compression-gzip",
+            feature = "compression-brotli",
+            feature = "compression-zstd",
+            feature = "compression-deflate"
+        ))]
+        let mut compression = opts.compression;
+        #[cfg(any(
+            feature = "compression",
+            feature = "compression-gzip",
+            feature = "compression-brotli",
+            feature = "compression-zstd",
+            feature = "compression-deflate"
+        ))]
+        let mut compression_level = opts.compression_level;
+
+        let mut compression_static = opts.compression_static;
+
+        let mut page404 = opts.page404;
+        let mut page50x = opts.page50x;
+
+        #[cfg(feature = "tls")]
+        let mut tls = opts.tls;
+        #[cfg(feature = "tls")]
+        let mut tls_cert = opts.tls_cert;
+        #[cfg(feature = "tls")]
+        let mut tls_key = opts.tls_key;
+        #[cfg(feature = "tls")]
+        let mut https_redirect = opts.https_redirect;
+        #[cfg(feature = "tls")]
+        let mut https_redirect_host = opts.https_redirect_host;
+        #[cfg(feature = "tls")]
+        let mut https_redirect_from_port = opts.https_redirect_from_port;
+        #[cfg(feature = "tls")]
+        let mut https_redirect_from_hosts = opts.https_redirect_from_hosts;
+        #[cfg(feature = "http2")]
+        let mut http2 = opts.http2;
+
+        let mut security_headers = opts.security_headers;
+        let mut cors_allow_origins = opts.cors_allow_origins;
+        let mut cors_allow_headers = opts.cors_allow_headers;
+        let mut cors_expose_headers = opts.cors_expose_headers;
+
+        #[cfg(feature = "directory-listing")]
+        let mut directory_listing = opts.directory_listing;
+        #[cfg(feature = "directory-listing")]
+        let mut directory_listing_order = opts.directory_listing_order;
+        #[cfg(feature = "directory-listing")]
+        let mut directory_listing_format = opts.directory_listing_format;
+
+        #[cfg(feature = "directory-listing-download")]
+        let mut directory_listing_download = opts.directory_listing_download;
+
+        #[cfg(feature = "basic-auth")]
+        let mut basic_auth = opts.basic_auth;
+
+        let mut fd = opts.fd;
+        #[cfg(unix)]
+        let mut unix_socket = opts.unix_socket.clone();
+        #[cfg(unix)]
+        let mut unix_socket_mode = opts.unix_socket_mode;
+        #[cfg(unix)]
+        let mut unix_socket_force = opts.unix_socket_force;
+        let mut threads_multiplier = opts.threads_multiplier;
+        let mut max_blocking_threads = opts.max_blocking_threads;
+        let mut grace_period = opts.grace_period;
+
+        #[cfg(feature = "fallback-page")]
+        let mut page_fallback = opts.page_fallback;
+
+        let mut log_remote_address = opts.log_remote_address;
+        let mut log_x_real_ip = opts.log_x_real_ip;
+        let mut log_forwarded_for = opts.log_forwarded_for;
+        let mut trusted_proxies = opts.trusted_proxies;
+        let mut redirect_trailing_slash = opts.redirect_trailing_slash;
+        let mut include_hidden = opts.include_hidden;
+        let mut follow_symlinks = opts.follow_symlinks;
+        let mut use_relative_root = opts.use_relative_root;
+        let mut accept_markdown = opts.accept_markdown;
+        let mut text_charset = opts.text_charset;
+        let mut index_files = opts.index_files;
+        let mut health = opts.health;
+
+        #[cfg(feature = "metrics")]
+        let mut metrics = opts.metrics;
+
+        let mut maintenance_mode = opts.maintenance_mode;
+        let mut maintenance_mode_status = opts.maintenance_mode_status;
+        let mut maintenance_mode_file = opts.maintenance_mode_file;
+
+        // Windows-only options
+        #[cfg(windows)]
+        let mut windows_service = opts.windows_service;
+
+        // Define the advanced file options
+        let mut settings_advanced: Option<Advanced> = None;
+
+        let to_use_config_file = match Path::new("./config.toml").is_file() {
+            true => {
+                eprintln!(
+                    "Deprecated: 'config.toml' found, rename it to 'sws.toml' to prepare for future releases"
+                );
+                PathBuf::from("./config.toml")
+            }
+            false => opts.config_file.clone(),
+        };
+
+        if let Some((settings, config_file_resolved)) = read_file_settings(&to_use_config_file)? {
+            config_file = config_file_resolved;
+
+            // File-based "general" options
+            let has_general_settings = settings.general.is_some();
+            if let Some(general) = settings.general {
+                if let Some(v) = general.host {
+                    host = v
+                }
+                if let Some(v) = general.port {
+                    port = v
+                }
+                if let Some(v) = general.root {
+                    root = v
+                }
+                if let Some(ref v) = general.log_level {
+                    log_level = v.name().to_lowercase();
+                }
+                if let Some(v) = general.log_with_ansi {
+                    log_with_ansi = v;
+                }
+                if let Some(v) = general.log_format {
+                    log_format = v;
+                }
+                if let Some(v) = general.log_file {
+                    log_file = Some(v);
+                }
+                if let Some(v) = general.cache_control_headers {
+                    cache_control_headers = v
+                }
+                if let Some(v) = general.etag {
+                    etag = v
+                }
+                #[cfg(any(
+                    feature = "compression",
+                    feature = "compression-gzip",
+                    feature = "compression-brotli",
+                    feature = "compression-zstd",
+                    feature = "compression-deflate"
+                ))]
+                if let Some(v) = general.compression {
+                    compression = v
+                }
+                #[cfg(any(
+                    feature = "compression",
+                    feature = "compression-gzip",
+                    feature = "compression-brotli",
+                    feature = "compression-zstd",
+                    feature = "compression-deflate"
+                ))]
+                if let Some(v) = general.compression_level {
+                    compression_level = v
+                }
+                if let Some(v) = general.compression_static {
+                    compression_static = v
+                }
+                if let Some(v) = general.page404 {
+                    page404 = v
+                }
+                if let Some(v) = general.page50x {
+                    page50x = v
+                }
+                #[cfg(feature = "tls")]
+                if let Some(v) = general.tls {
+                    tls = v
+                }
+                #[cfg(feature = "tls")]
+                if let Some(v) = general.tls_cert {
+                    tls_cert = Some(v)
+                }
+                #[cfg(feature = "tls")]
+                if let Some(v) = general.tls_key {
+                    tls_key = Some(v)
+                }
+                #[cfg(feature = "http2")]
+                if let Some(v) = general.http2 {
+                    http2 = v
+                }
+                #[cfg(feature = "tls")]
+                if let Some(v) = general.https_redirect {
+                    https_redirect = v
+                }
+                #[cfg(feature = "tls")]
+                if let Some(v) = general.https_redirect_host {
+                    https_redirect_host = v
+                }
+                #[cfg(feature = "tls")]
+                if let Some(v) = general.https_redirect_from_port {
+                    https_redirect_from_port = v
+                }
+                #[cfg(feature = "tls")]
+                if let Some(v) = general.https_redirect_from_hosts {
+                    https_redirect_from_hosts = v
+                }
+                #[cfg(feature = "tls")]
+                match general.security_headers {
+                    Some(v) => security_headers = v,
+                    _ => {
+                        if tls {
+                            security_headers = true;
+                        }
+                    }
+                }
+                #[cfg(not(feature = "tls"))]
+                if let Some(v) = general.security_headers {
+                    security_headers = v
+                }
+                if let Some(ref v) = general.cors_allow_origins {
+                    v.clone_into(&mut cors_allow_origins)
+                }
+                if let Some(ref v) = general.cors_allow_headers {
+                    v.clone_into(&mut cors_allow_headers)
+                }
+                if let Some(ref v) = general.cors_expose_headers {
+                    v.clone_into(&mut cors_expose_headers)
+                }
+                #[cfg(feature = "directory-listing")]
+                if let Some(v) = general.directory_listing {
+                    directory_listing = v
+                }
+                #[cfg(feature = "directory-listing")]
+                if let Some(v) = general.directory_listing_order {
+                    directory_listing_order = v
+                }
+                #[cfg(feature = "directory-listing")]
+                if let Some(v) = general.directory_listing_format {
+                    directory_listing_format = v
+                }
+                #[cfg(feature = "directory-listing-download")]
+                if let Some(v) = general.directory_listing_download {
+                    directory_listing_download = v
+                }
+                #[cfg(feature = "basic-auth")]
+                if let Some(ref v) = general.basic_auth {
+                    v.clone_into(&mut basic_auth)
+                }
+                if let Some(v) = general.fd {
+                    fd = Some(v)
+                }
+                #[cfg(unix)]
+                if let Some(v) = general.unix_socket {
+                    unix_socket = Some(v)
+                }
+                #[cfg(unix)]
+                if let Some(v) = general.unix_socket_mode {
+                    unix_socket_mode = Some(v)
+                }
+                #[cfg(unix)]
+                if let Some(v) = general.unix_socket_force {
+                    unix_socket_force = v
+                }
+                if let Some(v) = general.threads_multiplier {
+                    threads_multiplier = v
+                }
+                if let Some(v) = general.max_blocking_threads {
+                    max_blocking_threads = v
+                }
+                if let Some(v) = general.grace_period {
+                    grace_period = v
+                }
+                #[cfg(feature = "fallback-page")]
+                if let Some(v) = general.page_fallback {
+                    page_fallback = v
+                }
+                if let Some(v) = general.log_remote_address {
+                    log_remote_address = v
+                }
+                if let Some(v) = general.log_x_real_ip {
+                    log_x_real_ip = v
+                }
+                if let Some(v) = general.log_forwarded_for {
+                    log_forwarded_for = v
+                }
+                if let Some(v) = general.trusted_proxies {
+                    trusted_proxies = v
+                }
+                if let Some(v) = general.redirect_trailing_slash {
+                    redirect_trailing_slash = v
+                }
+                if let Some(v) = general.include_hidden {
+                    include_hidden = v
+                }
+                if let Some(v) = general.follow_symlinks {
+                    follow_symlinks = v
+                }
+                if let Some(v) = general.use_relative_root {
+                    use_relative_root = v
+                }
+                if let Some(v) = general.health {
+                    health = v
+                }
+                if let Some(v) = general.accept_markdown {
+                    accept_markdown = v
+                }
+                if let Some(v) = general.text_charset {
+                    text_charset = v
+                }
+                #[cfg(feature = "metrics")]
+                if let Some(v) = general.metrics {
+                    metrics = v
+                }
+                if let Some(v) = general.index_files {
+                    index_files = v
+                }
+                if let Some(v) = general.maintenance_mode {
+                    maintenance_mode = v
+                }
+                if let Some(v) = general.maintenance_mode_status {
+                    maintenance_mode_status =
+                        StatusCode::from_u16(v).with_context(|| "invalid HTTP status code")?
+                }
+                if let Some(v) = general.maintenance_mode_file {
+                    maintenance_mode_file = v
+                }
+
+                // Windows-only options
+                #[cfg(windows)]
+                if let Some(v) = general.windows_service {
+                    windows_service = v
+                }
+            }
+
+            // Logging system initialization in config file context
+            if log_init {
+                logger::init(
+                    log_level.as_str(),
+                    &log_format,
+                    log_with_ansi,
+                    log_file.as_deref(),
+                )?;
+            }
+
+            tracing::debug!("config file read successfully");
+            tracing::debug!("config file path provided: {}", opts.config_file.display());
+            tracing::debug!("config file path resolved: {}", config_file.display());
+
+            if !has_general_settings {
+                tracing::warn!(
+                    "config file empty or no `general` settings found, using default values"
+                );
+            }
+
+            // File-based "advanced" options
+            if let Some(advanced) = settings.advanced {
+                // 1. Custom HTTP headers assignment
+                let headers_entries = match advanced.headers {
+                    Some(headers_entries) => {
+                        let mut headers_vec: Vec<Headers> = Vec::new();
+
+                        // Compile a glob pattern for each header sources entry
+                        for headers_entry in headers_entries.iter() {
+                            let source = Glob::new(&headers_entry.source)
+                                .with_context(|| {
+                                    format!(
+                                        "can not compile glob pattern for header source: {}",
+                                        headers_entry.source
+                                    )
+                                })?
+                                .compile_matcher();
+
+                            headers_vec.push(Headers {
+                                source,
+                                headers: headers_entry.headers.to_owned(),
+                            });
+                        }
+                        Some(headers_vec)
+                    }
+                    _ => None,
+                };
+
+                // 2. Rewrites assignment
+                let rewrites_entries = match advanced.rewrites {
+                    Some(rewrites_entries) => {
+                        let mut rewrites_vec: Vec<Rewrites> = Vec::new();
+
+                        // Compile a glob pattern for each rewrite sources entry
+                        for rewrites_entry in rewrites_entries.iter() {
+                            let source = GlobBuilder::new(&rewrites_entry.source)
+                                .literal_separator(true)
+                                .build()
+                                .with_context(|| {
+                                    format!(
+                                        "can not compile glob pattern for rewrite source: {}",
+                                        rewrites_entry.source
+                                    )
+                                })?
+                                .compile_matcher();
+
+                            let pattern = source
+                                .glob()
+                                .regex()
+                                .trim_start_matches("(?-u)")
+                                .replace("?:.*", ".*")
+                                .replace("?:", "")
+                                .replace(".*.*", ".*")
+                                .to_owned();
+                            tracing::debug!(
+                                "url rewrites glob pattern: {}",
+                                &rewrites_entry.source
+                            );
+                            tracing::debug!("url rewrites regex equivalent: {}", pattern);
+
+                            let source = Regex::new(&pattern).with_context(|| {
+                                    format!(
+                                        "can not compile regex pattern equivalent for rewrite source: {}",
+                                        pattern
+                                    )
+                                })?;
+
+                            let replacer = build_placeholder_replacer(&source);
+                            rewrites_vec.push(Rewrites {
+                                source,
+                                destination: rewrites_entry.destination.to_owned(),
+                                redirect: rewrites_entry.redirect.to_owned(),
+                                replacer,
+                            });
+                        }
+                        Some(rewrites_vec)
+                    }
+                    _ => None,
+                };
+
+                // 3. Redirects assignment
+                let redirects_entries = match advanced.redirects {
+                    Some(redirects_entries) => {
+                        let mut redirects_vec: Vec<Redirects> = Vec::new();
+
+                        // Compile a glob pattern for each redirect sources entry
+                        for redirects_entry in redirects_entries.iter() {
+                            let source = GlobBuilder::new(&redirects_entry.source)
+                                .literal_separator(true)
+                                .build()
+                                .with_context(|| {
+                                    format!(
+                                        "can not compile glob pattern for redirect source: {}",
+                                        redirects_entry.source
+                                    )
+                                })?
+                                .compile_matcher();
+
+                            let pattern = source
+                                .glob()
+                                .regex()
+                                .trim_start_matches("(?-u)")
+                                .replace("?:.*", ".*")
+                                .replace("?:", "")
+                                .replace(".*.*", ".*")
+                                .to_owned();
+                            tracing::debug!(
+                                "url redirects glob pattern: {}",
+                                &redirects_entry.source
+                            );
+                            tracing::debug!("url redirects regex equivalent: {}", pattern);
+
+                            let source = Regex::new(&pattern).with_context(|| {
+                                    format!(
+                                        "can not compile regex pattern equivalent for redirect source: {}",
+                                        pattern
+                                    )
+                                })?;
+
+                            let status_code = redirects_entry.kind.to_owned() as u16;
+                            let replacer = build_placeholder_replacer(&source);
+                            redirects_vec.push(Redirects {
+                                host: redirects_entry.host.to_owned(),
+                                source,
+                                destination: redirects_entry.destination.to_owned(),
+                                kind: StatusCode::from_u16(status_code).with_context(|| {
+                                    format!("invalid redirect status code: {status_code}")
+                                })?,
+                                replacer,
+                            });
+                        }
+                        Some(redirects_vec)
+                    }
+                    _ => None,
+                };
+
+                // 3. Virtual hosts assignment
+                let vhosts_entries = match advanced.virtual_hosts {
+                    Some(vhosts_entries) => {
+                        let mut vhosts_vec: Vec<VirtualHosts> = Vec::new();
+
+                        for vhosts_entry in vhosts_entries.iter() {
+                            if let Some(root) = vhosts_entry.root.to_owned() {
+                                // Make sure path is valid
+                                let root_dir = helpers::get_valid_dirpath(&root)
+                                    .with_context(|| "root directory for virtual host was not found or inaccessible")?;
+                                // Canonicalize once so the per-request
+                                // containment check can skip a `canonicalize`
+                                // syscall (see `static_files::security`), unless
+                                // `use_relative_root` is enabled.
+                                let root_dir = if use_relative_root {
+                                    root_dir
+                                } else {
+                                    root_dir.canonicalize().unwrap_or(root_dir)
+                                };
+                                tracing::debug!(
+                                    "added virtual host: {} -> {}",
+                                    vhosts_entry.host,
+                                    root_dir.display()
+                                );
+                                vhosts_vec.push(VirtualHosts {
+                                    host: vhosts_entry.host.to_owned(),
+                                    root: root_dir,
+                                });
+                            }
+                        }
+                        Some(vhosts_vec)
+                    }
+                    _ => None,
+                };
+
+                settings_advanced = Some(Advanced {
+                    headers: headers_entries,
+                    rewrites: rewrites_entries,
+                    redirects: redirects_entries,
+                    virtual_hosts: vhosts_entries,
+                    memory_cache: advanced.memory_cache,
+                });
+            }
+        } else if log_init {
+            // Logging system initialization on demand
+            logger::init(
+                log_level.as_str(),
+                &log_format,
+                log_with_ansi,
+                log_file.as_deref(),
+            )?;
+        }
+
+        // Runtime validation: HTTP/2 requires TLS
+        #[cfg(all(feature = "http2", feature = "tls"))]
+        if http2 && !tls {
+            bail!("HTTP/2 requires TLS; enable --tls along with --tls-cert and --tls-key");
+        }
+
+        // Runtime validation: ANSI log output requires pretty format
+        if log_with_ansi && log_format != logger::LogFormat::Pretty {
+            bail!("--log-with-ansi requires --log-format=pretty");
+        }
+
+        // Runtime validation: HTTPS redirect requires TLS
+        #[cfg(feature = "tls")]
+        if https_redirect && !tls {
+            bail!("--https-redirect requires TLS to be enabled (--tls)");
+        }
+
+        // Auto-enable security headers when TLS is on (applies when no config file is present)
+        #[cfg(feature = "tls")]
+        if tls && !security_headers {
+            security_headers = true;
+        }
+
+        Ok(Settings {
+            general: General {
+                version,
+                host,
+                port,
+                root,
+                log_level,
+                log_with_ansi,
+                log_format,
+                log_file,
+                config_file,
+                cache_control_headers,
+                etag,
+                #[cfg(any(
+                    feature = "compression",
+                    feature = "compression-gzip",
+                    feature = "compression-brotli",
+                    feature = "compression-zstd",
+                    feature = "compression-deflate"
+                ))]
+                compression,
+                #[cfg(any(
+                    feature = "compression",
+                    feature = "compression-gzip",
+                    feature = "compression-brotli",
+                    feature = "compression-zstd",
+                    feature = "compression-deflate"
+                ))]
+                compression_level,
+                compression_static,
+                page404,
+                page50x,
+                #[cfg(feature = "http2")]
+                http2,
+                #[cfg(feature = "tls")]
+                tls,
+                #[cfg(feature = "tls")]
+                tls_cert,
+                #[cfg(feature = "tls")]
+                tls_key,
+                #[cfg(feature = "tls")]
+                https_redirect,
+                #[cfg(feature = "tls")]
+                https_redirect_host,
+                #[cfg(feature = "tls")]
+                https_redirect_from_port,
+                #[cfg(feature = "tls")]
+                https_redirect_from_hosts,
+                security_headers,
+                cors_allow_origins,
+                cors_allow_headers,
+                cors_expose_headers,
+                #[cfg(feature = "directory-listing")]
+                directory_listing,
+                #[cfg(feature = "directory-listing")]
+                directory_listing_order,
+                #[cfg(feature = "directory-listing")]
+                directory_listing_format,
+                #[cfg(feature = "directory-listing-download")]
+                directory_listing_download,
+                #[cfg(feature = "basic-auth")]
+                basic_auth,
+                fd,
+                #[cfg(unix)]
+                unix_socket,
+                #[cfg(unix)]
+                unix_socket_mode,
+                #[cfg(unix)]
+                unix_socket_force,
+                threads_multiplier,
+                max_blocking_threads,
+                grace_period,
+                #[cfg(feature = "fallback-page")]
+                page_fallback,
+                log_remote_address,
+                log_x_real_ip,
+                log_forwarded_for,
+                trusted_proxies,
+                redirect_trailing_slash,
+                include_hidden,
+                follow_symlinks,
+                use_relative_root,
+                accept_markdown,
+                text_charset,
+                index_files,
+                health,
+                #[cfg(feature = "metrics")]
+                metrics,
+                maintenance_mode,
+                maintenance_mode_status,
+                maintenance_mode_file,
+
+                // Windows-only options and commands
+                #[cfg(windows)]
+                windows_service,
+                commands: opts.commands,
+            },
+            advanced: settings_advanced,
+        })
+    }
+}
+
+fn read_file_settings(config_file: &Path) -> Result<Option<(FileSettings, PathBuf)>> {
+    if config_file.is_file() {
+        let file_path_resolved = config_file
+            .canonicalize()
+            .with_context(|| "unable to resolve toml config file path")?;
+
+        let settings = FileSettings::read(&file_path_resolved).with_context(
+            || "unable to read toml config file because has invalid format or unsupported options",
+        )?;
+
+        return Ok(Some((settings, file_path_resolved)));
+    }
+    Ok(None)
+}

@@ -1,0 +1,181 @@
+[package]
+name = "static-web-server"
+version = "2.43.0"
+edition = "2024"
+rust-version = "1.88.0"
+authors = ["Jose Quintana <https://joseluisq.net>"]
+license = "MIT OR Apache-2.0"
+description = "A cross-platform, high-performance and asynchronous web server for static files-serving."
+repository = "https://github.com/static-web-server/static-web-server"
+readme = "README.md"
+homepage = "https://static-web-server.net"
+keywords = [
+    "static-web-server",
+    "file-server",
+    "http-server"
+]
+categories = ["network-programming", "web-programming::http-server"]
+include = [
+    "src/**/*.rs",
+    "build.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+]
+autotests = true
+autoexamples = true
+build = "build.rs"
+
+[lib]
+name = "static_web_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "static-web-server"
+path = "src/bin/server.rs"
+doc = false
+
+[features]
+# All features enabled by default
+default = ["compression", "http2", "tls-ring", "directory-listing", "directory-listing-download", "basic-auth", "fallback-page", "metrics", "mem-cache"]
+# Include all features (used when building SWS binaries)
+all = ["default", "experimental"]
+# Default feature set with the FIPS crypto provider in place of ring.
+default-fips = ["compression", "http2", "tls-fips", "directory-listing", "directory-listing-download", "basic-auth", "fallback-page", "metrics", "mem-cache"]
+# All features with the FIPS crypto provider (used when building FIPS SWS binaries).
+all-fips = ["default-fips", "experimental"]
+# TLS base plumbing -- gates all TLS code via cfg(feature = "tls").
+# Does not select a crypto provider on its own.
+tls = ["tokio-rustls", "rustls-pki-types", "tokio-rustls/logging", "tokio-rustls/tls12"]
+# TLS with ring crypto provider (default)
+tls-ring = ["tls", "tokio-rustls/ring"]
+# TLS with FIPS-validated crypto via aws-lc-rs
+tls-fips = ["tls", "tokio-rustls/fips", "aws-lc-rs"]
+# HTTP2 (requires TLS)
+http2 = ["tls", "hyper-util/http2"]
+# Compression
+compression = ["compression-brotli", "compression-deflate", "compression-gzip", "compression-zstd"]
+compression-brotli = ["async-compression/brotli"]
+compression-deflate = ["async-compression/deflate"]
+compression-gzip = ["async-compression/deflate"]
+compression-zstd = ["async-compression/zstd"]
+# Directory listing
+directory-listing = ["chrono"]
+# Directory listing download
+directory-listing-download = ["async-tar",  "compression-gzip", "directory-listing"]
+# Basic HTTP Authorization
+basic-auth = ["bcrypt"]
+# Fallback Page
+fallback-page = []
+# Metrics endpoint with Prometheus integration
+metrics = ["prometheus"]
+# In-memory file cache with LFU admission and LRU eviction
+mem-cache = ["compact_str", "mini-moka"]
+# Experimental features (requires: `RUSTFLAGS="--cfg tokio_unstable"`)
+experimental = ["metrics", "tokio-metrics-collector"]
+
+[dependencies]
+aho-corasick = "1.1.4"
+anyhow = "1.0"
+aws-lc-rs = { version = "1", optional = true, default-features = false }
+async-compression = { version = "0.4", default-features = false, optional = true, features = ["brotli", "deflate", "gzip", "zstd", "tokio"] }
+async-tar = { version = "0.5.1", optional = true }
+bcrypt = { version = "0.18.0", optional = true }
+bytes = "1.11.1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"], optional = true }
+clap = { version = "4.5", features = ["derive", "env"] }
+clap_allgen = "0.2.1"
+compact_str = { version = "0.9.0", optional = true }
+form_urlencoded = "1.2"
+futures-util = { version = "0.3", default-features = false }
+globset = { version = "0.4.18", features = ["serde1"] }
+headers = "0.4"
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+http-serde = "2"
+hyper = { version = "1", default-features = false, features = ["http1", "http2", "server"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio", "server", "server-auto", "server-graceful"] }
+listenfd = "1.0"
+maud = { version = "0.27" }
+mime_guess = "2.0"
+mini-moka = { version = "0.10.3", optional = true }
+percent-encoding = "2.3"
+pin-project = "1.1"
+prometheus = { version = "0.14.0", default-features = false, optional = true }
+regex-lite = "0.1.8"
+rustls-pki-types = { version = "1.13.2", optional = true }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_ignored = "0.1"
+serde_json = "1.0"
+serde_repr = "0.1"
+shadow-rs = "1.4.0"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "fs", "io-util", "net", "signal"] }
+tokio-rustls = { version = "0.26", optional = true, default-features = false }
+tokio-util = { version = "0.7", default-features = false, features = ["io", "compat"] }
+toml = "0.9"
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-appender = { version = "0.2", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["smallvec", "registry", "parking_lot", "fmt", "ansi", "json", "tracing-log", "local-time"] }
+
+[target.'cfg(all(target_env = "musl", target_pointer_width = "64"))'.dependencies]
+mimalloc = { version = "0.1.48", features = ["v3"] }
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = { version = "0.4.1", features = ["extended-siginfo"] }
+signal-hook-tokio = { version = "0.4.0", features = ["futures-v0_3"], default-features = false }
+tokio-metrics-collector = { version = "0.3.1", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.8"
+
+[dev-dependencies]
+bytes = "1.11.1"
+serde_json = "1.0"
+hyper = { version = "1", default-features = false, features = ["http1", "http2", "client"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio", "http2"] }
+http-body-util = "0.1"
+tokio-rustls = { version = "0.26", default-features = false }
+rustls-pki-types = "1.13"
+rustls-pemfile = "2"
+proptest = { version = "1.5", default-features = false, features = ["std"] }
+tempfile = "3"
+
+[build-dependencies]
+shadow-rs = "1.4.0"
+
+[profile.release]
+codegen-units = 1
+debug = false
+debug-assertions = false
+lto = "fat"
+opt-level = 3
+panic = "abort"
+rpath = false
+strip = true
+
+# Same optimizations as `release` but with debug info and no stripping.
+# Use this profile when profiling with samply / Instruments / perf:
+#
+#   cargo build --profile release-profiling --features all
+#   samply record target/release-profiling/static-web-server -p 8787 -d docker/public/
+[profile.release-profiling]
+inherits = "release"
+debug = 2
+strip = false
+
+[package.metadata.docs.rs]
+features = ["all"]
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+rustc-args = ["--cfg", "tokio_unstable"]
+
+# Cross: workaround for https://github.com/cross-rs/cross/issues/1345
+[package.metadata.cross.target.x86_64-unknown-netbsd]
+pre-build = [
+    "mkdir -p /tmp/netbsd",
+    "curl -fO https://ftp.uni-erlangen.de/netbsd/NetBSD-9.4/amd64/binary/sets/base.tar.xz",
+    "tar -C /tmp/netbsd -xJf base.tar.xz",
+    "cp /tmp/netbsd/usr/lib/libexecinfo.so /usr/local/x86_64-unknown-netbsd/lib",
+    "rm -rf base.tar.xz /tmp/netbsd",
+]

@@ -1,0 +1,14 @@
+*.~
+.git
+**/*.gz
+**/*.log
+**/*.tar
+**/*.zip
+**/.DS_Store
+**/*.env
+.gitignore
+*docker-compose*
+Makefile
+target
+.vscode
+release

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/tarka/vicarian/compare/v0.2.6...v0.3.0) - 2026-07-20
+
+### <!-- 1 -->Bug Fixes
+
+- Vendor static-web-server for the time being as crates.io doesn't like git dependencies.
+
+### <!-- 7 -->Miscellaneous Tasks
+
+- Bump to 0.3.0
+
+### Other
+
+- Squashed 'vendor/static-web-server/' content from commit 13228a9
+
 ## [0.2.6](https://github.com/tarka/vicarian/compare/v0.2.5...v0.2.6) - 2026-06-08
 
 ### <!-- 1 -->Bug Fixes

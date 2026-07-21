@@ -48,12 +48,7 @@ rustls = "0.23.42"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
 serde_json = "1.0.150"
-static-web-server = {
-    # Pre-V3; update when upstream releases
-    path = "./vendor/static-web-server",
-    default-features = false,
-    features = ["directory-listing", "fallback-page"]
-}
+static-web-server = { version = "2.43.0", default-features = false, features = ["directory-listing", "fallback-page"] }
 strum_macros = "0.28.0"
 thiserror = "2.0.19"
 time = { version = "0.3.53", features = ["local-offset"] }
@@ -63,6 +58,9 @@ tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 x509-parser = "0.18.1"
 zone-update = { version = "0.11.0", features = ["async"] }
+
+[patch.crates-io]
+static-web-server = { git = "https://github.com/static-web-server/static-web-server.git", rev = "3a7a0db" }
 
 [features]
 default = ["integration_tests"]

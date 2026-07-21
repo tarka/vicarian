@@ -9,10 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0](https://github.com/tarka/vicarian/compare/v0.2.6...v0.3.0) - 2026-07-21
 
-### <!-- 1 -->Bug Fixes
+### <!-- 1 -->Features
 
-- crates.io expects a valid version for a vendored crate
-- Vendor static-web-server for the time being as crates.io doesn't like git dependencies.
+- Add static file support using static-web-server library. See CONFIGURATION.md for detail.
 
 ### <!-- 7 -->Miscellaneous Tasks
 

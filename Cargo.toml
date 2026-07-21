@@ -48,10 +48,9 @@ rustls = "0.23.42"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
 serde_json = "1.0.151"
-static-web-server = {
-    version = "2.43.0",
-    # Pre-V3; update when upstream releases
-    path = "./vendor/static-web-server",
+# Pre-V3 fork; update when upstream releases
+static-web-server-vicarian = {
+    version = "3.0.0-vicarian.1",
     default-features = false,
     features = ["directory-listing", "fallback-page"]
 }

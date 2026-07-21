@@ -18,15 +18,15 @@ anyhow = "1.0.104"
 async-trait = "0.1.91"
 bytes = "1.12.1"
 camino = { version = "1.2.4", features = ["serde1"] }
-clap = { version = "4.6.2", features = ["derive"] }
+clap = { version = "4.6.3", features = ["derive"] }
 dnsclient = "0.2.0"
-fastrand = "2.4.1"
+fastrand = "2.5.0"
 futures = "0.3.33"
 futures-lite = "2.6.1"
 http = "1.4.2"
 http-body-util = "0.1.4"
 http-serde = "2.1.1"
-hyper = "1.10.1"
+hyper = "1.11.0"
 instant-acme = { version = "0.8.5", features = ["time"] }
 
 itertools = "0.15.0"
@@ -47,7 +47,7 @@ psl = "2.1.219"
 rustls = "0.23.42"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
-serde_json = "1.0.150"
+serde_json = "1.0.151"
 static-web-server = {
     version = "2.43.0",
     # Pre-V3; update when upstream releases
@@ -57,8 +57,8 @@ static-web-server = {
 }
 strum_macros = "0.28.0"
 thiserror = "2.0.19"
-time = { version = "0.3.53", features = ["local-offset"] }
-tokio = { version = "1.53.0", features = ["macros", "rt", "sync", "fs"] }
+time = { version = "0.3.54", features = ["local-offset"] }
+tokio = { version = "1.53.1", features = ["macros", "rt", "sync", "fs"] }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
@@ -78,8 +78,8 @@ reqwest = { version = "0.13.4", default-features = false, features = ["http2", "
 serial_test = "3.5.0"
 tempfile = "3.27.0"
 test-log = { version = "0.2.21", features = ["trace"] }
-time = { version = "0.3.53", features = ["macros"] }
-tokio = { version = "1.53.0", features = ["fs"] }
+time = { version = "0.3.54", features = ["macros"] }
+tokio = { version = "1.53.1", features = ["fs"] }
 tokio-tungstenite = { version = "0.30.0", features = ["rustls", "rustls-tls-webpki-roots", "tokio-rustls"] }
 wiremock = "0.6.5"
 wiremocket = "0.3.2"

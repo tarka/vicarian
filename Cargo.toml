@@ -49,6 +49,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
 serde_json = "1.0.150"
 static-web-server = {
+    version = "2.43.0",
     # Pre-V3; update when upstream releases
     path = "./vendor/static-web-server",
     default-features = false,

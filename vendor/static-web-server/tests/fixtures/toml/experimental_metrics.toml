@@ -1,5 +1,0 @@
-[general]
-
-root = "docker/public"
-
-metrics = true

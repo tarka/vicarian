@@ -292,6 +292,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     unsafe {
         std::env::set_var("PORKBUN_KEY", "PORKBUN_KEY");
         std::env::set_var("PORKBUN_SECRET", "PORKBUN_SECRET");
+        std::env::set_var("my-secret-key", "my-secret-key");
     };
     let config = hcl::Config::from_file("examples/vicarian-full.hcl".into())?;
 

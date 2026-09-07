@@ -69,6 +69,11 @@ cert "snakeoil" {
 //
 //////////////////////////////////////////////////////////////////////////////
 
+// Disables some functionality when not in production. At the moment this just
+// directs ACME requests to the Letsencrypt staging servers, but other restrictions
+// may be added later.
+dev_mode = false
+
 // The `listen` directive; this defines addresss and interfaces to listen on.
 //
 // Optional; if not present it defaults to the values below.
@@ -145,5 +150,14 @@ vhost "vicarian.org" {
     backend "/html" {
         type = "static"
         root = "/var/www/vicarian.org"
+    }
+}
+
+vhost "localhost" {
+    tls = "snakeoil"
+
+    backend "/" {
+        type = "static"
+        root = "/var/www"
     }
 }

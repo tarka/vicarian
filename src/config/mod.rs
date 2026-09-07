@@ -20,7 +20,7 @@ use tracing_log::log::info;
 pub use cli::CliOptions;
 
 
-pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.corn";
+pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.hcl";
 
 // pub for tests
 pub trait ValidateSanitise: Sized {

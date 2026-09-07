@@ -1,4 +1,5 @@
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4};
+use itertools::Itertools;
 
 use crate::config::hcl::{ProxyBackend, StaticBackend};
 
@@ -296,25 +297,36 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     };
     let config = hcl::Config::from_file("examples/vicarian-full.hcl".into())?;
 
+    assert!(!config.dev_mode);
+
     // `listen` block
     assert_eq!(443, config.listen.tls_port);
     assert_eq!(Some(80), config.listen.insecure_port);
 
-    // Two `acme` blocks and one `cert` block, merged into one map.
-    assert_eq!(3, config.tls.len());
+    // Two `acme` blocks, and one (unused) `cert` block, merged into vhosts
+    let certs = config.vhosts.iter()
+        .filter(|vh| matches!(vh.tls, hcl::TlsConfig::Cert(_)))
+        .count();
+    let acme = config.vhosts.iter()
+        .filter(|vh| matches!(vh.tls, hcl::TlsConfig::Acme(_)))
+        .count();
+    assert_eq!(1, certs);
+    assert_eq!(2, acme);
 
+    let vh_haltcondition = config.vhosts.iter()
+        .filter(|vh| vh.hostname == "haltcondition.net")
+        .exactly_one()
+        .map_err(|_e| anyhow!("Vhost not found"))?;
     // `acme "le-porkbun"` — dns-01 with a porkbun provider.
-    let le_porkbun = config.tls.get("le-porkbun")
-        .ok_or_else(|| anyhow!("missing tls definition le-porkbun"))?;
-    assert!(matches!(le_porkbun, hcl::TlsConfig::Acme(hcl::AcmeConfig {
-        acme_provider: hcl::AcmeProvider::LetsEncrypt,
+    assert!(matches!(vh_haltcondition.tls, hcl::TlsConfig::Acme(hcl::AcmeConfig {
+        acme_provider: AcmeProvider::LetsEncrypt,
         profile: AcmeProfile::ShortLived,
-        contact,
-        challenge: hcl::AcmeChallenge::Dns01(hcl::DnsProvider {
+        ref contact,
+        challenge: AcmeChallenge::Dns01(DnsProvider {
             wildcard: true,
             dns_provider: zone_update::Provider::PorkBun(zone_update::porkbun::Auth {
-                key,
-                secret,
+                ref key,
+                ref secret,
             } ),
         }),
     }) if contact == "admin@haltcondition.net"
@@ -322,19 +334,23 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
                      && secret == "PORKBUN_SECRET"));
 
     // `acme "le-http01"` — http-01, defaults for provider and profile.
-    let le_http01 = config.tls.get("le-http01")
-        .ok_or_else(|| anyhow!("missing tls definition le-http01"))?;
-    assert!(matches!(le_http01, hcl::TlsConfig::Acme(hcl::AcmeConfig {
-        acme_provider: hcl::AcmeProvider::LetsEncrypt,
+    let vh_vicarian = config.vhosts.iter()
+        .filter(|vh| vh.hostname == "vicarian.org")
+        .exactly_one()
+        .map_err(|_e| anyhow!("Vhost not found"))?;
+    assert!(matches!(vh_vicarian.tls, hcl::TlsConfig::Acme(hcl::AcmeConfig {
+        acme_provider: AcmeProvider::LetsEncrypt,
         profile: AcmeProfile::Classic,
         contact: _,
-        challenge: hcl::AcmeChallenge::Http01,
+        challenge: AcmeChallenge::Http01,
     })));
 
     // `cert "snakeoil"` — static key/cert files.
-    let snakeoil = config.tls.get("snakeoil")
-        .ok_or_else(|| anyhow!("missing tls definition snakeoil"))?;
-    let hcl::TlsConfig::Cert(files) = snakeoil else {
+    let vh_localhost = config.vhosts.iter()
+        .filter(|vh| vh.hostname == "localhost")
+        .exactly_one()
+        .map_err(|_e| anyhow!("Vhost not found"))?;
+    let hcl::TlsConfig::Cert(ref files) = vh_localhost.tls else {
         bail!("snakeoil should be a cert (files) definition")
     };
     // Paths are canonicalised when they exist, so only check the suffix.
@@ -343,15 +359,19 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     assert!(files.reload);
 
     // `vhost` blocks; hostname is populated from the block label.
-    assert_eq!(2, config.vhosts.len());
+    assert_eq!(3, config.vhosts.len());
 
-    let hc = config.vhosts.get("haltcondition.net")
-        .ok_or_else(|| anyhow!("missing vhost haltcondition.net"))?;
-    assert_eq!("haltcondition.net", hc.hostname);
-    assert_eq!("le-porkbun", hc.tls);
-    assert_eq!(vec!["www.haltcondition.net".to_string()], hc.aliases);
-    assert_eq!(3, hc.backend.len());
-    let hcl::Backend { backend_type: hcl::BackendType::Proxy(ProxyBackend { url, trust }), auth_key } = hc.backend.get("/").unwrap() else {
+    assert_eq!("haltcondition.net", vh_haltcondition.hostname);
+    assert_eq!(
+        vec!["www.haltcondition.net".to_string()],
+        vh_haltcondition.aliases
+    );
+    assert_eq!(3, vh_haltcondition.backends.len());
+    let hcl::Backend {
+        backend_type: hcl::BackendType::Proxy(ProxyBackend { url, trust }),
+        auth_key,
+    } = vh_haltcondition.backends.get("/").unwrap()
+    else {
         bail!("expected proxy backend /")
     };
     assert_eq!("http", url.scheme_str().unwrap());
@@ -359,39 +379,57 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     assert!(!trust);
     assert!(auth_key.is_none());
 
-    let hcl::Backend { backend_type: hcl::BackendType::Static(StaticBackend { root } ), auth_key } = hc.backend.get("/html").unwrap() else {
+    let hcl::Backend {
+        backend_type: hcl::BackendType::Static(StaticBackend { root }),
+        auth_key,
+    } = vh_haltcondition.backends.get("/html").unwrap()
+    else {
         bail!("expected static backend /html")
     };
     assert_eq!("/var/www/haltcondition.net", root);
     assert!(auth_key.is_none());
 
-    let hcl::Backend { backend_type: hcl::BackendType::Metrics, auth_key: Some(keyval) } = hc.backend.get("/metrics").unwrap() else {
+    let hcl::Backend {
+        backend_type: hcl::BackendType::Metrics,
+        auth_key: Some(keyval),
+    } = vh_haltcondition.backends.get("/metrics").unwrap()
+    else {
         bail!("expected static backend /metrics")
     };
     assert_eq!(keyval, "my-secret-key");
 
-    let vo = config.vhosts.get("vicarian.org")
-        .ok_or_else(|| anyhow!("missing vhost vicarian.org"))?;
-    assert_eq!("vicarian.org", vo.hostname);
-    assert_eq!("le-http01", vo.tls);
-    assert_eq!(vec!["www.vicarian.org".to_string()], vo.aliases);
-    assert_eq!(3, vo.backend.len());
+    assert_eq!("vicarian.org", vh_vicarian.hostname);
+    assert_eq!(vec!["www.vicarian.org".to_string()], vh_vicarian.aliases);
+    assert_eq!(3, vh_vicarian.backends.len());
 
-    let hcl::Backend { backend_type: hcl::BackendType::Proxy(ProxyBackend { url, .. }), auth_key: _ } = vo.backend.get("/").unwrap() else {
+    let hcl::Backend {
+        backend_type: hcl::BackendType::Proxy(ProxyBackend { url, .. }),
+        auth_key: _,
+    } = vh_vicarian.backends.get("/").unwrap()
+    else {
         bail!("expected proxy backend /")
     };
     assert_eq!("http", url.scheme_str().unwrap());
     assert_eq!("192.168.20.27:9192", url.authority().unwrap().as_str());
 
-    let hcl::Backend { backend_type: hcl::BackendType::Static(StaticBackend { root, .. }), auth_key: _ } = vo.backend.get("/html").unwrap() else {
+    let hcl::Backend {
+        backend_type: hcl::BackendType::Static(StaticBackend { root, .. }),
+        auth_key: _,
+    } = vh_vicarian.backends.get("/html").unwrap()
+    else {
         bail!("expected static backend /html")
     };
     assert_eq!("/var/www/vicarian.org", root);
 
-    let hcl::Backend { backend_type: hcl::BackendType::Proxy(ProxyBackend { url, trust }), auth_key: _ } = vo.backend.get("/trusted").unwrap() else {
+    let hcl::Backend {
+        backend_type: hcl::BackendType::Proxy(ProxyBackend { url, trust }),
+        auth_key: _,
+    } = vh_vicarian.backends.get("/trusted").unwrap()
+    else {
         bail!("expected proxy backend /")
     };
     assert_eq!("https", url.scheme_str().unwrap());
     assert!(trust);
+
     Ok(())
 }

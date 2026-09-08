@@ -296,11 +296,28 @@
         <section id="installation" class="section">
             <h2 class="section-title">Installation</h2>
 
+            <h3>Debian & Ubuntu packages</h3>
+            <div class="code-block">
+                <pre><code class="language-bash"># Download the repository key:
+curl -fsSL https://vicarian.org/debian/vicarian-repo.gpg \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/vicarian-repo-archive-keyring.gpg
+
+# Add the APT source
+echo "deb [signed-by=/etc/apt/keyrings/vicarian-repo-archive-keyring.gpg] https://vicarian.org/debian stable main" \
+    | sudo tee /etc/apt/sources.list.d/vicarian.list
+
+# Install Vicarian
+sudo apt update && sudo apt install vicarian </code></pre>
+            </div>
+
+            <h3>Binary releases</h3>
+            <p>Binaries are available on the <a href="https://github.com/tarka/vicarian/releases">Github release page</a></p>
+
             <h3>Building from Source</h3>
             <div class="code-block">
                 <pre><code class="language-bash">git clone https://github.com/tarka/vicarian.git
 cd vicarian
-cargo build --release</code></pre>
+cargo build --release </code></pre>
             </div>
             <p>The binary will be available at <code>target/release/vicarian</code></p>
 

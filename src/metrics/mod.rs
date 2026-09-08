@@ -11,7 +11,7 @@ use pingora_proxy::Session;
 use std::sync::OnceLock;
 use tracing_log::log::{debug, info};
 
-use crate::{RunContext, config::Backend, proxy::Handler};
+use crate::{RunContext, config::Backend, proxy::BackendHandler};
 
 const UPKEEP_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -138,14 +138,14 @@ pub struct MetricsHandler;
 
 impl MetricsHandler {
     // Just for consistency
-    pub fn new(_backend: &Backend) -> Self {
+    pub fn new() -> Self {
         Self
     }
 }
 
 #[async_trait]
-impl Handler for MetricsHandler {
-    async fn handle(&self, session: &mut Session) -> Result<()> {
+impl BackendHandler for MetricsHandler {
+    async fn handle(&self, session: &mut Session) -> Result<bool> {
         counter!(METRIC_METRICS_SCRAPE_TOTAL).increment(1);
         debug!("Replying to metrics endpoint");
 
@@ -158,7 +158,7 @@ impl Handler for MetricsHandler {
         session.write_response_header(Box::new(header), false).await?;
         session.write_response_body(Some(body), true).await?;
 
-        Ok(())
+        Ok(true)
 
     }
 }

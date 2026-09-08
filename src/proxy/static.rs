@@ -12,7 +12,7 @@ use static_web_server::handler::{
     RequestHandler as SWSHandler, RequestHandlerOpts as SWSHandlerOpts,
 };
 
-use crate::{config::Backend, proxy::{E500, Handler}};
+use crate::{config::{Backend, StaticBackend}, proxy::{E500, BackendHandler}};
 
 // TODO: Should be own top-level module (like metrics)?
 
@@ -21,15 +21,13 @@ pub struct StaticHandler {
 }
 
 impl StaticHandler {
-    pub fn new(backend: &Backend) -> Self {
-        let static_root = backend.static_root.clone()
-            .expect("No static root; should be caught in config")
+    pub fn new(backend: &StaticBackend) -> Self {
+        let static_root = backend.root.clone()
             .join("index.html");
         let fallback_page = std::fs::read(&static_root)
             .unwrap_or_else(|_| Vec::new());
         let opts = Arc::new(SWSHandlerOpts{
-            root_dir: backend.static_root.clone()
-                .expect("No static root; should be caught in config")
+            root_dir: backend.root.clone()
                 .into_std_path_buf(),
             compression: true,
             dir_listing: true,
@@ -46,8 +44,8 @@ impl StaticHandler {
 }
 
 #[async_trait]
-impl Handler for StaticHandler {
-    async fn handle(&self, session: &mut Session) -> Result<()> {
+impl BackendHandler for StaticHandler {
+    async fn handle(&self, session: &mut Session) -> Result<bool> {
 
         // FIXME: Check length
         let parts = session.req_header().as_owned_parts();
@@ -75,6 +73,6 @@ impl Handler for StaticHandler {
         }
         session.write_response_body(Bytes::new().into(), true).await?;
 
-        Ok(())
+        Ok(true)
     }
 }

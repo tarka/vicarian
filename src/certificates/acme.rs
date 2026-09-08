@@ -148,7 +148,7 @@ impl AcmeRuntime {
     pub fn new(certstore: Arc<CertStore>, context: Arc<RunContext>) -> Result<Self> {
         let acme_hosts = context.config.vhosts.iter()
             .filter_map(|vhost| match &vhost.tls {
-                TlsConfig::Files(_) => None, // Handled elsewhere
+                TlsConfig::Cert(_) => None, // Handled elsewhere
                 TlsConfig::Acme(aconf) => Some((vhost, aconf)),
             })
             .map(|(vhost, aconf)| {

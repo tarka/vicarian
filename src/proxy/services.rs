@@ -1,5 +1,6 @@
 use std::{iter, sync::Arc};
 
+use anyhow::bail;
 use async_trait::async_trait;
 use http::{
     HeaderValue, Uri,
@@ -16,18 +17,11 @@ use pingora_proxy::{ProxyHttp, Session};
 use tracing::{debug, info};
 
 use crate::{
-    RunContext,
-    certificates::store::CertStore,
-    config::{Backend, Vhost},
-    metrics::{
+    RunContext, certificates::store::CertStore, config::{Backend, BackendType, Vhost}, metrics::{
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
         MetricsHandler,
-    },
-    proxy::{
-        E401, E404, E500, Handler,
-        mimetypes::is_compressible,
-        router::{Router, RouterBackend},
-        r#static::StaticHandler,
+    }, proxy::{
+        BackendHandler, E401, E404, E500, ProxyHandler, mimetypes::is_compressible, router::{Router, RouterBackend}, r#static::StaticHandler,
     },
 };
 
@@ -106,28 +100,18 @@ impl Vicarian {
     }
 }
 
-fn to_module_handler(backend: &Backend) -> Option<Box<dyn Handler>> {
-    // url => module:://<module_name>
-    // The schema/authority correctness is checked in the config module.
-
-    let url = &backend.url;
-    let _is_module = url.scheme_str()
-        .filter(|&s| s == "module")?;
-
-    let module = url.authority()?
-        .as_str();
-
-    match module {
-        "metrics" => {
-            Some(Box::new(MetricsHandler::new(backend)))
+fn to_module_handler(backend: &Backend) -> Box<dyn BackendHandler> {
+    match backend.backend_type {
+        BackendType::Proxy(ref backend) => {
+            Box::new(ProxyHandler::new(backend))
         }
 
-        "static" => {
-            Some(Box::new(StaticHandler::new(backend)))
+        BackendType::Static(ref bconf) => {
+            Box::new(StaticHandler::new(bconf))
         }
 
-        _ => {
-            panic!("Unknown module {module}");
+        BackendType::Metrics => {
+            Box::new(MetricsHandler::new())
         }
     }
 }
@@ -135,7 +119,7 @@ fn to_module_handler(backend: &Backend) -> Option<Box<dyn Handler>> {
 // FIXME: Refactor amd make RouterBackend::new()
 fn to_router_backend(backend: &Backend) -> RouterBackend {
     RouterBackend {
-        config: backend.clone(),
+        backend: backend.clone(),
         handler: to_module_handler(backend),
     }
 }
@@ -150,7 +134,7 @@ fn vhost_to_router(vhost: &Vhost) -> Router {
 
 #[derive(Clone)]
 pub struct VicarianCtx {
-    backend: Arc<RouterBackend>,
+    routed: Arc<RouterBackend>,
 }
 
 #[async_trait]
@@ -169,7 +153,7 @@ impl ProxyHttp for Vicarian {
         counter!(METRIC_TLS_REQUESTS_TOTAL).increment(1);
 
         let components = to_components(session)?;
-        let backend = {
+        let routed = {
             let pinned = self.routes_by_host.pin();
             let host = components.host.to_string().to_lowercase();
             let router = pinned.get(&host)
@@ -179,7 +163,7 @@ impl ProxyHttp for Vicarian {
                 .backend
         };
 
-        if let Some(key) = &backend.config.auth_key {
+        if let Some(key) = &routed.backend.auth_key {
             let auth = session.req_header().headers.get(AUTHORIZATION)
                 .or_err(E401, "Failed to fetch Authorization header")?
                 .to_str()
@@ -192,30 +176,34 @@ impl ProxyHttp for Vicarian {
             }
 
             counter!(METRIC_AUTH_VALID_TOTAL).increment(1);
-            info!("Valid auth received for {:?}", backend.config.path);
+            info!("Valid auth received for {:?}", routed.backend.path);
         }
 
-        match &backend.handler {
-            Some(handler) => {
-                debug!("Calling custom handler for {}", backend.config.path);
-                handler.handle(session).await
-                    .map_err(|e| pingora_core::Error::explain(E500, format!("Failed to call handler: {e}")))?;
-                Ok(true)
-            }
-            None => {
-                *ctx = Some(VicarianCtx {
-                    backend: backend.clone()
-                });
-                Ok(false)
-            }
+        debug!("Calling handler for {}", routed.backend.path);
+        let finished = routed.handler.handle(session).await
+            .map_err(|e| pingora_core::Error::explain(E500, format!("Failed to call handler: {e}")))?;
+
+        if !finished {
+            *ctx = Some(VicarianCtx {
+                routed: routed.clone()
+            });
         }
+
+        Ok(finished)
     }
 
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> pingora_core::Result<Box<HttpPeer>> {
-        let backend = ctx.clone()
+        let routed = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
- .backend;
-        let url = &backend.config.url;
+            .routed;
+
+        let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, path: _ } = routed.backend
+        else {
+
+            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
+            return Err(pingora_core::Error::because(E500, "Unexpected state", e));
+        };
+        let url = &upstream.url;
 
         let host = url.host()
             .or_err(E500, "Backend host lookup failed")?;
@@ -225,7 +213,7 @@ impl ProxyHttp for Vicarian {
 
         let tls = url.scheme() == Some(&Scheme::HTTPS);
         let mut peer = HttpPeer::new((host, port), tls, host.to_string());
-        if backend.config.trust && let Some(opts) = peer.get_mut_peer_options() {
+        if upstream.trust && let Some(opts) = peer.get_mut_peer_options() {
             opts.verify_cert = false;
         }
 
@@ -238,16 +226,21 @@ impl ProxyHttp for Vicarian {
                                      ctx: &mut Self::CTX,)
                                      -> pingora_core::Result<()>
     {
-        let backend = ctx.clone()
+        let routed = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
-            .backend;
+            .routed;
+        let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, ref path } = routed.backend
+        else {
 
-        if backend.config.path != "/"
-            && ! backend.config.url.path().starts_with(&backend.config.path)
-        {
-            debug!("Modifying {} for context {}", upstream_request.uri, backend.config.path);
+            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
+            return Err(pingora_core::Error::because(E500, "Unexpected state", e));
+        };
+
+
+        if path != "/" && ! upstream.url.path().starts_with(&routed.backend.path) {
+            debug!("Modifying {} for context {}", upstream_request.uri, routed.backend.path);
             let upath = upstream_request.uri.path()
-                .strip_prefix(&backend.config.path)
+                .strip_prefix(&routed.backend.path)
                 .unwrap_or("/");
             let uquery = upstream_request.uri.query()
                 .map(|s| format!("?{s}"))
@@ -278,19 +271,24 @@ impl ProxyHttp for Vicarian {
                                       ctx: &mut Self::CTX)
                                       -> pingora_core::Result<()>
     {
-        let backend = ctx.clone()
+        let routed = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
-            .backend;
+            .routed;
+        let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, ref path } = routed.backend
+        else {
+            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
+            return Err(pingora_core::Error::because(E500, "Unexpected state", e));
+        };
 
-        if backend.config.path != "/"
-            && ! backend.config.url.path().starts_with(&backend.config.path)
+        if path != "/"
+            && ! upstream.url.path().starts_with(&routed.backend.path)
         {
             for headername in [LOCATION, REFRESH] {
                 let header_p = upstream_response.headers.get(&headername);
                 if let Some(header) = header_p {
                     let oldloc = header.to_str()
                         .or_err(E500, "Failed to rewrite location header")?;
-                    let newloc = HeaderValue::from_str(&format!("{}{oldloc}", backend.config.path))
+                    let newloc = HeaderValue::from_str(&format!("{}{oldloc}", routed.backend.path))
                         .or_err(E500, "Failed to rewrite location header")?;
 
                     debug!("Modifying Location to {newloc:?}");

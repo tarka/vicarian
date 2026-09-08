@@ -51,7 +51,7 @@ impl CertificateRuntime  {
         let iter = self.context.config.vhosts.iter();
         let certs: Vec<HostCertificate> = stream::iter(iter)
             .filter_map(|vhost| match &vhost.tls {
-                TlsConfig::Files(tcf) => Some(tcf),
+                TlsConfig::Cert(tcf) => Some(tcf),
                 _ => None,
             })
             .then(|tfc| HostCertificate::new(

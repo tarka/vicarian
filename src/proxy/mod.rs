@@ -19,10 +19,7 @@ use pingora_proxy::Session;
 use tracing::info;
 
 use crate::{
-    RunContext,
-    certificates::{CertificateRuntime, handler::CertHandler},
-    config::{AcmeChallenge, TlsAcmeConfig, TlsConfig},
-    proxy::{cleartext::CleartextHandler, services::Vicarian},
+    RunContext, certificates::{CertificateRuntime, handler::CertHandler}, config::{AcmeChallenge, ProxyBackend, TlsAcmeConfig, TlsConfig}, proxy::{cleartext::CleartextHandler, services::Vicarian},
 };
 
 pub const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());
@@ -31,18 +28,31 @@ pub const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTE
 
 
 #[async_trait]
-pub trait Handler: Send + Sync {
-    async fn handle(&self, session: &mut Session) -> Result<()>;
+pub trait BackendHandler: Send + Sync {
+    async fn handle(&self, session: &mut Session) -> Result<bool>;
 }
 
+
+struct ProxyHandler;
+
+impl ProxyHandler {
+    fn new(_backend: &ProxyBackend) -> Self {
+        ProxyHandler
+    }
+}
+
+#[async_trait]
+impl BackendHandler for ProxyHandler {
+    async fn handle(&self, _session: &mut Session) -> Result<bool> {
+        Ok(false)
+    }
+}
 
 pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunContext>) -> Result<()> {
     info!("Starting Proxy");
 
     let mut pingora_server = PingoraServer::new(None)?;
     pingora_server.bootstrap();
-
-    let addrs = context.config.listen.addrs()?;
 
     let vicarian_service = {
         let vicarian = Vicarian::new(cert_runtime.certstore().clone(), context.clone());
@@ -51,7 +61,7 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
             &pingora_server.configuration,
             vicarian);
 
-        for addr in &addrs {
+        for addr in &context.config.listen.addrs {
             let cert_handler = CertHandler::new(cert_runtime.certstore().clone());
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(cert_handler))?;
             tls_settings.enable_h2();
@@ -78,7 +88,7 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
         let redirector = CleartextHandler::new(cert_runtime.acme().clone(), context.config.listen.tls_port);
         let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
-        for addr in &addrs {
+        for addr in &context.config.listen.addrs {
             let mut addr_port = *addr;
             addr_port.set_port(insecure_port);
             let addr_port = addr_port.to_string();

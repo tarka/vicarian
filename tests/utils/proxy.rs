@@ -42,7 +42,7 @@ impl ProxyBuilder {
     }
 
     pub fn with_simple_config(mut self, confname: &str) -> Self {
-        let path = format!("tests/data/config/{confname}.corn");
+        let path = format!("tests/data/config/{confname}.hcl");
         self.config = Some(Utf8PathBuf::from(path));
         self
     }

@@ -130,18 +130,6 @@ fn test_no_leading_slash() -> Result<()> {
     Ok(())
 }
 
-// #[test]
-// fn test_module_backend() -> Result<()> {
-//     let file = Utf8PathBuf::from("tests/data/config/module-backend.corn");
-//     let config = Config::from_file(&file)?;
-
-//     let url = &config.vhosts[0].backend_by_path("/").unwrap().url;
-//     assert_eq!("module", url.scheme_str().unwrap());
-//     assert_eq!("metrics", url.authority().unwrap());
-
-//     Ok(())
-// }
-
 #[test]
 fn test_extract_files() -> Result<()> {
     let config = hcl::Config::from_file("tests/data/config/no-optionals.hcl".into())?;

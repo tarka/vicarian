@@ -1,22 +1,21 @@
-// FIXME
-#![allow(unused)]
 
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr, SocketAddrV6};
+use std::net::SocketAddr;
 
 use anyhow::{Context as AnyhowContext, Result, anyhow};
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8Path;
 use hcl::{
     Body, Value,
     eval::{Context, Evaluate, FuncArgs, FuncDef, ParamType}
 };
 use http::Uri;
+use itertools::Itertools;
 //use pingora_core::OkOrErr;
 use serde::Deserialize;
 use serde_default_utils::default_bool;
 use tracing_log::log::info;
 
-use crate::config::{AcmeChallenge, AcmeProfile, AcmeProvider, TlsFilesConfig};
+use crate::config::{AcmeChallenge, AcmeProfile, AcmeProvider, Backend, TlsAcmeConfig, TlsConfig, TlsFilesConfig, Vhost};
 
 use super::{
     deserialize_canonical,
@@ -29,6 +28,16 @@ pub struct Config {
     pub listen: Listen,
     pub vhosts: Vec<Vhost>,
     pub dev_mode: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            listen: Default::default(),
+            vhosts: Vec::new(),
+            dev_mode: true,
+        }
+    }
 }
 
 impl Config {
@@ -64,16 +73,21 @@ impl Config {
                     .ok_or(anyhow!("No matching TLS declaration for '{}'", rv.tls))?
                     .clone();
 
+                let backends = rv.backends.into_iter()
+                    .sorted_by(|a, b| a.0.cmp(&b.0))
+                    .map(|(k, v)| Backend { path: k, ..v })
+                    .collect();
+
                 Ok(Vhost {
                     hostname,
-                    tls,
                     aliases: rv.aliases,
-                    backends: rv.backends,
+                    tls,
+                    backends,
                 })
             })
             .collect::<Result<Vec<Vhost>>>()?;
 
-        let mut config = Config {
+        let config = Config {
             listen,
             vhosts,
             dev_mode: raw.dev_mode,
@@ -116,7 +130,7 @@ fn env_fn() -> (&'static str, FuncDef) {
 #[derive(Debug, Deserialize)]
 struct RawConfig {
     #[serde(default)]
-    acme: HashMap<String, AcmeConfig>,
+    acme: HashMap<String, TlsAcmeConfig>,
 
     #[serde(default)]
     cert: HashMap<String, TlsFilesConfig>,
@@ -150,27 +164,20 @@ impl Default for RawListen {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct AcmeConfig {
-    #[serde(default)]
-    pub acme_provider: AcmeProvider,
-    pub profile: AcmeProfile,
-    pub contact: String,
-    pub challenge: AcmeChallenge
-}
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct AcmeConfig {
+//     #[serde(default)]
+//     pub acme_provider: AcmeProvider,
+//     pub profile: AcmeProfile,
+//     pub contact: String,
+//     pub challenge: AcmeChallenge
+// }
 
 #[derive(Debug, Deserialize)]
 pub struct DnsProvider {
     #[serde(default = "default_bool::<false>")]
     pub wildcard: bool,
     pub dns_provider: zone_update::Provider,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum TlsConfig {
-    Acme(AcmeConfig),
-    Cert(TlsFilesConfig),
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -208,49 +215,4 @@ pub struct RawVhost {
     /// Key is the label from `backend "<path>" { ... }`, i.e. the path.
     #[serde(default, rename = "backend")]
     pub backends: HashMap<String, Backend>,
-}
-
-
-#[derive(Debug)]
-pub struct Vhost {
-    /// This should the FQDN, especially if using ACME as it is used
-    /// to calculate the domain. Populated from the `vhost` block label.
-    pub hostname: String,
-    pub aliases: Vec<String>,
-
-    pub tls: TlsConfig,
-
-    pub backends: HashMap<String, Backend>,
-}
-
-
-#[derive(Debug, Deserialize)]
-pub struct Backend {
-    #[serde(rename = "type", flatten)]
-    pub backend_type: BackendType,
-    #[serde(default)]
-    pub auth_key: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum BackendType {
-    Proxy(ProxyBackend),
-    Static(StaticBackend),
-    Metrics,
-}
-
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ProxyBackend {
-    #[serde(with = "http_serde::uri")]
-    pub url: Uri,
-    #[serde(default = "default_bool::<false>")]
-    pub trust: bool,
-}
-
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct StaticBackend {
-    pub root: String,
 }

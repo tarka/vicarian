@@ -53,8 +53,8 @@ platforms is welcome.
 - **Separated secrets**: ACME DNS requires DNS-provider secrets to be
   configured. These can be placed in a separate secure file using systemd
   [EnvironmentFile](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
-  and [corn](https://cornlang.dev) environment injection (see
-  [vicarian-dns01.corn](examples/vicarian-dns01.corn) for an example).
+  and environment injection via [HCL function calls](https://github.com/hashicorp/hcl/blob/main/hclsyntax/spec.md); see
+  [vicarian-full.hcl](examples/vicarian-full.hcl) for an example.
 - **Wildcards**: Wildcard ACME certificate generation.
 - **Prometheus Metrics**: Built-in support for exporting Prometheus metrics.
   See [METRICS.md](METRICS.md) for configuration and visualization details.
@@ -78,11 +78,11 @@ resources.
 - [h2c](https://httpwg.org/specs/rfc7540.html#versioning) backend support
   (avoids a lot of proxy security corner-cases, but there's not much support in
   backend server software).
-- Basic [12-factor](https://12factor.net/config)-style
-  configuration. This should be relatively easy due to
-  [corn's](https://cornlang.dev/) support for environment injection; however
-  there is a [known issue](https://github.com/corn-config/corn/issues/49)
-  limiting this currently.
+- Basic [12-factor](https://12factor.net/config)-style configuration.
+- Further secret-retrieval options;
+  [Vault](https://www.hashicorp.com/en/products/vault)/[OpenBao](https://openbao.org/),
+  TPM2/[systemd-creds](https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html),
+  etc.
 
 ### Probably-not features
 
@@ -109,18 +109,18 @@ systemd configuration:
 ```
 ├── bin
 │   └── vicarian
-├── CONFIGURATION.md
 ├── etc
 │   ├── systemd
 │   │   └── system
 │   │       └── vicarian.service
 │   └── vicarian
 │       ├── examples
-│       │   ├── vicarian-dns01.corn
-│       │   ├── vicarian-http01.corn
-│       │   └── vicarian-tls-files.corn
+│       │   └── vicarian-full.hcl
+│       │   ├── vicarian-dns01.hcl
+│       │   ├── vicarian-http01.hcl
+│       │   ├── ...
 │       ├── secrets
-│       └── vicarian.corn
+│       └── vicarian.hcl
 ├── LICENSE
 └── README.md
 ```
@@ -159,57 +159,65 @@ ports 80/443 without root.
 
 ## Configuration
 
-Vicarian currently uses the [corn](https://cornlang.dev/) configuration
-language. The default configuration file is located at
-`/etc/vicarian/vicarian.corn`, but can be changed with the `--config` flag.
+Vicarian currently uses a syntax based on
+[HCL](https://github.com/hashicorp/hcl/blob/main/hclsyntax/spec.md)/[Terraform](https://developer.hashicorp.com/terraform/language/syntax/configuration)
+configuration syntax. The default configuration file is located at
+`/etc/vicarian/vicarian.hcl`, but can be changed with the `--config` flag.
 
 ### Basic Configuration Structure
 
 The full configuration structure is documented in
-[CONFIGURATION.md](CONFIGURATION.md), and additional examples are available in
-the `examples` directory, but a basic working configuration with HTTP-based
-Let's Encrypt TLS would look like:
+[vicarian-full.hcl](examples/vicarian-full.hcl) example file; this and the other
+example files should be considered the syntax reference; they are all run
+through parser as part of the test suite.  A basic working configuration with
+HTTP-based Let's Encrypt TLS would look like:
 
-```corn
-{
-    listen = {
-        addrs = [
-            "[::]"  // Default; this covers IPv4 & IPv6
-        ]
-        insecure_port = 80 // Disabled by default, this will redirect to HTTPS
-        tls_port = 443 // Default
+```hcl
+// Declare an ACME HTTP-01 provider for use in the vhost.
+acme "le-http01" {
+    contact = "admin@example.com"
+    profile = "shortlived"
+    challenge {
+        type = "http-01"
+    }
+}
+
+listen {
+    addrs = [
+        "[::]"  // Default; this covers IPv4 & IPv6
+    ]
+    tls_port = 443 // Default
+    // Default; this is implied by the ACME config
+    // Non-ACME traffic will redirect to TLS
+    insecure_port = 80
+}
+
+vhost "www.example.com" {
+    // Optional aliases for this host. These will be added to
+    // the generated TLS certificate.
+    aliases = [
+        "docs.example.com",
+        "pics.example.com",
+    ]
+
+    // This implicitly enables port 80 above
+    tls = "le-http01"
+
+    // A service that does not allow a custom root/context,
+    // so we must place at root.
+    backend "/" {
+        type = "proxy"
+        url = "https://localhost:8443"
+        // This service enforces TLS with a self-signed cert, so
+        // we need to disable certificate verification.
+        trust = true
     }
 
-    vhosts = [
-        {
-            hostname = "example.com"
-
-            tls = {
-                acme = {
-                    contact = "admin@example.com"
-                    challenge.type = "http-01"
-                }
-            }
-
-            backends = [
-                {
-                    context = "/"
-                    url = "http://localhost:8080"
-                }
-                {
-                    context = "/app2"
-                    url = "https://localhost:8443"
-                    trust = true
-                }
-                {
-                    context = "/metrics"
-                    url = "module://metrics"
-                    // Optional. Env variables can be referenced.
-                    auth_key = $env_SECRET_KEY
-                }
-            ]
-        }
-    ]
+    // A better behaved service that allows a custom root.
+    backend "/copyparty" {
+        type = "proxy"
+        url = "http://localhost:9090"
+    }
 }
 ```
 
@@ -232,7 +240,7 @@ As well as the usual dependencies Vicarian also uses:
 - [Pingora](https://github.com/cloudflare/pingora) for HTTP/TLS proxying.
 - [instant-acme](https://github.com/djc/instant-acme) for ACME/LetEncrypt support.
 - [static-web-server](https://static-web-server.net/) for static file support.
-- [corn](https://cornlang.dev) for configuration.
+- [hcl-rc](https://github.com/martinohmann/hcl-rs) for configuration.
 
 ### AI Contribution Policy
 

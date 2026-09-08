@@ -8,23 +8,20 @@ Metrics are enabled by adding a backend with the `module://metrics` URL. This al
 
 ### Example Configuration
 
-```corn
-{
-    vhosts = [
-        {
-            hostname = "example.com"
-            // ... TLS configuration ...
+```hcl
+vhost "files.example.com" {
+    tls = "snakeoil"
 
-            backends = [
-                {
-                    context = "/metrics"
-                    url = "module://metrics"
-                    // Optional: require "Authorization: Bearer secret_key"
-                    auth_key = "secret_key"
-                }
-            ]
-        }
-    ]
+    backend "/" {
+        type = "proxy"
+        url = "http://localhost:8080"
+    }
+
+    // Serve prometheus metrics under /metrics.
+    backend "/metrics" {
+        type = "metrics"
+        auth_key = "secret_key"
+    }
 }
 ```
 

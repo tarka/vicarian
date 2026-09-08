@@ -97,7 +97,6 @@ assets = [
     ["target/release/vicarian", "usr/bin/", "755"],
     ["examples/vicarian-full.hcl", "etc/vicarian/vicarian.hcl", "644"],
     ["CHANGELOG.md", "usr/share/doc/vicarian/", "644"],
-    ["CONFIGURATION.md", "usr/share/doc/vicarian/", "644"],
     ["METRICS.md", "usr/share/doc/vicarian/", "644"],
     ["LICENSE", "usr/share/doc/vicarian/", "644"],
     ["README.md", "usr/share/doc/vicarian/", "644"],

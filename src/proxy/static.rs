@@ -12,7 +12,7 @@ use static_web_server::handler::{
     RequestHandler as SWSHandler, RequestHandlerOpts as SWSHandlerOpts,
 };
 
-use crate::{config::{Backend, StaticBackend}, proxy::{E500, BackendHandler}};
+use crate::{config::StaticBackend, proxy::{E500, BackendHandler}};
 
 // TODO: Should be own top-level module (like metrics)?
 

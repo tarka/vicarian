@@ -11,7 +11,7 @@ use pingora_proxy::Session;
 use std::sync::OnceLock;
 use tracing_log::log::{debug, info};
 
-use crate::{RunContext, config::Backend, proxy::BackendHandler};
+use crate::{RunContext, proxy::BackendHandler};
 
 const UPKEEP_TIMEOUT: Duration = Duration::from_secs(60);
 

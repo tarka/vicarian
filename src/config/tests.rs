@@ -1,7 +1,9 @@
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4};
+use anyhow::bail;
+use http::Uri;
 use itertools::Itertools;
 
-use crate::config::{ProxyBackend, StaticBackend};
+use crate::config::{ProxyBackend, StaticBackend, hcl::{AcmeProfile, AcmeProvider, TlsFilesConfig}};
 
 use super::*;
 

@@ -8,8 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Arborium syntax highlighting -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@arborium/arborium/dist/themes/github-dark.css">
-    <!-- NOTE: Configuration examples are in Corn language (cornlang.dev) -->
-    <!-- Arborium does not include tree-sitter-corn by default -->
     <style>
 * {
              margin: 0;
@@ -258,6 +256,16 @@
             </div>
         </header>
 
+        <section id="about" class="section">
+            <h2 class="section-title">About Vicarian</h2>
+            <p>
+                Vicarian is a TLS-first reverse proxy server with
+                built-in ACME support. It is currently targeted at self-hosting and SOHO
+                installations; in particular it supports provisioning TLS certificates
+                behind-the-firewall via ACME DNS-01.
+            </p>
+        </section>
+
         <section id="features" class="features">
             <div class="feature-card">
                 <i class="fas fa-exchange-alt"></i>
@@ -284,147 +292,6 @@
             </div>
         </section>
 
-        <section id="about" class="section">
-            <h2 class="section-title">About Vicarian</h2>
-            <p>Vicarian is a reverse proxy server designed for self-hosting and small office/home office installations. It's targeted at users who want to run their own web services with automatic SSL/TLS certificates.</p>
-
-            <p>This software is currently in pre-alpha stage with a minimal viable product (MVP) feature set. It should not be considered production-ready, but is actively being developed.</p>
-
-            <div class="code-block">
-                <pre><code class="language-hcl">// Basic configuration example (corn format)
-{
-    listen = {
-        addrs = [
-            "[::]"  // Default; this covers IPv4 & IPv6
-        ]
-        tls_port = 443 // Default
-        // Non-ACME traffic will redirect to TLS.
-        // his is also implied by the ACME config below.
-        insecure_port = 80
-    }
-
-    vhosts = [
-        {
-            hostname = "www.example.com"
-
-            tls = {
-                acme = {
-                    contact = "admin@example.com"
-                    // This implicitly enables port 80 above
-                    challenge.type = "http-01"
-                    profile = "shortlived"  // Default: tlsserver
-                }
-            }
-
-            backends = [
-                {
-                    // A service that does not allow a custom root/context,
-                    // so we must place at root.
-                    context = "/"
-                    url = "http://localhost:8443"
-                    // This service enforces TLS with a self-signed cert, so
-                    // we need to disable certificate verification.
-                    trust = true
-                }
-                {
-                    // A better behaved service that allows a custom root.
-                    context = "/copyparty"
-                    url = "http://localhost:9090"
-                }
-            ]
-        }
-    ]
-}
-</code></pre>
-            </div>
-        </section>
-
-        <section id="config-examples" class="section">
-            <h2 class="section-title">Configuration Examples</h2>
-
-            <div class="config-example">
-                <div class="config-box">
-                    <h3><i class="fas fa-key"></i> Certificate Files</h3>
-                    <p>Using pre-generated certificate files:</p>
-                    <div class="code-block">
-                        <pre><code class="language-hcl">
-// Certificate Files (corn format)
-tls = {
-  port = 443
-  config = {
-    files = {
-      keyfile = "/path/to/private.key"
-      certfile = "/path/to/certificate.crt"
-      reload = true
-    }
-  }
-}
-</code></pre>
-                    </div>
-                </div>
-
-                <div class="config-box">
-                    <h3><i class="fas fa-cloud"></i> ACME with DNS</h3>
-                    <p>Automatic certificate management via DNS-01 challenge:</p>
-                    <div class="code-block">
-                        <pre><code class="language-hcl">
-// ACME with DNS (corn format)
-tls = {
-  port = 443
-  config = {
-    acme = {
-      acme_provider = "letsencrypt"
-      contact = "admin@your-domain.com"
-      challenge_type = {
-        type = "dns-01"
-        dns_provider = {
-          name = "porkbun"
-          key = $env_PORKBUN_KEY
-          secret = $env_PORKBUN_SECRET
-        }
-      }
-    }
-  }
-}
-</code></pre>
-                    </div>
-                </div>
-
-                <div class="config-box">
-                    <h3><i class="fas fa-folder-open"></i> Static Files</h3>
-                    <p>Serve files from a local directory natively:</p>
-                    <div class="code-block">
-                        <pre><code class="language-hcl">
-// Static Files (corn format)
-backends = [
-  {
-    context = "/"
-    url = "module://static"
-    static_root = "/var/www/html"
-  }
-]
-</code></pre>
-                    </div>
-                </div>
-
-                <div class="config-box">
-                    <h3><i class="fas fa-chart-line"></i> Prometheus Metrics</h3>
-                    <p>Export built-in Prometheus metrics with optional auth:</p>
-                    <div class="code-block">
-                        <pre><code class="language-hcl">
-// Prometheus Metrics (corn format)
-backends = [
-  {
-    context = "/metrics"
-    url = "module://metrics"
-    auth_key = "secret_key"
-  }
-]
-</code></pre>
-                    </div>
-                </div>
-            </div>
-        </section>
 
         <section id="installation" class="section">
             <h2 class="section-title">Installation</h2>
@@ -441,8 +308,150 @@ cargo build --release</code></pre>
             <p>An example systemd service is provided in <code>systemd/vicarian.service</code>. The systemd service sets the <code>CAP_NET_BIND_SERVICE</code> flag which allows binding to ports 80/443 without root.</p>
         </section>
 
+        <section id="config-examples" class="section">
+            <h2 class="section-title">Configuration Examples</h2>
+
+            Vicarian uses a configuration syntax based on HCL/Terraform:
+
+            <div class="config-example">
+                <div class="config-box">
+                    <h3><i class="fas fa-cloud-upload"></i> ACME/Letsencrypt over DNS</h3>
+                    <p>This is full working example; other fragments are below:</p>
+                    <div class="code-block">
+                        <pre><code class="language-hcl">
+// Unlike most other HTTP proxies we declare our TLS configuration
+// up-front and then reference it in the vhost blocks. This allows
+// Acme DNS-01 configuration to re-used across hosts (the expected
+// use-case for Vicarian).
+
+// An ACME DNS-01 provider using Porkbun. Secrets are read from the
+// environment; see the README for using a systemd EnvironmentFile.
+acme "le-porkbun" {
+    acme_provider = "letsencrypt"    // Default
+    contact = "admin@example.com"
+
+    challenge {
+        type = "dns-01"
+        dns_provider {
+            name = "porkbun"
+            key = env("PORKBUN_KEY")
+            secret = env("PORKBUN_SECRET")
+        }
+    }
+}
+
+listen {
+    addrs = [
+        "[::]"            // Default; this listens to IPv4 & IPv6 from everywhere
+    ]
+    insecure_port = 80    // Default
+    tls_port = 443        // Default
+}
+
+vhost "files.example.com" {
+    // Optional aliases for this host. These will be added to
+    // the generated TLS certificate.
+    aliases = [
+        "docs.example.com",
+        "pics.example.com",
+    ]
+
+    tls = "le-porkbun"
+
+    // A service that does not allow a custom root/context,
+    // so we must place at root.
+    backend "/" {
+        type = "proxy"
+        url = "http://localhost:8443"
+        // This service enforces TLS with a self-signed cert, so
+        // we need to disable certificate verification.
+        //
+        // Looking at you Unifi Controller.
+        trust = true
+    }
+
+    // A better behaved service that allows a custom root.
+    backend "/copyparty" {
+        type = "proxy"
+        url = "http://localhost:9090"
+    }
+}
+                        </code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-example">
+                <div class="config-box">
+                    <h3><i class="fas fa-key"></i> Certificate Files</h3>
+                    <p>Using pre-generated certificate files:</p>
+                    <div class="code-block">
+                        <pre><code class="language-hcl">
+cert "snakeoil" {
+    keyfile = "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+    certfile = "/etc/ssl/private/ssl-cert-snakeoil.key"
+    reload = true // Optional; defaults to true
+}
+                        </code></pre>
+                    </div>
+                </div>
+
+                <div class="config-box">
+                    <h3><i class="fas fa-cloud"></i> ACME over HTTP</h3>
+                    <p>Automatic certificate management via HTTP-01 challenge:</p>
+                    <div class="code-block">
+                        <pre><code class="language-hcl">
+acme "le-http01" {
+    contact = "admin@example.com"
+    profile = "shortlived"
+    challenge {
+        type = "http-01"
+    }
+}
+                        </code></pre>
+                    </div>
+                </div>
+
+                <div class="config-box">
+                    <h3><i class="fas fa-folder-open"></i> Static Files</h3>
+                    <p>Serve files from a local directory natively:</p>
+                    <div class="code-block">
+                        <pre><code class="language-hcl">
+vhost "example.com" {
+    tls = "snakeoil"
+
+    backend "/html" {
+         type = "static"
+         root = "/var/www"
+    }
+}
+                        </code></pre>
+                    </div>
+                </div>
+
+                <div class="config-box">
+                    <h3><i class="fas fa-chart-line"></i> Prometheus Metrics</h3>
+                    <p>Export built-in Prometheus metrics with optional auth:</p>
+                    <div class="code-block">
+                        <pre><code class="language-hcl">
+vhost "example.com" {
+    tls = "le-porkbun"
+
+    backend "/metrics" {
+        type = "metrics"
+        // An authorisation key; if present
+        // the `Authorization` header will be checked for this key.
+        auth_key = env("my-secret-key")
+    }
+}
+                        </code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <footer>
-            <p><i class="fas fa-code"></i> Vicarian - Reverse Proxy with ACME Support</p>
+            <p>Vicarian - Reverse Proxy with ACME Support</p>
             <p>This project is licensed under the Apache License 2.0</p>
             <p class="license">See <a href="LICENSE" style="color: #4dabf7;">LICENSE</a> for details</p>
 

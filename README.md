@@ -240,7 +240,7 @@ As well as the usual dependencies Vicarian also uses:
 - [Pingora](https://github.com/cloudflare/pingora) for HTTP/TLS proxying.
 - [instant-acme](https://github.com/djc/instant-acme) for ACME/LetEncrypt support.
 - [static-web-server](https://static-web-server.net/) for static file support.
-- [hcl-rc](https://github.com/martinohmann/hcl-rs) for configuration.
+- [hcl-rs](https://github.com/martinohmann/hcl-rs) for configuration.
 
 ### AI Contribution Policy
 

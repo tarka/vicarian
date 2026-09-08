@@ -16,7 +16,12 @@ use tracing_log::log::info;
 use crate::{
     RunContext,
     certificates::{
-        HostCertificate, acme::to_txt_name, host::load_hostcert, store::CertStore, tests::certutils::LocalCert, watcher::{CertWatcher, RELOAD_GRACE}
+        HostCertificate,
+        acme::to_txt_name,
+        host::load_hostcert,
+        store::CertStore,
+        tests::certutils::LocalCert,
+        watcher::{CertWatcher, RELOAD_GRACE},
     },
     config::Config,
     errors::VicarianError,

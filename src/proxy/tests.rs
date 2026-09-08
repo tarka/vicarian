@@ -1,11 +1,22 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use http::{header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE}, uri::Builder, HeaderMap, HeaderName, HeaderValue, Uri};
+use http::{
+    HeaderMap, HeaderName, HeaderValue, Uri,
+    header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE},
+    uri::Builder,
+};
 use pingora_proxy::Session;
 use test_log::test;
 
 use crate::{
-    config::{Backend, BackendType, ProxyBackend, ValidateSanitise}, proxy::{BackendHandler, cleartext::rewrite_port, mimetypes::is_compressible, router::{Router, RouterBackend}, services::strip_port}
+    config::{Backend, BackendType, ProxyBackend, ValidateSanitise},
+    proxy::{
+        BackendHandler,
+        cleartext::rewrite_port,
+        mimetypes::is_compressible,
+        router::{Router, RouterBackend},
+        services::strip_port,
+    },
 };
 
 fn backend(path: &str, port: u16) -> Backend {

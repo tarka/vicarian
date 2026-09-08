@@ -16,11 +16,18 @@ use pingora_proxy::{ProxyHttp, Session};
 use tracing::{debug, info};
 
 use crate::{
-    RunContext, certificates::store::CertStore, config::{Backend, BackendType, Vhost}, metrics::{
+    RunContext,
+    certificates::store::CertStore,
+    config::{Backend, BackendType, Vhost},
+    metrics::{
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
         MetricsHandler,
-    }, proxy::{
-        BackendHandler, E401, E404, E500, ProxyHandler, mimetypes::is_compressible, router::{Router, RouterBackend}, r#static::StaticHandler,
+    },
+    proxy::{
+        BackendHandler, E401, E404, E500, ProxyHandler,
+        mimetypes::is_compressible,
+        router::{Router, RouterBackend},
+        r#static::StaticHandler,
     },
 };
 

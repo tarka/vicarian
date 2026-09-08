@@ -1,9 +1,14 @@
-use std::{fs::create_dir_all, iter, net::SocketAddr, sync::{Arc, RwLock}};
+use std::{
+    fs::create_dir_all,
+    iter,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+};
 
 use anyhow::{Context, Result, anyhow, bail};
 use camino::Utf8PathBuf;
 use dnsclient::{UpstreamServer, r#async::DNSClient};
-use futures_lite::{stream, StreamExt};
+use futures_lite::{StreamExt, stream};
 use instant_acme::{
     Account, AccountCredentials, AuthorizationStatus, ChallengeHandle, ChallengeType, Identifier,
     LetsEncrypt, NewOrder, OrderStatus, RetryPolicy,
@@ -11,11 +16,11 @@ use instant_acme::{
 use itertools::Itertools;
 use metrics::{counter, gauge};
 use phf_macros::phf_map;
+use time::{Duration, OffsetDateTime, UtcOffset};
 use tokio::{
     fs::{self, File, read_to_string},
     io::AsyncWriteExt,
 };
-use time::{Duration, OffsetDateTime, UtcOffset};
 use tracing_log::log::{debug, error, info, warn};
 use zone_update::{RecordType, async_impl::AsyncDnsProvider};
 
@@ -23,7 +28,10 @@ use crate::{
     RunContext,
     certificates::{HostCertificate, store::CertStore},
     config::{AcmeChallenge, DnsProvider, TlsConfig},
-    metrics::{METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, METRIC_ACME_RENEW_ERROR_TOTAL, METRIC_ACME_RENEW_SUCCESS_TOTAL},
+    metrics::{
+        METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, METRIC_ACME_RENEW_ERROR_TOTAL,
+        METRIC_ACME_RENEW_SUCCESS_TOTAL,
+    },
 };
 
 const DAYS_TO_SECS: i64 =  24 * 60 * 60;

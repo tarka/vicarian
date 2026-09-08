@@ -2,19 +2,20 @@ pub mod acme;
 pub mod handler;
 pub mod host;
 pub mod store;
-pub mod watcher;
 #[cfg(test)]
 mod tests;
+pub mod watcher;
 
 use std::sync::Arc;
 
-use anyhow::Result;
-use futures::future::try_join_all;
-use futures_lite::{stream, StreamExt};
 use crate::{
     RunContext,
-    certificates::{acme::AcmeRuntime, store::CertStore, watcher::CertWatcher}, config::TlsConfig,
+    certificates::{acme::AcmeRuntime, store::CertStore, watcher::CertWatcher},
+    config::TlsConfig,
 };
+use anyhow::Result;
+use futures::future::try_join_all;
+use futures_lite::{StreamExt, stream};
 
 pub use host::HostCertificate;
 

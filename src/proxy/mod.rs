@@ -19,7 +19,10 @@ use pingora_proxy::Session;
 use tracing::info;
 
 use crate::{
-    RunContext, certificates::{CertificateRuntime, handler::CertHandler}, config::{AcmeChallenge, ProxyBackend, TlsAcmeConfig, TlsConfig}, proxy::{cleartext::CleartextHandler, services::Vicarian},
+    RunContext,
+    certificates::{CertificateRuntime, handler::CertHandler},
+    config::{AcmeChallenge, ProxyBackend, TlsAcmeConfig, TlsConfig},
+    proxy::{cleartext::CleartextHandler, services::Vicarian},
 };
 
 pub const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());

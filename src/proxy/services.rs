@@ -182,6 +182,7 @@ impl ProxyHttp for Vicarian {
         let finished = routed.handler.handle(session).await
             .map_err(|e| pingora_core::Error::explain(E500, format!("Failed to call handler: {e}")))?;
 
+        // FIXME: Could be moved into handler?
         if !finished {
             *ctx = Some(VicarianCtx {
                 routed: routed.clone()

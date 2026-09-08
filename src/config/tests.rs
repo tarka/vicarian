@@ -7,8 +7,7 @@ use super::*;
 
 #[test]
 fn test_tls_files_example_config() -> Result<()> {
-    let file = Utf8PathBuf::from("examples/vicarian-tls-files.corn");
-    let config = Config::from_file(&file)?;
+    let config = hcl::Config::from_file("examples/vicarian-tls-files.hcl".into())?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(8443, config.listen.tls_port);
@@ -26,8 +25,11 @@ fn test_tls_files_example_config() -> Result<()> {
 
 #[test]
 fn test_dns01_example_config() -> Result<()> {
-    let file = Utf8PathBuf::from("examples/vicarian-dns01.corn");
-    let config = Config::from_file(&file)?;
+    unsafe {
+        std::env::set_var("PORKBUN_KEY", "PORKBUN_KEY");
+        std::env::set_var("PORKBUN_SECRET", "PORKBUN_SECRET");
+    }
+    let config = hcl::Config::from_file("examples/vicarian-dns01.hcl".into())?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
@@ -38,10 +40,13 @@ fn test_dns01_example_config() -> Result<()> {
             directory: _,
             challenge: AcmeChallenge::Dns01(DnsProvider {
                 wildcard: false,
-                dns_provider: zone_update::Provider::PorkBun(_)
+                dns_provider: zone_update::Provider::PorkBun(zone_update::porkbun::Auth {
+                    key,
+                    secret,
+                })
             }),
             profile: AcmeProfile::Classic,
-        })));
+        }) if key == "PORKBUN_KEY" && secret == "PORKBUN_SECRET"));
 
     assert!(config.vhosts[0].backend_by_path("/").is_ok());
 
@@ -50,8 +55,7 @@ fn test_dns01_example_config() -> Result<()> {
 
 #[test]
 fn test_http01_example_config() -> Result<()> {
-    let file = Utf8PathBuf::from("examples/vicarian-http01.corn");
-    let config = Config::from_file(&file)?;
+    let config = hcl::Config::from_file("examples/vicarian-http01.hcl".into())?;
     assert_eq!("www.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
@@ -75,17 +79,16 @@ fn test_wildcard_example_config() -> Result<()> {
         std::env::set_var("DNS_KEY", "my-key");
         std::env::set_var("DNS_SECRET", "my-secret");
     }
-    let file = Utf8PathBuf::from("examples/vicarian-wildcard-tls.corn");
-    let config = Config::from_file(&file)?;
-    assert_eq!("files.example.com", config.vhosts[0].hostname);
+    let config = hcl::Config::from_file("examples/vicarian-wildcard-tls.hcl".into())?;
+    // Vhost order is not deterministic (HashMap), so check for presence.
+    assert!(config.vhosts.iter().any(|vh| vh.hostname == "files.example.com"));
 
     Ok(())
 }
 
 #[test]
 fn test_tls_example_interface() -> Result<()> {
-    let file = Utf8PathBuf::from("examples/vicarian-listen-interface.corn");
-    let config = Config::from_file(&file)?;
+    let config = hcl::Config::from_file("examples/vicarian-listen-interface.hcl".into())?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
@@ -103,8 +106,7 @@ fn test_tls_example_interface() -> Result<()> {
 
 #[test]
 fn test_no_optionals() -> Result<()> {
-    let file = Utf8PathBuf::from("tests/data/config/no-optionals.corn");
-    let config = Config::from_file(&file)?;
+    let config = hcl::Config::from_file("tests/data/config/no-optionals.hcl".into())?;
 
     assert_eq!("host01.example.com", config.vhosts[0].hostname);
     assert_eq!(443, config.listen.tls_port);
@@ -120,8 +122,7 @@ fn test_no_optionals() -> Result<()> {
 
 #[test]
 fn test_no_leading_slash() -> Result<()> {
-    let file = Utf8PathBuf::from("tests/data/config/no-leading-slash.corn");
-    let result = Config::from_file(&file);
+    let result = hcl::Config::from_file("tests/data/config/no-leading-slash.hcl".into());
     assert!(result.is_err());
 
     Ok(())
@@ -141,8 +142,7 @@ fn test_no_leading_slash() -> Result<()> {
 
 #[test]
 fn test_extract_files() -> Result<()> {
-    let file = Utf8PathBuf::from("tests/data/config/no-optionals.corn");
-    let config = Config::from_file(&file)?;
+    let config = hcl::Config::from_file("tests/data/config/no-optionals.hcl".into())?;
 
     let files = if let TlsConfig::Cert(tfc) = &config.vhosts[0].tls {
         tfc

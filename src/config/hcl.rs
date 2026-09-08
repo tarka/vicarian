@@ -91,11 +91,23 @@ impl Config {
             listen,
             vhosts,
             dev_mode: raw.dev_mode,
-        };
-
-//        let config = config.validate_and_sanitise()?;
+        }
+        .validate_and_sanitise()?;
 
         Ok(config)
+    }
+}
+
+impl ValidateSanitise for Config {
+    fn validate_and_sanitise(self) -> Result<Self> {
+        let vhosts = self.vhosts.into_iter()
+            .map(ValidateSanitise::validate_and_sanitise)
+            .collect::<Result<Vec<Vhost>>>()?;
+
+        Ok(Self {
+            vhosts,
+            ..self
+        })
     }
 }
 

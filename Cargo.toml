@@ -27,10 +27,9 @@ hcl-rs = "0.19.8"
 http = "1.5.0"
 http-body-util = "0.1.5"
 http-serde = "2.1.1"
-hyper = "1.11.0"
+hyper = "1.11.1"
 instant-acme = { version = "0.8.5", features = ["time"] }
 itertools = "0.15.0"
-libcorn = "0.10.1"
 metrics = "0.24.6"
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["tokio", "tracing"] }
 nix = { version = "0.31.3", features = ["net", "resource"] }
@@ -43,8 +42,8 @@ pingora-boringssl = "0.8.1"
 pingora-core = { version = "0.8.1", features = ["boringssl"] }
 pingora-http = "0.8.1"
 pingora-proxy = "0.8.1"
-psl = "2.1.226"
-rustls = "0.23.43"
+psl = "2.1.231"
+rustls = "0.23.44"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
 serde_json = "1.0.151"
@@ -67,7 +66,7 @@ integration_tests = []
 fslock = "0.2.1"
 nix = { version = "0.31.3", features = ["process", "signal", "term"] }
 pem = "4.0.0"
-rcgen = { version = "0.14.9", features = ["x509-parser"] }
+rcgen = { version = "0.14.10", features = ["x509-parser"] }
 reqwest = { version = "0.13.4", default-features = false, features = ["http2", "rustls"] }
 serial_test = "4.0.1"
 tempfile = "3.27.0"
@@ -96,7 +95,7 @@ section = "Network"
 maintainer-scripts = "systemd"
 assets = [
     ["target/release/vicarian", "usr/bin/", "755"],
-    ["examples/vicarian-static.corn", "etc/vicarian/vicarian.corn", "644"],
+    ["examples/vicarian-full.hcl", "etc/vicarian/vicarian.hcl", "644"],
     ["CHANGELOG.md", "usr/share/doc/vicarian/", "644"],
     ["CONFIGURATION.md", "usr/share/doc/vicarian/", "644"],
     ["METRICS.md", "usr/share/doc/vicarian/", "644"],
@@ -117,4 +116,4 @@ bin-dir = "{ name }-v{ version }-{ target }/bin/{ bin }{ binary-ext }"
 
 [package.metadata.bacon]
 apply_gitignore = false
-watch = ["vicarian.corn"]
+watch = ["vicarian.hcl"]

@@ -169,7 +169,7 @@ configuration syntax. The default configuration file is located at
 The full configuration structure is documented in
 [vicarian-full.hcl](examples/vicarian-full.hcl) example file; this and the other
 example files should be considered the syntax reference; they are all run
-through parser as part of the test suite.  A basic working configuration with
+through the parser as part of the test suite. A basic working configuration with
 HTTP-based Let's Encrypt TLS would look like:
 
 ```hcl

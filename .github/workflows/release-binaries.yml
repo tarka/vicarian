@@ -48,7 +48,7 @@ jobs:
           mkdir -p etc/systemd/system etc/vicarian
           cp systemd/vicarian.service etc/systemd/system/
           cp -r examples/ etc/vicarian/examples
-          cp examples/vicarian-tls-files.corn etc/vicarian/vicarian.corn
+          cp examples/vicarian-full.hcl etc/vicarian/vicarian.hcl
           cp systemd/secrets etc/vicarian/secrets
           chmod o-rwx etc/vicarian/secrets
 

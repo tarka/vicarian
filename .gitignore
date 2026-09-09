@@ -2,6 +2,7 @@
 .idea
 \#*\#
 /*.corn
+/*.hcl
 .envrc
 *~
 /.dir-locals.el

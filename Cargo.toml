@@ -42,7 +42,7 @@ pingora-boringssl = "0.8.1"
 pingora-core = { version = "0.8.1", features = ["boringssl"] }
 pingora-http = "0.8.1"
 pingora-proxy = "0.8.1"
-psl = "2.1.231"
+psl = "2.1.232"
 rustls = "0.23.44"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.1", features = ["inline"] }
@@ -67,7 +67,7 @@ fslock = "0.2.1"
 nix = { version = "0.31.3", features = ["process", "signal", "term"] }
 pem = "4.0.0"
 rcgen = { version = "0.14.10", features = ["x509-parser"] }
-reqwest = { version = "0.13.4", default-features = false, features = ["http2", "rustls"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["http2", "rustls"] }
 serial_test = "4.0.1"
 tempfile = "3.27.0"
 test-log = { version = "0.2.21", features = ["trace"] }

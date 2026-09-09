@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/tarka/vicarian/compare/v0.3.4...v0.4.0) - 2026-09-09
+
+### <!-- 0 -->Features
+
+- *(hcl)* Remove libcorn and update corn references in Cargo.toml
+- *(hcl)* Post-conversion cleanup and move config structs to hcl.rs.
+- *(hcl)* Convert integration-test config files to HCL and remove remaining .corn files.
+- *(hcl)* Convert example Corn configs into HCL and convert tests.
+- *(hcl)* Inline the TLS definitions into the vhosts.
+- *(hcl)* Add env() function handling to the HCL loader.
+- *(hcl)* Remove some duplicated structs, and add trusted test.
+- *(hcl)* Add metrics backend and raw/processed validation conversion.
+- *(hcl)* Interim checkin prior to validate/transform work.
+- *(hcl)* Use a raw representation of the HCL schema to parse the config and re-map after load.
+- *(hcl)* Add initial HCL certfile support.
+- *(hcl)* Initial pass; create an outline example and corresponding module and scaffolding.
+
+### <!-- 3 -->Documentation
+
+- Minor readme typos.
+- *(website)* Add more installation methods.
+- *(website)* Update website with new configuration details.
+- Update docs for configuration; example/vicarian-full.hcl is now the full reference.
+- Expand HCL documentation.
+
+### <!-- 6 -->Testing
+
+- Default ACME profile is now Classic
+
+### Other
+
+- Dependency bump.
+- Use HCL files in release-binaries.
+- Import formatting.
+- Minor comment.
+- Interim checkin prior to tests update.
+
 ## [0.3.4](https://github.com/tarka/vicarian/compare/v0.3.3...v0.3.4) - 2026-08-22
 
 ### <!-- 1 -->Bug Fixes

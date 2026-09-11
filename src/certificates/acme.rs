@@ -366,9 +366,9 @@ impl AcmeRuntime {
 
         info!("Writing certificate and key");
         fs::write(&acme_host.keyfile, pem_certificate.private_key.as_bytes()).await
-            .context("Failed to write keyfile {keyfile}")?;
+            .context(format!("Failed to write keyfile {}", acme_host.keyfile))?;
         fs::write(&acme_host.certfile, pem_certificate.cert_chain.as_bytes()).await
-            .context("Failed to write certfile {certfile}")?;
+            .context(format!("Failed to write certfile {}", acme_host.certfile))?;
 
         info!("Loading new certificate");
         let hc = HostCertificate::new(acme_host.keyfile.clone(), acme_host.certfile.clone(), false).await?;

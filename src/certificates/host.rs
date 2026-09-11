@@ -166,9 +166,9 @@ impl Hash for HostCertificate {
 
 pub(crate) async fn load_hostcert(keyfile: &Utf8Path, certfile: &Utf8Path) -> Result<(PKey<Private>, Vec<X509>)> {
     let kdata = tokio::fs::read(keyfile).await
-        .context("Failed to load keyfile {keyfile}")?;
+        .context(format!("Failed to load keyfile {keyfile}"))?;
     let cdata = tokio::fs::read(certfile).await
-        .context("Failed to load certfile {certfile}")?;
+        .context(format!("Failed to load certfile {certfile}"))?;
 
     let key = PKey::private_key_from_pem(&kdata)?;
     let certs = X509::stack_from_pem(&cdata)?;

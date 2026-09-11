@@ -198,9 +198,9 @@ fn gen_cert(host: &str,
 
 fn load_cert(keyfile: Utf8PathBuf, certfile: Utf8PathBuf) -> Result<LocalCert> {
     let kdata = fs::read(&keyfile)
-        .context("Failed to load keyfile {keyfile}")?;
+        .context(format!("Failed to load keyfile {keyfile}"))?;
     let cdata = fs::read(&certfile)
-        .context("Failed to load certfile {certfile}")?;
+        .context(format!("Failed to load certfile {certfile}"))?;
 
     let key = PKey::private_key_from_pem(&kdata)?;
     let certs = X509::stack_from_pem(&cdata)?;

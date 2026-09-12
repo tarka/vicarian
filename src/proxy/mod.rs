@@ -20,7 +20,7 @@ use tracing::info;
 
 use crate::{
     RunContext, certificates::{
-        CertificateRuntime, handler::{CertHandler, DummyCallbackHandler},
+        CertificateRuntime, handler::{CertHandler, NoopCallbackHandler},
     }, config::{AcmeChallenge, ProxyBackend, TlsAcmeConfig, TlsConfig}, proxy::{
         cleartext::CleartextHandler,
         services::Vicarian,
@@ -68,8 +68,16 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
 
         for addr in &context.config.listen.addrs {
             let cert_handler = CertHandler::new(cert_runtime.certstore().clone());
-            let dummy_callbacks = DummyCallbackHandler {};
+
+            // When using the BoringSSL backend `with_callbacks()` is how both the cert
+            // resolvers added the settings object is created. However with the rustls
+            // backend the resolver is set after the setting object is created (see
+            // below). For this reason we need to add a dummy handler (which is never
+            // accessed) to create settings. I assume this will get cleaned-up in a
+            // later version.
+            let dummy_callbacks = NoopCallbackHandler {};
             let mut tls_settings = TlsSettings::with_callbacks(Box::new(dummy_callbacks))?;
+
             tls_settings.enable_h2();
             tls_settings.set_cert_resolver(Arc::new(cert_handler));
 

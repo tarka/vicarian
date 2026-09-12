@@ -43,9 +43,11 @@ impl ResolvesServerCert for CertHandler {
 
 }
 
-pub struct DummyCallbackHandler {}
+// A no-op Certificate Handler; this is used when configuring the
+// rustls handler as callbacks are handled differently. See mod.rs for
+// where it's used.
+pub struct NoopCallbackHandler {}
 
 #[async_trait]
-impl TlsAccept for DummyCallbackHandler {
-
+impl TlsAccept for NoopCallbackHandler {
 }

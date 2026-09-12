@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tarka/vicarian/compare/v0.4.0...v0.5.0) - 2026-09-12
+
+### <!-- 0 -->Features
+
+- *(tls)* Add comments and clarifications of the dummy/noop cert handler.
+- *(rustls)* Move to Pingora 0.9 and enable rustls
+- Convert to use Rustls Pingora backend
+
+### <!-- 3 -->Documentation
+
+- Update status of project.
+
+### Other
+
+- Cleanup after rustls rework
+- Fix some incorrect context strings.
+
 ## [0.4.0](https://github.com/tarka/vicarian/compare/v0.3.4...v0.4.0) - 2026-09-09
 
 This release changes the configuration language from Corn to a HCL-derived DSL. An annotated reference config file is available in example/vicarian-full.hcl.

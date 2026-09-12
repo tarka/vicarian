@@ -13,23 +13,18 @@ use async_trait::async_trait;
 use http::StatusCode;
 use pingora_core::{
     ErrorType, listeners::tls::TlsSettings, server::Server as PingoraServer,
-    listeners::tls::TlsSettings,
-    server::Server as PingoraServer,
     services::listening::Service,
 };
 use pingora_proxy::Session;
 use tracing::info;
 
 use crate::{
-    RunContext,
-    certificates::{CertificateRuntime, handler::CertHandler},
-    config::{AcmeChallenge, ProxyBackend, TlsAcmeConfig, TlsConfig},
-    proxy::{cleartext::CleartextHandler, services::Vicarian},
     RunContext, certificates::{
         CertificateRuntime, handler::{CertHandler, DummyCallbackHandler},
-    }, config::{AcmeChallenge, TlsAcmeConfig, TlsConfig}, proxy::services::{
-        CleartextHandler, Vicarian
-    }
+    }, config::{AcmeChallenge, ProxyBackend, TlsAcmeConfig, TlsConfig}, proxy::{
+        cleartext::CleartextHandler,
+        services::Vicarian,
+    },
 };
 
 pub const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAUTHORIZED.as_u16());

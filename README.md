@@ -14,18 +14,13 @@ Vicarian aims to have sensible defaults without additional configuration.
 [![GitHub CI](https://github.com/tarka/vicarian/actions/workflows/tests.yml/badge.svg)](https://github.com/tarka/vicarian/actions)
 [![License](https://img.shields.io/crates/l/vicarian)](https://github.com/tarka/vicarian/blob/master/README.md#License)
 
-This software should be consider pre-alpha; the feature-set is
-[MVP](https://en.wikipedia.org/wiki/Minimum_viable_product) and is still in
-active development. It should not be considered production-ready and no warranty
-is expressed or implied. It is very-much a work-in-progress and virtually every
-part of it subject to change without notice.
+This software should be consider beta; the core feature-set is largely complete,
+and most development should be for more niche features.
 
 Only Linux is currently supported (x86_64 and Arm64). Testing for other
 platforms is welcome.
 
 ## Features
-
-### Current features
 
 - **TLS-first**: Port-80/HTTP can be enabled, but will always redirect to the
   configured TLS server. The exception to this is when the HTTP-01 ACME is

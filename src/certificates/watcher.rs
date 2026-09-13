@@ -103,15 +103,12 @@ impl CertWatcher {
         let existing = paths.into_iter()
             .map(|path| {
                 let cert = self.certstore.by_file(&path)
-                 .ok_or(anyhow!("Path not found in store: {path}"))?
+                    .ok_or(anyhow!("Path not found in store: {path}"))?
                     .clone();
                 Ok(cert)
             })
-            // 2-pass as .unique() doesn't work with Results
-            .collect::<Result<Vec<HostCertificate>>>()?
-            .into_iter()
-            .unique()
-            .collect::<Vec<HostCertificate>>();
+            .unique_by(|r| r.as_ref().ok().cloned())
+            .collect::<Result<Vec<HostCertificate>>>()?;
 
         for old in existing {
             // Attempt to reload the relevant HostCertificate.

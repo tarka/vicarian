@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Error, Result, anyhow, bail};
 use camino::Utf8PathBuf;
 use dnsclient::{UpstreamServer, r#async::DNSClient};
 use futures_lite::{StreamExt, stream};
@@ -252,10 +252,9 @@ impl AcmeRuntime {
                     *renewal = Renewal::new(*hc.expires());
                 }
 
-                Ok(hc)
+                Ok::<HostCertificate, Error>(hc)
             })
-            .collect::<Vec<Result<HostCertificate>>>().await
-            .into_iter().collect::<Result<Vec<HostCertificate>>>()?;
+            .try_collect().await?;
 
         // Initial load of existing certs. NOTE: This is slightly hacky
         // as we're possibly loading expired certs only to immediately

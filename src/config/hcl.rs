@@ -164,7 +164,7 @@ struct RawConfig {
 #[serde(default, deny_unknown_fields)]
 struct RawListen {
     addrs: Vec<String>,
-    insecure_port: Option<u16>,
+    insecure_port: u16,
     tls_port: u16,
 }
 
@@ -172,20 +172,16 @@ impl Default for RawListen {
     fn default() -> Self {
         Self {
             addrs: vec!["[::]".to_string()],
-            insecure_port: None,
+            insecure_port: 80,
             tls_port: 443
         }
     }
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
 pub struct Listen {
-    #[serde(default)]
     pub addrs: Vec<SocketAddr>,
-    #[serde(default)]
-    pub insecure_port: Option<u16>,
-    #[serde(default)]
+    pub insecure_port: u16,
     pub tls_port: u16,
 }
 

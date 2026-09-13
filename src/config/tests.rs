@@ -5,7 +5,12 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4};
 
 use crate::config::{
     ProxyBackend, StaticBackend,
-    hcl::{AcmeProfile, AcmeProvider, TlsFilesConfig},
+    hcl::{
+        AcmeProfile,
+        AcmeProvider,
+        TlsAcmeConfig,
+        TlsFilesConfig,
+    },
 };
 
 use super::*;
@@ -38,6 +43,7 @@ fn test_dns01_example_config() -> Result<()> {
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
+    println!("VHOST: {:?}", config.vhosts[0].tls);
     assert!(matches!(&config.vhosts[0].tls, TlsConfig::Acme(
         TlsAcmeConfig {
             contact: _,
@@ -294,7 +300,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
 
     // `listen` block
     assert_eq!(443, config.listen.tls_port);
-    assert_eq!(Some(80), config.listen.insecure_port);
+    assert_eq!(80, config.listen.insecure_port);
 
     // Two `acme` blocks, and one (unused) `cert` block, merged into vhosts
     let certs = config.vhosts.iter()

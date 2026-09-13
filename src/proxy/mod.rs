@@ -19,9 +19,13 @@ use pingora_proxy::Session;
 use tracing::info;
 
 use crate::{
-    RunContext, certificates::{
-        CertificateRuntime, handler::{CertHandler, NoopCallbackHandler},
-    }, config::{AcmeChallenge, ProxyBackend, TlsAcmeConfig, TlsConfig}, proxy::{
+    certificates::{
+        CertificateRuntime,
+        handler::{CertHandler, NoopCallbackHandler},
+    },
+    config::ProxyBackend,
+    RunContext,
+    proxy::{
         cleartext::CleartextHandler,
         services::Vicarian,
     },
@@ -92,26 +96,18 @@ pub fn run_indefinitely(cert_runtime: Arc<CertificateRuntime>, context: Arc<RunC
     };
     pingora_server.add_service(vicarian_service);
 
-    let has_http01 = context.config.vhosts.iter()
-        .any(|vh| matches!(vh.tls, TlsConfig::Acme(
-            TlsAcmeConfig { challenge: AcmeChallenge::Http01, .. })));
 
-    if has_http01 || context.config.listen.insecure_port.is_some() {
-        let insecure_port = context.config.listen.insecure_port
-            .unwrap_or(80);
+    let redirector = CleartextHandler::new(cert_runtime.acme().clone(), context.config.listen.tls_port);
+    let mut cleartext_service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
 
-        let redirector = CleartextHandler::new(cert_runtime.acme().clone(), context.config.listen.tls_port);
-        let mut service = Service::new("HTTP->HTTPS Redirector".to_string(), redirector);
-
-        for addr in &context.config.listen.addrs {
-            let mut addr_port = *addr;
-            addr_port.set_port(insecure_port);
-            let addr_port = addr_port.to_string();
-            info!("Binding to {addr_port}");
-            service.add_tcp(&addr_port);
-        }
-        pingora_server.add_service(service);
-    };
+    for addr in &context.config.listen.addrs {
+        let mut addr_port = *addr;
+        addr_port.set_port(context.config.listen.insecure_port);
+        let addr_port = addr_port.to_string();
+        info!("Binding to {addr_port}");
+        cleartext_service.add_tcp(&addr_port);
+    }
+    pingora_server.add_service(cleartext_service);
 
     pingora_server.run(pingora_core::server::RunArgs::default());
 

@@ -28,7 +28,6 @@ pub use hcl::{
     BackendType,
     StaticBackend,
     ProxyBackend,
-    TlsAcmeConfig,
 };
 
 pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.hcl";

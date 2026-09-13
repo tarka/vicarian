@@ -65,12 +65,13 @@ fn default_path() -> String {
 }
 
 fn validate_path(s: &String) -> Result<()> {
-    s.starts_with('/').then_some(())
-        .ok_or(anyhow!("No leading slash in context path: {s}"))?;
-    (!s.is_empty()).then_some(())
-        .ok_or(anyhow!("Context path cannot be empty"))?;
-
-    Ok(())
+    if s.is_empty() {
+        Err(anyhow!("Context path cannot be empty"))
+    } else if !s.starts_with('/') {
+        Err(anyhow!("No leading slash in context path: {s}"))
+    } else {
+        Ok(())
+    }
 }
 
 

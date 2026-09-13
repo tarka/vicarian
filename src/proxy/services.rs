@@ -95,7 +95,7 @@ impl Vicarian {
                 iter::once(&vhost.hostname)
                     .chain(vhost.aliases.iter())
                     .map(|s| UniCase::new(s.to_lowercase()))
-                    .map(move |h| (h.clone(), router.clone()))
+                    .map(move |h| (h, router.clone()))
             })
             .collect();
 

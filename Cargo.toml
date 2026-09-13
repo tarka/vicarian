@@ -54,6 +54,7 @@ time = { version = "0.3.55", features = ["local-offset"] }
 tokio = { version = "1.53.1", features = ["macros", "rt", "sync", "fs"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+unicase = "2.9.0"
 x509-parser = "0.18.1"
 zone-update = { version = "0.12.2", features = ["async"] }
 

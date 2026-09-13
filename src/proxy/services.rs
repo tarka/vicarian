@@ -14,6 +14,7 @@ use pingora_core::{
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
 use tracing::{debug, info};
+use unicase::UniCase;
 
 use crate::{
     RunContext,
@@ -82,7 +83,7 @@ pub(crate) fn strip_port(host_header: &str) -> &str {
 pub struct Vicarian {
     _context: Arc<RunContext>,
     _certstore: Arc<CertStore>,
-    routes_by_host: HashMap<String, Arc<Router>>,
+    routes_by_host: HashMap<UniCase<String>, Arc<Router>>,
 }
 
 impl Vicarian {
@@ -93,10 +94,10 @@ impl Vicarian {
                 let router = Arc::new(vhost_to_router(vhost));
                 iter::once(&vhost.hostname)
                     .chain(vhost.aliases.iter())
-                    .map(|s| s.to_lowercase())
+                    .map(|s| UniCase::new(s.to_lowercase()))
                     .map(move |h| (h.clone(), router.clone()))
             })
-            .collect::<HashMap<String, Arc<Router>>>();
+            .collect();
 
         Self {
             _context: context,
@@ -160,7 +161,7 @@ impl ProxyHttp for Vicarian {
 
         let components = to_components(session)?;
         let routed = {
-            let host = components.host.to_string().to_lowercase();
+            let host = UniCase::new(components.host.to_string());
             let router = self.routes_by_host.get(&host)
                 .or_err(E404, "Hostname not found in backends")?;
             router.lookup(components.path)

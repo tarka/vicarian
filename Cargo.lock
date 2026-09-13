@@ -4828,6 +4828,7 @@ dependencies = [
  "tokio-tungstenite 0.30.0",
  "tracing",
  "tracing-subscriber",
+ "unicase",
  "wiremock",
  "wiremocket",
  "x509-parser 0.18.1",

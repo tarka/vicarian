@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 use camino::Utf8PathBuf;
 use papaya::HashMap as Papaya;
 use tracing::info;
+use unicase::UniCase;
 
 use crate::{
     RunContext,
@@ -22,7 +23,7 @@ use crate::{
 #[derive(Debug)]
 pub struct CertStore {
     _context: Arc<RunContext>,
-    by_host: Papaya<String, HostCertificate>,
+    by_host: Papaya<UniCase<String>, HostCertificate>,
     by_file: Papaya<Utf8PathBuf, HostCertificate>,
 }
 
@@ -41,7 +42,8 @@ impl CertStore {
 
     pub fn by_host(&self, host: &str) -> Option<HostCertificate> {
         let pmap = self.by_host.pin();
-        pmap.get(&host.to_lowercase())
+        let host = UniCase::new(host.to_string());
+        pmap.get(&host)
             .cloned()
     }
 
@@ -63,7 +65,7 @@ impl CertStore {
 
     pub fn upsert(&self, newcert: HostCertificate) -> Result<()> {
         for hostname in newcert.hostnames().iter() {
-            let host = hostname.clone();
+            let host = UniCase::new(hostname.clone());
 
             info!("Updating/inserting certificate for {host}");
             self.by_host.pin().update_or_insert(host, |_old| newcert.clone(), newcert.clone());
@@ -88,7 +90,8 @@ impl CertStore {
     pub fn update(&self, newcert: HostCertificate) -> Result<()> {
         for hostname in newcert.hostnames().iter() {
             info!("Updating certificate for {hostname}");
-            self.by_host.pin().update(hostname.clone(), |_old| newcert.clone())
+            let host = UniCase::new(hostname.clone());
+            self.by_host.pin().update(host, |_old| newcert.clone())
                 .ok_or(anyhow!("Matching host for {} not found in cert store", hostname))?;
         }
 

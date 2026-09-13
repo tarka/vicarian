@@ -10,7 +10,7 @@ use itertools::Itertools;
 use pingora_rustls::{CertificateDer, CryptoProvider, PrivateKeyDer};
 use rustls::{pki_types::pem::PemObject, sign::CertifiedKey};
 use time::OffsetDateTime;
-use tracing_log::log::info;
+use tracing::info;
 use x509_parser::{extensions::GeneralName, prelude::{FromDer, X509Certificate}};
 
 use crate::errors::VicarianError;

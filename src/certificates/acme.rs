@@ -21,7 +21,7 @@ use tokio::{
     fs::{self, File, read_to_string},
     io::AsyncWriteExt,
 };
-use tracing_log::log::{debug, error, info, warn};
+use tracing::{debug, error, info, warn};
 use zone_update::{RecordType, async_impl::AsyncDnsProvider};
 
 use crate::{

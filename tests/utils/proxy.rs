@@ -13,7 +13,7 @@ use tempfile::{TempDir, tempdir_in};
 use tokio::{fs::{File, copy, create_dir_all}};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{Child, Command};
-use tracing_log::log::info;
+use tracing::info;
 use wiremock::MockServer;
 
 pub const INSECURE_PORT: u16 = 18080;

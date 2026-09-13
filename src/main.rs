@@ -11,8 +11,8 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 use nix::sys::resource::{Resource, getrlimit, setrlimit};
 use tokio::sync::watch;
+use tracing::info;
 use tracing::level_filters::LevelFilter;
-use tracing_log::log::info;
 
 use crate::metrics::Metrics;
 use crate::{

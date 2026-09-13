@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use pingora_core::listeners::TlsAccept;
 use pingora_rustls::{ClientHello, ResolvesServerCert};
 use rustls::sign::CertifiedKey;
-use tracing_log::log::{debug, info};
+use tracing::{debug, info};
 
 use crate::certificates::store::CertStore;
 

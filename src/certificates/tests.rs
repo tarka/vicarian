@@ -11,7 +11,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use tempfile::{NamedTempFile, tempdir};
 use test_log::test;
-use tracing_log::log::info;
+use tracing::info;
 
 use crate::{
     RunContext,

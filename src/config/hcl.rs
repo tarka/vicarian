@@ -14,7 +14,7 @@ use itertools::Itertools;
 use serde::Deserialize;
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
-use tracing_log::log::info;
+use tracing::info;
 
 use crate::config::{strip_trailing_slashes, validate_path};
 

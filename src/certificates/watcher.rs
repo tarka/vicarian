@@ -6,7 +6,7 @@ use itertools::Itertools;
 use notify::{EventKind, RecursiveMode};
 use notify_debouncer_full::{self as debouncer, DebounceEventResult, DebouncedEvent};
 use tokio::sync::mpsc;
-use tracing_log::log::{debug, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     RunContext,

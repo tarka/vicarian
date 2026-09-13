@@ -8,8 +8,8 @@ use metrics::{counter, describe_counter, describe_gauge, gauge};
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use pingora_http::ResponseHeader;
 use pingora_proxy::Session;
+use tracing::{debug, info};
 use std::sync::OnceLock;
-use tracing_log::log::{debug, info};
 
 use crate::{RunContext, proxy::BackendHandler};
 

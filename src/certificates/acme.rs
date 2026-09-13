@@ -80,11 +80,10 @@ struct AcmeHost {
 }
 
 impl AcmeHost {
-    pub fn hostnames(&self) -> Vec<&String> {
+    fn hostnames(&self) -> impl Iterator<Item = &String> {
         iter::once(&self.fqdn)
             .chain(self.aliases.iter())
             .unique()
-            .collect()
     }
 }
 
@@ -381,7 +380,7 @@ impl AcmeRuntime {
         let account = self.fetch_account(acme_host).await?;
 
         info!("Create order for {}", acme_host.fqdn);
-        let hids = acme_host.hostnames().into_iter()
+        let hids = acme_host.hostnames()
                 .cloned()
                 .map(Identifier::Dns)
                 .collect::<Vec<Identifier>>();

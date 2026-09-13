@@ -1,4 +1,4 @@
-use std::{iter, sync::Arc};
+use std::{collections::HashMap, iter, sync::Arc};
 
 use async_trait::async_trait;
 use http::{
@@ -82,7 +82,7 @@ pub(crate) fn strip_port(host_header: &str) -> &str {
 pub struct Vicarian {
     _context: Arc<RunContext>,
     _certstore: Arc<CertStore>,
-    routes_by_host: papaya::HashMap<String, Arc<Router>>,
+    routes_by_host: HashMap<String, Arc<Router>>,
 }
 
 impl Vicarian {
@@ -96,7 +96,7 @@ impl Vicarian {
                     .map(|s| s.to_lowercase())
                     .map(move |h| (h.clone(), router.clone()))
             })
-            .collect::<papaya::HashMap<String, Arc<Router>>>();
+            .collect::<HashMap<String, Arc<Router>>>();
 
         Self {
             _context: context,
@@ -160,9 +160,8 @@ impl ProxyHttp for Vicarian {
 
         let components = to_components(session)?;
         let routed = {
-            let pinned = self.routes_by_host.pin();
             let host = components.host.to_string().to_lowercase();
-            let router = pinned.get(&host)
+            let router = self.routes_by_host.get(&host)
                 .or_err(E404, "Hostname not found in backends")?;
             router.lookup(components.path)
                 .or_err(E404, "Path not found in host backends")?

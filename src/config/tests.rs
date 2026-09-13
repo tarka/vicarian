@@ -1,4 +1,4 @@
-use anyhow::bail;
+use crate::errors::Error;
 use http::Uri;
 use itertools::Itertools;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4};
@@ -315,7 +315,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     let vh_haltcondition = config.vhosts.iter()
         .filter(|vh| vh.hostname == "haltcondition.net")
         .exactly_one()
-        .map_err(|_e| anyhow!("Vhost not found"))?;
+        .map_err(|_e| Error::VhostNotFound("haltcondition.net".to_string()))?;
     // `acme "le-porkbun"` — dns-01 with a porkbun provider.
     assert!(matches!(vh_haltcondition.tls, TlsConfig::Acme(TlsAcmeConfig {
         acme_provider: AcmeProvider::LetsEncrypt,
@@ -337,7 +337,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     let vh_vicarian = config.vhosts.iter()
         .filter(|vh| vh.hostname == "vicarian.org")
         .exactly_one()
-        .map_err(|_e| anyhow!("Vhost not found"))?;
+        .map_err(|_e| Error::VhostNotFound("vicarian.org".to_string()))?;
     assert!(matches!(vh_vicarian.tls, TlsConfig::Acme(TlsAcmeConfig {
         acme_provider: AcmeProvider::LetsEncrypt,
         profile: AcmeProfile::Classic,
@@ -350,9 +350,9 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     let vh_localhost = config.vhosts.iter()
         .filter(|vh| vh.hostname == "localhost")
         .exactly_one()
-        .map_err(|_e| anyhow!("Vhost not found"))?;
+        .map_err(|_e| Error::VhostNotFound("localhost".to_string()))?;
     let TlsConfig::Cert(ref files) = vh_localhost.tls else {
-        bail!("snakeoil should be a cert (files) definition")
+        panic!("snakeoil should be a cert (files) definition")
     };
     // Paths are canonicalised when they exist, so only check the suffix.
     assert!(files.keyfile.ends_with("ssl-cert-snakeoil.pem"));
@@ -374,7 +374,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
         path: _,
     } = vh_haltcondition.backend_by_path("/").unwrap()
     else {
-        bail!("expected proxy backend /")
+        panic!("expected proxy backend /")
     };
     assert_eq!("http", url.scheme_str().unwrap());
     assert_eq!("192.168.20.27:9191", url.authority().unwrap().as_str());
@@ -387,7 +387,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
         path: _,
     } = vh_haltcondition.backend_by_path("/html").unwrap()
     else {
-        bail!("expected static backend /html")
+        panic!("expected static backend /html")
     };
     assert_eq!("/var/www/haltcondition.net", root);
     assert!(auth_key.is_none());
@@ -398,7 +398,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
         path: _,
     } = vh_haltcondition.backend_by_path("/metrics").unwrap()
     else {
-        bail!("expected static backend /metrics")
+        panic!("expected static backend /metrics")
     };
     assert_eq!(keyval, "my-secret-key");
 
@@ -412,7 +412,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
         path: _,
     } = vh_vicarian.backend_by_path("/").unwrap()
     else {
-        bail!("expected proxy backend /")
+        panic!("expected proxy backend /")
     };
     assert_eq!("http", url.scheme_str().unwrap());
     assert_eq!("192.168.20.27:9192", url.authority().unwrap().as_str());
@@ -423,7 +423,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
         path: _,
     } = vh_vicarian.backend_by_path("/html").unwrap()
     else {
-        bail!("expected static backend /html")
+        panic!("expected static backend /html")
     };
     assert_eq!("/var/www/vicarian.org", root);
 
@@ -433,7 +433,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
         path: _,
     } = vh_vicarian.backend_by_path("/trusted").unwrap()
     else {
-        bail!("expected proxy backend /")
+        panic!("expected proxy backend /")
     };
     assert_eq!("https", url.scheme_str().unwrap());
     assert!(trust);

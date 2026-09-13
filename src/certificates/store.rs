@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use camino::Utf8PathBuf;
 use papaya::HashMap as Papaya;
 use tracing::info;
@@ -8,6 +8,7 @@ use tracing::info;
 use crate::{
     RunContext,
     certificates::HostCertificate,
+    errors::Error,
 };
 
 
@@ -89,16 +90,16 @@ impl CertStore {
         for hostname in newcert.hostnames().iter() {
             info!("Updating certificate for {hostname}");
             self.by_host.pin().update(hostname.clone(), |_old| newcert.clone())
-                .ok_or(anyhow!("Matching host for {} not found in cert store", hostname))?;
+                .ok_or_else(|| Error::HostNotFoundInCertStore(hostname.clone()))?;
         }
 
         let keyfile = newcert.keyfile().to_path_buf();
         let certfile = newcert.certfile().to_path_buf();
         let by_file = self.by_file.pin();
-        by_file.update(keyfile, |_old| newcert.clone())
-            .ok_or(anyhow!("File {} not found in cert store", newcert.keyfile()))?;
-        by_file.update(certfile, |_old| newcert.clone())
-            .ok_or(anyhow!("File {} not found in cert store", newcert.certfile()))?;
+        by_file.update(keyfile.clone(), |_old| newcert.clone())
+            .ok_or_else(|| Error::FileNotFoundInCertStore(keyfile))?;
+        by_file.update(certfile.clone(), |_old| newcert.clone())
+            .ok_or_else(|| Error::FileNotFoundInCertStore(certfile))?;
 
         Ok(())
     }

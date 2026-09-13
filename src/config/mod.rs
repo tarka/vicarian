@@ -6,8 +6,10 @@ mod tests;
 
 use std::{net::{IpAddr, SocketAddr, SocketAddrV6}};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
+
+use crate::errors::Error;
 
 use itertools::Itertools;
 use nix::sys::socket::SockaddrStorage;
@@ -66,9 +68,9 @@ fn default_path() -> String {
 
 fn validate_path(s: &String) -> Result<()> {
     s.starts_with('/').then_some(())
-        .ok_or(anyhow!("No leading slash in context path: {s}"))?;
+        .ok_or_else(|| Error::NoLeadingSlash(s.clone()))?;
     (!s.is_empty()).then_some(())
-        .ok_or(anyhow!("Context path cannot be empty"))?;
+        .ok_or(Error::EmptyContextPath)?;
 
     Ok(())
 }
@@ -102,7 +104,7 @@ pub(crate) fn expand_listen_addrs(addrs: &[String]) -> Result<Vec<SocketAddr>> {
             if let Some((pref, body)) = addr_str.split_once(SPECIAL_ADDRESS_DELIMITER) {
                 match pref {
                     SPECIAL_ADDRESS_INTERFACE => get_if_addrs(body),
-                    _ => Err(anyhow!("Unexpected address prefix: {pref}"))
+                    _ => Err(Error::UnexpectedAddressPrefix(pref.to_string()).into()),
                 }
             } else {
                 let addr = strip_brackets(addr_str);

@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
 use dnsclient::{UpstreamServer, r#async::DNSClient};
 use futures_lite::{StreamExt, stream};
@@ -28,6 +28,7 @@ use crate::{
     RunContext,
     certificates::{HostCertificate, store::CertStore},
     config::{AcmeChallenge, DnsProvider, TlsConfig},
+    errors::Error,
     metrics::{
         METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, METRIC_ACME_RENEW_ERROR_TOTAL,
         METRIC_ACME_RENEW_SUCCESS_TOTAL,
@@ -161,7 +162,7 @@ impl AcmeRuntime {
             })
             .map(|(vhost, aconf)| {
                 let domain_psl = psl::domain(vhost.hostname.as_bytes())
-                    .ok_or(anyhow!("Failed to find base domain for {}", vhost.hostname))?;
+                    .ok_or_else(|| Error::BaseDomainNotFound(vhost.hostname.clone()))?;
                 let domain = String::from_utf8(domain_psl.as_bytes().to_vec())?;
                 let is_wildcard = matches!(aconf.challenge, AcmeChallenge::Dns01(DnsProvider {wildcard: true, dns_provider: _}));
 
@@ -171,7 +172,7 @@ impl AcmeRuntime {
                     } else {
                         vhost.hostname.split_once('.')
                             .map(|(_host, domain)| domain)
-                            .ok_or(anyhow!("Invalid host for wildcard certificate: {}", vhost.hostname))?
+                            .ok_or_else(|| Error::InvalidWildcardHost(vhost.hostname.clone()))?
                     };
                     (format!("*.{wildcard_domain}"), format!("_.{wildcard_domain}"))
                 } else {
@@ -202,7 +203,7 @@ impl AcmeRuntime {
                     .with_added_extension("conf");
 
                 let profile = LE_PROFILES.get(aconf.profile.into())
-                        .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;
+                        .ok_or_else(|| Error::UnsupportedAcmeProfile(format!("{:?}", aconf.profile)))?;
 
                 let renewal = RwLock::new(Renewal::new(OffsetDateTime::UNIX_EPOCH));
 
@@ -248,7 +249,7 @@ impl AcmeRuntime {
 
                 {
                     let mut renewal = ah.renewal.write()
-                        .map_err(|e| anyhow!("Failed to lock renewal struct: {e}"))?;
+                        .map_err(|e| Error::LockError("renewal struct".to_string(), e.to_string()))?;
                     *renewal = Renewal::new(*hc.expires());
                 }
 
@@ -267,7 +268,7 @@ impl AcmeRuntime {
         let mut quit_rx = self.context.quit_rx.clone();
         loop {
             let next_secs = self.next_renewable_secs()?
-                .ok_or(anyhow!("Nothing expiring; this shouldn't really happen. Exiting."))?;
+                .ok_or(Error::NothingExpiring)?;
 
             let fuzzy = fastrand::i64(FUZZY_RANGE.0..FUZZY_RANGE.1);
             let expiring_secs = next_secs + Duration::seconds(fuzzy);
@@ -301,13 +302,13 @@ impl AcmeRuntime {
             match self.renew_acme(ahost).await {
                 Ok(hc) => {
                     let mut lock = ahost.renewal.write()
-                        .map_err(|e| anyhow!("Failed to lock renewal for {}: {e}", ahost.fqdn))?;
+                        .map_err(|e| Error::LockError(format!("renewal for {}", ahost.fqdn), e.to_string()))?;
                     *lock = Renewal::new(*hc.expires());
                 },
                 // TODO: Differentiate network vs local errors?
                 Err(e) => {
                     let mut renew = ahost.renewal.write()
-                        .map_err(|le| anyhow!("Failed to lock renewal for {}: {le}", ahost.fqdn))?;
+                        .map_err(|le| Error::LockError(format!("renewal for {}", ahost.fqdn), le.to_string()))?;
                     let backoff = renew.backoff();
                     warn!("Failed to renew {} due to {e} (attempt {}), retrying later", ahost.fqdn, backoff.tries);
                     *renew = backoff;
@@ -323,7 +324,7 @@ impl AcmeRuntime {
       self.acme_hosts.iter()
             .map(|ah| {
                 let renew = ah.renewal.read()
-                    .map_err(|e| anyhow!("Failed to lock renewal info for {}: {e}", ah.fqdn))?;
+                    .map_err(|e| Error::LockError(format!("renewal info for {}", ah.fqdn), e.to_string()))?;
                 Ok((ah, renew.is_renewable_in(ah.profile.exp_window_secs)))
           })
           .filter_ok(|(_, is_due)| *is_due)
@@ -335,9 +336,9 @@ impl AcmeRuntime {
         let next = self.acme_hosts.iter()
             .map(|ah| {
                 let renew = ah.renewal.read()
-                    .map_err(|e| anyhow!("Failed to read renewal: {e}"))?;
+                    .map_err(|e| Error::LockError("renewal".to_string(), e.to_string()))?;
                 let exp_in = renew.renewable_in_secs(ah.profile.exp_window_secs);
-                Ok::<i64, anyhow::Error>(exp_in.max(0))
+                Ok::<i64, Error>(exp_in.max(0))
             })
             .process_results(|iter| iter.sorted())?
             .next()
@@ -401,13 +402,13 @@ impl AcmeRuntime {
                 // It's technically possibly to pick up an old auth order here
                 // which returns ::Valid?
                 AuthorizationStatus::Valid => break,
-                _ => bail!("Failed to renew {} due to unexpected upstream status {:?}", acme_host.fqdn, auth.status),
+                _ => return Err(Error::UnexpectedAcmeAuthStatus(acme_host.fqdn.clone(), format!("{:?}", auth.status)).into()),
             }
 
             info!("Creating challenge");
             let mut challenge = auth
                 .challenge(ChallengeType::from(&acme_host.challenge))
-                .ok_or_else(|| anyhow!("No {:?} challenge found", acme_host.challenge))?;
+                .ok_or_else(|| Error::AcmeChallengeNotFound(format!("{:?}", acme_host.challenge)))?;
 
             // As DNS providers generally don't allow concurrent
             // updates to a zone we need to process these series.
@@ -424,7 +425,7 @@ impl AcmeRuntime {
         let status = order.poll_ready(&RetryPolicy::default()).await?;
         if status != OrderStatus::Ready {
             // Will cleanup on return
-            return Err(anyhow!("Unexpected order status: {status:?}"));
+            return Err(Error::UnexpectedAcmeOrderStatus(format!("{status:?}")).into());
         }
 
         let private_key = order.finalize().await?;
@@ -607,5 +608,5 @@ async fn wait_for_dns(txt_fqdn: &str, token: &str) -> Result<()> {
         tokio::time::sleep(ONE_SECOND.try_into()?).await;
     }
 
-    Err(anyhow!("Failed to find record {txt_fqdn} in public DNS"))
+    Err(Error::DnsRecordNotFound(txt_fqdn.to_string()).into())
 }

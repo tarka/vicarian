@@ -24,7 +24,7 @@ use crate::{
         watcher::{CertWatcher, RELOAD_GRACE},
     },
     config::Config,
-    errors::VicarianError,
+    errors::Error,
 };
 
 use certutils::TEST_CERTS;
@@ -80,8 +80,8 @@ async fn test_load_certs_invalid_pair() -> Result<()> {
     let result = HostCertificate::new(key_path.into(), other_cert_path.into(), false).await;
     println!("ERR: {result:?}");
     assert!(result.is_err());
-    let err: VicarianError = result.unwrap_err().downcast()?;
-    assert!(matches!(err, VicarianError::CertificateMismatch(_, _)));
+    let err: Error = result.unwrap_err().downcast()?;
+    assert!(matches!(err, Error::CertificateMismatch(_, _)));
 
     Ok(())
 }

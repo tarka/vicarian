@@ -2,8 +2,10 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use anyhow::{Context as AnyhowContext, Result, anyhow};
+use anyhow::{Context as AnyhowContext, Result};
 use camino::{Utf8Path, Utf8PathBuf};
+
+use crate::errors::Error;
 use hcl::{
     Body, Value,
     eval::{Context, Evaluate, FuncArgs, FuncDef, ParamType}
@@ -72,7 +74,7 @@ impl Config {
             .map(|(hostname, rv)| {
                 // Inline the matching TLS declaration
                 let tls = tls.get(&rv.tls)
-                    .ok_or(anyhow!("No matching TLS declaration for '{}'", rv.tls))?
+                    .ok_or_else(|| Error::NoMatchingTlsDeclaration(rv.tls.clone()))?
                     .clone();
 
                 let backends = rv.backends.into_iter()
@@ -327,9 +329,9 @@ impl ValidateSanitise for Backend {
                         (s == "http" || s == "https")
                             .then_some(s)
                     })
-                    .ok_or(anyhow!("No valid scheme (`http`, `https`) in URI {uri}"))?;
+                    .ok_or_else(|| Error::InvalidUriScheme(uri.to_string()))?;
                 let _authority = uri.authority()
-                    .ok_or(anyhow!("No hostname in URI {uri}"))?;
+                    .ok_or_else(|| Error::NoHostnameInUri(uri.to_string()))?;
             }
             BackendType::Static(ref _b) => {
                 // We don't require that root exists up-front, so
@@ -359,7 +361,7 @@ impl ValidateSanitise for Vec<Backend> {
             .unique_by(|b| &b.path)
             .count() != backends.len();
         if dup_paths {
-            return Err(anyhow!("Duplicate paths in backend"))
+            return Err(Error::DuplicateBackendPaths.into())
         }
 
         Ok(backends)
@@ -385,8 +387,8 @@ impl Vhost {
         self.backends.iter()
             .filter(|b| b.path == path)
             .exactly_one()
-            .map_err(|_e| anyhow!("Failed to find '{path}' in vhost"))
-            .cloned()
+            .map(Clone::clone)
+            .map_err(|_e| Error::BackendNotFound(path.to_string()).into())
     }
 }
 

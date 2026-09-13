@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 
 use itertools::Itertools;
@@ -13,7 +13,7 @@ use time::OffsetDateTime;
 use tracing_log::log::info;
 use x509_parser::{extensions::GeneralName, prelude::{FromDer, X509Certificate}};
 
-use crate::errors::VicarianError;
+use crate::errors::Error;
 
 pub type PrivateKey = PrivateKeyDer<'static>;
 pub type Certificate = CertificateDer<'static>;
@@ -66,16 +66,16 @@ impl HostCertificateInner {
         let expires = get_not_after(&x509)?;
 
         let crypto = CryptoProvider::get_default()
-            .ok_or(anyhow!("Failed to find default crypto provider in rustls"))?;
+            .ok_or(Error::MissingCryptoProvider)?;
         let cert = CertifiedKey::from_der(certs, key, crypto)
             .map_err(|e| match e {
                 rustls::Error::InconsistentKeys(_) => {
-                    VicarianError::CertificateMismatch(
+                    Error::CertificateMismatch(
                         keyfile.to_path_buf(),
                         certfile.to_path_buf())
                 },
                 _ => {
-                    VicarianError::RustlsError(e)
+                    Error::RustlsError(e)
                 },
             })?;
 
@@ -196,7 +196,7 @@ pub(crate) async fn load_hostcert(keyfile: &Utf8Path, certfile: &Utf8Path) -> Re
         .collect::<Result<Vec<_>, _>>()?;
 
     if certs.is_empty() {
-        bail!("No certificates found in TLS .crt file");
+        return Err(Error::NoCertificatesFound.into());
     }
 
     Ok((key, certs))

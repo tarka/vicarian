@@ -19,6 +19,7 @@ use crate::{
     RunContext,
     certificates::store::CertStore,
     config::{Backend, BackendType, Vhost},
+    errors::Error,
     metrics::{
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
         MetricsHandler,
@@ -207,7 +208,7 @@ impl ProxyHttp for Vicarian {
         let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, path: _ } = routed.backend
         else {
 
-            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
+            let e = Error::UnexpectedBackendType(format!("{:?}", routed.backend));
             return Err(pingora_core::Error::because(E500, "Unexpected state", e));
         };
         let url = &upstream.url;
@@ -239,7 +240,7 @@ impl ProxyHttp for Vicarian {
         let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, ref path } = routed.backend
         else {
 
-            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
+            let e = Error::UnexpectedBackendType(format!("{:?}", routed.backend));
             return Err(pingora_core::Error::because(E500, "Unexpected state", e));
         };
 
@@ -283,7 +284,7 @@ impl ProxyHttp for Vicarian {
             .routed;
         let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, ref path } = routed.backend
         else {
-            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
+            let e = Error::UnexpectedBackendType(format!("{:?}", routed.backend));
             return Err(pingora_core::Error::because(E500, "Unexpected state", e));
         };
 

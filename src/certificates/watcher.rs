@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use camino::Utf8PathBuf;
 use itertools::Itertools;
 use notify::{EventKind, RecursiveMode};
@@ -11,7 +11,7 @@ use tracing_log::log::{debug, info, warn};
 use crate::{
     RunContext,
     certificates::{HostCertificate, store::CertStore},
-    errors::VicarianError,
+    errors::Error,
 };
 
 pub const RELOAD_GRACE: Duration = Duration::from_millis(1500);
@@ -87,7 +87,7 @@ impl CertWatcher {
             .unique()
             .map(|path| {
                 let cert_path = Utf8PathBuf::from_path_buf(path)
-                    .map_err(|p| anyhow!("Invalid path encoding: {p:#?}"))?
+                    .map_err(Error::InvalidPathEncoding)?
                     .canonicalize_utf8()?;
                 Ok(cert_path)
             })
@@ -103,7 +103,7 @@ impl CertWatcher {
         let existing = paths.into_iter()
             .map(|path| {
                 let cert = self.certstore.by_file(&path)
-                 .ok_or(anyhow!("Path not found in store: {path}"))?
+                 .ok_or_else(|| Error::PathNotFoundInStore(path.clone()))?
                     .clone();
                 Ok(cert)
             })
@@ -123,10 +123,10 @@ impl CertWatcher {
                     self.certstore.update(hc)?;
                 }
                 Err(err) => {
-                    if err.is::<VicarianError>() {
-                        let perr = err.downcast::<VicarianError>()
+                    if err.is::<Error>() {
+                        let perr = err.downcast::<Error>()
                                 .expect("Error downcasting VicarianError after check; this shouldn't happen");
-                            if matches!(perr, VicarianError::CertificateMismatch(_, _)) {
+                            if matches!(perr, Error::CertificateMismatch(_, _)) {
                                 warn!("Possible error on reload: {perr}. This may be transient.");
                             } else {
                                 return Err(perr.into())

@@ -64,7 +64,7 @@ fn default_path() -> String {
     "/".to_string()
 }
 
-fn validate_path(s: &String) -> Result<()> {
+fn validate_path(s: &str) -> Result<()> {
     if s.is_empty() {
         Err(anyhow!("Context path cannot be empty"))
     } else if !s.starts_with('/') {

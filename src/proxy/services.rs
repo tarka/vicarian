@@ -94,7 +94,7 @@ impl Vicarian {
                 let router = Arc::new(vhost_to_router(vhost));
                 iter::once(&vhost.hostname)
                     .chain(vhost.aliases.iter())
-                    .map(|s| UniCase::new(s.to_lowercase()))
+                    .map(|s| UniCase::new(s.to_string()))
                     .map(move |h| (h, router.clone()))
             })
             .collect();

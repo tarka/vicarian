@@ -6,3 +6,4 @@
 .envrc
 *~
 /.dir-locals.el
+/TODO.md

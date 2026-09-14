@@ -109,12 +109,11 @@ impl CertStore {
     pub fn watchlist(&self) -> Vec<Utf8PathBuf> {
         let by_host = self.by_host.pin();
         by_host.values()
-            .filter_map(|h| if h.watch() {
-                Some(vec![h.keyfile().to_path_buf(), h.certfile().to_path_buf()])
-            } else {
-                None
-            })
-            .flatten()
+            .filter(|h| h.watch())
+            .flat_map(|h| [
+                h.keyfile().to_path_buf(),
+                h.certfile().to_path_buf()
+            ])
             .collect()
     }
 

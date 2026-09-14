@@ -121,7 +121,7 @@ impl HostCertificate {
 
     /// Generates a fresh certificate from an existing one. This is
     /// effectively a reload.
-    pub async fn from(hc: &HostCertificate) -> Result<HostCertificate> {
+    pub async fn new_from(hc: &HostCertificate) -> Result<HostCertificate> {
         HostCertificate::new(hc.keyfile().to_path_buf(), hc.certfile().to_path_buf(), hc.watch()).await
     }
 

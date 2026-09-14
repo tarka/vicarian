@@ -115,7 +115,7 @@ impl CertWatcher {
             // However as errors can be expected while the certs
             // are being replaced externally we just warn and pass
             // for now.
-            match HostCertificate::from(&old).await {
+            match HostCertificate::new_from(&old).await {
                 Ok(hc) => {
                     self.certstore.update(hc)?;
                 }

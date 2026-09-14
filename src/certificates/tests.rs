@@ -244,7 +244,7 @@ async fn test_file_update_success() -> Result<()> {
     let cert = TEST_HOST_CERTS.snakeoil_2.clone();
     fs::copy(cert.keyfile(), &key_path)?;
     fs::copy(cert.certfile(), &cert_path)?;
-    let newcert = HostCertificate::from(&first_cert).await?;
+    let newcert = HostCertificate::new_from(&first_cert).await?;
 
     store.update(newcert)?;
 

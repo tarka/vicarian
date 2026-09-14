@@ -26,7 +26,7 @@ impl StaticHandler {
             .join("index.html");
         let fallback_page = std::fs::read(&static_root)
             .unwrap_or_else(|_| Vec::new());
-        let opts = Arc::new(SWSHandlerOpts{
+        let opts = Arc::new(SWSHandlerOpts {
             root_dir: backend.root.clone()
                 .into_std_path_buf(),
             compression: true,

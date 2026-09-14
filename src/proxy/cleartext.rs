@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use http::{
     Response, StatusCode, header,
-    uri::{Builder, Scheme},
+    uri::{Authority, Builder, Scheme},
 };
 use metrics::counter;
 use pingora_core::{apps::http_app::ServeHttp, protocols::http::ServerSession};
@@ -25,18 +25,12 @@ const TOKEN_NOT_FOUND: &[u8] = "<html><body>ACME token not found in request path
 
 
 pub(crate) fn rewrite_port(host: &str, newport: &str) -> String {
-    let port_i = if let Some(i) = host.rfind(':') {
-        i
-    } else {
-        return host.to_string();
-    };
-    if host[port_i + 1..].parse::<u16>().is_err() {
-        // Not an int, assume not port ':'
-        return host.to_string();
+    if let Ok(auth) = Authority::try_from(host)
+        && auth.port().is_some()
+    {
+        return format!("{}:{}", auth.host(), newport);
     }
-    let host_only = &host[0..port_i];
-
-    format!("{host_only}:{newport}")
+    host.to_string()
 }
 
 fn token_not_found() -> Response<Vec<u8>> {

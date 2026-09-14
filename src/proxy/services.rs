@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use http::{
     HeaderValue, Uri,
     header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
-    uri::Scheme,
+    uri::{Authority, Scheme},
 };
 use metrics::counter;
 use pingora_core::{
@@ -66,18 +66,12 @@ fn to_components(session: &Session) -> pingora_core::Result<RequestComponents<'_
 
 
 pub(crate) fn strip_port(host_header: &str) -> &str {
-    if host_header.starts_with('[') {
-        // IPv6-literal special case
-        if let Some(pos) = host_header.find("]:") {
-            &host_header[..pos + 1]
-        } else {
-            host_header
-        }
-    } else if let Some(i) = host_header.rfind(':') {
-        &host_header[..i]
-    } else {
-        host_header
+    if let Ok(auth) = Authority::try_from(host_header)
+        && auth.port().is_some()
+    {
+        return &host_header[..auth.host().len()];
     }
+    host_header
 }
 
 pub struct Vicarian {

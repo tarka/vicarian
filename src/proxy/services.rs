@@ -1,5 +1,6 @@
 use std::{collections::HashMap, iter, sync::Arc};
 
+use anyhow::{bail, Result};
 use async_trait::async_trait;
 use http::{
     HeaderValue, Uri,
@@ -19,7 +20,7 @@ use unicase::UniCase;
 use crate::{
     RunContext,
     certificates::store::CertStore,
-    config::{Backend, BackendType, Vhost},
+    config::{Backend, BackendType, ProxyBackend, Vhost},
     metrics::{
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
         MetricsHandler,
@@ -132,6 +133,18 @@ fn vhost_to_router(vhost: &Vhost) -> Router {
     Router::new(backends)
 }
 
+fn backend_to_proxy(backend: &Backend) -> Result<&ProxyBackend> {
+    let Backend {
+        backend_type: BackendType::Proxy(upstream),
+        auth_key: _,
+        path: _
+    } = backend
+    else {
+        bail!("Unexpected backend type: {:?}", backend.backend_type)
+    };
+
+    Ok(upstream)
+}
 
 #[derive(Clone)]
 pub struct VicarianCtx {
@@ -198,12 +211,9 @@ impl ProxyHttp for Vicarian {
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .routed;
 
-        let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, path: _ } = routed.backend
-        else {
+        let upstream = backend_to_proxy(&routed.backend)
+            .or_err_with(E500, || format!("Unexpected backend: {:?}", routed.backend))?;
 
-            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
-            return Err(pingora_core::Error::because(E500, "Unexpected state", e));
-        };
         let url = &upstream.url;
 
         let host = url.host()
@@ -230,15 +240,11 @@ impl ProxyHttp for Vicarian {
         let routed = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .routed;
-        let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, ref path } = routed.backend
-        else {
 
-            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
-            return Err(pingora_core::Error::because(E500, "Unexpected state", e));
-        };
+        let upstream = backend_to_proxy(&routed.backend)
+            .or_err_with(E500, || format!("Unexpected backend: {:?}", routed.backend))?;
 
-
-        if path != "/" && ! upstream.url.path().starts_with(&routed.backend.path) {
+        if routed.backend.path != "/" && ! upstream.url.path().starts_with(&routed.backend.path) {
             debug!("Modifying {} for context {}", upstream_request.uri, routed.backend.path);
             let upath = upstream_request.uri.path()
                 .strip_prefix(&routed.backend.path)
@@ -275,15 +281,11 @@ impl ProxyHttp for Vicarian {
         let routed = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .routed;
-        let Backend { backend_type: BackendType::Proxy(ref upstream), auth_key: _, ref path } = routed.backend
-        else {
-            let e = anyhow::anyhow!("Unexpected backend type: {:?}", routed.backend);
-            return Err(pingora_core::Error::because(E500, "Unexpected state", e));
-        };
 
-        if path != "/"
-            && ! upstream.url.path().starts_with(&routed.backend.path)
-        {
+        let upstream = backend_to_proxy(&routed.backend)
+            .or_err_with(E500, || format!("Unexpected backend: {:?}", routed.backend))?;
+
+        if routed.backend.path != "/" && ! upstream.url.path().starts_with(&routed.backend.path) {
             for headername in [LOCATION, REFRESH] {
                 let header_p = upstream_response.headers.get(&headername);
                 if let Some(header) = header_p {

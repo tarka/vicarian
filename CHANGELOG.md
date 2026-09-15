@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tarka/vicarian/compare/v0.4.0...v0.5.0) - 2026-09-15
+
+### <!-- 0 -->Features
+
+- *(tls)* Add comments and clarifications of the dummy/noop cert handler.
+- *(rustls)* Move to Pingora 0.9 and enable rustls
+- Convert to use Rustls Pingora backend
+
+### <!-- 3 -->Documentation
+
+- Update status of project.
+
+### Other
+
+- Dedup some destructuring code.
+- Dependency update
+- Minor formatting.
+- Better name for `from` in HostCertificate
+- Use Authority from the http crate to parse out hostname/port.
+- Clean-up and de-dup mimetype handling
+- Convert metrics initialisation to be more data-driven.
+- Minor coding style cleanups from review.
+- Remove unnecessary collection of hostnames into a Vec
+- Use unicase for certificate host lookups.
+- Simplify validate_path() logic.
+- Remove unnecessary .clone()
+- Use unicase to handle case-insensitive host matching
+- Remove unnecessary usage of tracing-log
+- Use a standard hashmap for route_by_host as we never update after startup.
+- Simplify some startup data conversions.
+- Enable port 80 by default (principle of least surprise).
+- Cleanup after rustls rework
+- Fix some incorrect context strings.
+
 ## [0.4.0](https://github.com/tarka/vicarian/compare/v0.3.4...v0.4.0) - 2026-09-09
 
 This release changes the configuration language from Corn to a HCL-derived DSL. An annotated reference config file is available in example/vicarian-full.hcl.

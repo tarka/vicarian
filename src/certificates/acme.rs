@@ -43,10 +43,12 @@ struct LeProfile {
     exp_window_secs: i64,
 }
 
+// See https://letsencrypt.org/docs/profiles/
+// and https://letsencrypt.org/2025/12/02/from-90-to-45
 static LE_PROFILES: phf::Map<&'static str, LeProfile> = phf_map! {
-    "tlsserver" => LeProfile {
-        name: "tlsserver",
-        _validity_days: 90, // TODO: Will be reduced to 45 in 2026
+    "classic" => LeProfile {
+        name: "classic",
+        _validity_days: 90, // TODO: Will be reduced to 64-days in 2027 and 45 in 2028
         exp_window_secs: 30 * DAYS_TO_SECS,
     },
     "shortlived" => LeProfile {
@@ -54,9 +56,9 @@ static LE_PROFILES: phf::Map<&'static str, LeProfile> = phf_map! {
         _validity_days: 6,
         exp_window_secs: 4 * DAYS_TO_SECS,
     },
-    "classic" => LeProfile {
-        name: "classic",
-        _validity_days: 90, // TODO: Will be reduced to 64-days in 2027
+    "tlsserver" => LeProfile {
+        name: "tlsserver",
+        _validity_days: 45,
         exp_window_secs: 30 * DAYS_TO_SECS,
     },
 };

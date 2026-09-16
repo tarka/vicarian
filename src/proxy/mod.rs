@@ -35,6 +35,8 @@ pub const E401: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::UNAU
 pub const E404: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::NOT_FOUND.as_u16());
 pub const E500: pingora_core::ErrorType = ErrorType::HTTPStatus(StatusCode::INTERNAL_SERVER_ERROR.as_u16());
 
+pub const YEAR_IN_SECS: u64 = 31536000;
+
 
 #[async_trait]
 pub trait BackendHandler: Send + Sync {

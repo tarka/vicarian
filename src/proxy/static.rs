@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
-use http::{HeaderValue, header::{STRICT_TRANSPORT_SECURITY, VIA}};
+use http::header::{STRICT_TRANSPORT_SECURITY, VIA};
 use http_body_util::BodyExt;
 use pingora_core::OrErr;
 use pingora_http::ResponseHeader;
@@ -12,7 +12,11 @@ use static_web_server::handler::{
     RequestHandler as SWSHandler, RequestHandlerOpts as SWSHandlerOpts,
 };
 
-use crate::{config::StaticBackend, proxy::{E500, BackendHandler}};
+use crate::{
+    config::StaticBackend,
+    proxy::{
+        E500, BackendHandler, YEAR_IN_SECS,
+    }};
 
 // TODO: Should be own top-level module (like metrics)?
 
@@ -57,8 +61,12 @@ impl BackendHandler for StaticHandler {
 
         let (rparts, mut body) = resp.into_parts();
         let mut header = ResponseHeader::from(rparts);
-        header.insert_header(VIA, HeaderValue::from_static("1.1 Vicarian"))?;
-        header.insert_header(STRICT_TRANSPORT_SECURITY, HeaderValue::from_static("max-age=31536000; includeSubDomains"))?;
+
+        let hsts = format!("max-age={YEAR_IN_SECS}; includeSubDomains");
+        header.insert_header(STRICT_TRANSPORT_SECURITY, hsts)?;
+
+        let via = format!("{:?} Vicarian", session.req_header().version);
+        header.insert_header(VIA, via)?;
 
         session.write_response_header(Box::new(header), false).await?;
 

@@ -26,14 +26,13 @@ use crate::{
         MetricsHandler,
     },
     proxy::{
+        YEAR_IN_SECS,
         BackendHandler, E401, E404, E500, ProxyHandler,
         mimetypes::is_compressible,
         router::{Router, RouterBackend},
         r#static::StaticHandler,
     },
 };
-
-const YEAR_IN_SECS: u64 = 31536000;
 
 struct RequestComponents<'a> {
     host: &'a str,

@@ -25,10 +25,7 @@ use tracing::{debug, error, info, warn};
 use zone_update::{RecordType, async_impl::AsyncDnsProvider};
 
 use crate::{
-    RunContext,
-    certificates::{HostCertificate, store::CertStore},
-    config::{AcmeChallenge, DnsProvider, TlsConfig},
-    metrics::{
+    RunContext, certificates::{HostCertificate, store::CertStore}, config::{AcmeChallenge, DnsProvider, TlsAcmeConfig, TlsConfig, Vhost}, metrics::{
         METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, METRIC_ACME_RENEW_ERROR_TOTAL,
         METRIC_ACME_RENEW_SUCCESS_TOTAL,
     },
@@ -80,6 +77,72 @@ struct AcmeHost {
 }
 
 impl AcmeHost {
+
+    fn new(vhost: &Vhost, aconf: &TlsAcmeConfig) -> Result<Self> {
+        let domain_psl = psl::domain(vhost.hostname.as_bytes())
+            .ok_or(anyhow!("Failed to find base domain for {}", vhost.hostname))?;
+        let domain = String::from_utf8(domain_psl.as_bytes().to_vec())?;
+        let is_wildcard = matches!(aconf.challenge, AcmeChallenge::Dns01(DnsProvider {wildcard: true, dns_provider: _}));
+
+        let (cert_hostname, cert_fname) = if is_wildcard {
+            let wildcard_domain = if vhost.hostname == domain {
+                &domain
+            } else {
+                vhost.hostname.split_once('.')
+                    .map(|(_host, domain)| domain)
+                    .ok_or(anyhow!("Invalid host for wildcard certificate: {}", vhost.hostname))?
+            };
+            (format!("*.{wildcard_domain}"), format!("_.{wildcard_domain}"))
+        } else {
+            (vhost.hostname.clone(), vhost.hostname.clone())
+        };
+
+        // Create /var/lib/vicarian/acme/example.com/
+        let cert_base = Utf8PathBuf::from(&aconf.directory);
+        let cert_dir = cert_base
+            .join(&cert_fname);
+        info!("Creating ACME certificate dir {cert_dir}");
+        create_dir_all(&cert_dir)
+            .context(format!("Error creating directory {cert_dir}"))?;
+
+        // Cert/key in .../example.com/example.com.{key,crt}
+        let cert_file = cert_dir
+            .join(&cert_fname);
+        let keyfile = cert_file.with_added_extension("key");
+        let certfile = cert_file.with_added_extension("crt");
+
+        // Create /var/lib/vicarian/acme/my.email@example.com/
+        let contact = aconf.contact.clone();
+        let contact_dir = cert_base
+            .join(&contact);
+        create_dir_all(&contact_dir)
+            .context(format!("Error creating directory {contact_dir}"))?;
+
+        // Contact creds in .../my.email@example.com/my.email@example.com.conf
+        let contactfile = contact_dir
+            .join(&contact)
+            .with_added_extension("conf");
+
+        let profile = LE_PROFILES.get(aconf.profile.into())
+            .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;
+
+        let renewal = RwLock::new(Renewal::new(OffsetDateTime::UNIX_EPOCH));
+
+        let acme_host = Self {
+            fqdn: cert_hostname,
+            aliases: vhost.aliases.clone(),
+            domain,
+            keyfile,
+            certfile,
+            contact,
+            contactfile,
+            challenge: aconf.challenge.clone(),
+            profile,
+            renewal,
+        };
+        Ok(acme_host)
+    }
+
     fn hostnames(&self) -> impl Iterator<Item = &String> {
         iter::once(&self.fqdn)
             .chain(self.aliases.iter())
@@ -158,67 +221,7 @@ impl AcmeRuntime {
                 TlsConfig::Cert(_) => None, // Handled elsewhere
                 TlsConfig::Acme(aconf) => Some((vhost, aconf)),
             })
-            .map(|(vhost, aconf)| {
-                let domain_psl = psl::domain(vhost.hostname.as_bytes())
-                    .ok_or(anyhow!("Failed to find base domain for {}", vhost.hostname))?;
-                let domain = String::from_utf8(domain_psl.as_bytes().to_vec())?;
-                let is_wildcard = matches!(aconf.challenge, AcmeChallenge::Dns01(DnsProvider {wildcard: true, dns_provider: _}));
-
-                let (cert_hostname, cert_fname) = if is_wildcard {
-                    let wildcard_domain = if vhost.hostname == domain {
-                        &domain
-                    } else {
-                        vhost.hostname.split_once('.')
-                            .map(|(_host, domain)| domain)
-                            .ok_or(anyhow!("Invalid host for wildcard certificate: {}", vhost.hostname))?
-                    };
-                    (format!("*.{wildcard_domain}"), format!("_.{wildcard_domain}"))
-                } else {
-                    (vhost.hostname.clone(), vhost.hostname.clone())
-                };
-
-
-                let cert_base = Utf8PathBuf::from(&aconf.directory);
-                let cert_dir = cert_base
-                    .join(&cert_fname);
-                info!("Creating ACME certificate dir {cert_base}");
-                create_dir_all(&cert_dir)
-                    .context(format!("Error creating directory {cert_base}"))?;
-
-                let cert_file = cert_dir
-                    .join(&cert_fname);
-                let keyfile = cert_file.with_added_extension("key");
-                let certfile = cert_file.with_added_extension("crt");
-
-                let contact = aconf.contact.clone();
-                let contact_dir = cert_base
-                    .join(&contact);
-                create_dir_all(&contact_dir)
-                    .context(format!("Error creating directory {contact_dir}"))?;
-
-                let contactfile = contact_dir
-                    .join(&contact)
-                    .with_added_extension("conf");
-
-                let profile = LE_PROFILES.get(aconf.profile.into())
-                        .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;
-
-                let renewal = RwLock::new(Renewal::new(OffsetDateTime::UNIX_EPOCH));
-
-                let acme_host = AcmeHost {
-                    fqdn: cert_hostname,
-                    aliases: vhost.aliases.clone(),
-                    domain,
-                    keyfile,
-                    certfile,
-                    contact,
-                    contactfile,
-                    challenge: aconf.challenge.clone(),
-                    profile,
-                    renewal,
-                };
-                Ok(acme_host)
-            })
+            .map(|(vhost, aconf)| AcmeHost::new(vhost, aconf))
             // Filter out duplicate wildcard hosts
             .unique_by(|ahost| ahost.as_ref().ok()
                        .map(|ahost| ahost.fqdn.clone()))
@@ -544,6 +547,7 @@ impl AcmeRuntime {
 
 
 }
+
 
 fn get_dns_client(acme_host: &AcmeHost, provider: &DnsProvider) -> Box<dyn AsyncDnsProvider> {
     // It's slightly inefficient to create this each time, but it simplifies the code.

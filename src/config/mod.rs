@@ -23,6 +23,7 @@ pub use hcl::{
     AcmeChallenge,
     DnsProvider,
     TlsConfig,
+    TlsAcmeConfig,
     Backend,
     Vhost,
     BackendType,

@@ -33,8 +33,8 @@ impl ResolvesServerCert for CertHandler {
         // guard here anyway). There may be another way to do it
         // cleanly?
         let host_cert = self.certstore.by_host(&host)
-            .or_else(|| self.certstore.by_wildcard(&host))
-            .expect("Certificate for host not found");
+            .or_else(|| self.certstore.by_wildcard(&host))?;
+
         debug!("Found certificate for {host}");
 
         info!("Found {host} cert");

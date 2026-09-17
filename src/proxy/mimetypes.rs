@@ -12,7 +12,7 @@ use http::{
 // This could be a PHF-set, but with this few parameters hits are a
 // wash, misses aren't slow enough to make a differnce on a
 // network-bound app.
-const COMPRESSIBLE: &[&str] = &[
+static COMPRESSIBLE: &[&str] = &[
     "application/dart",
     "application/ecmascript",
     "application/javascript",
@@ -89,7 +89,7 @@ const COMPRESSIBLE: &[&str] = &[
 
 const IDENTITY_ENC: &str = "identity";
 const NO_TRANSFORM: &str = "no-transform";
-const X_ACCEL_BUFFERING: HeaderName =  HeaderName::from_static("x-accel-buffering");
+const X_ACCEL_BUFFERING: HeaderName = HeaderName::from_static("x-accel-buffering");
 
 
 pub fn is_compressible(headers: &HeaderMap<HeaderValue>) -> bool {
@@ -102,7 +102,7 @@ pub fn is_compressible(headers: &HeaderMap<HeaderValue>) -> bool {
 
         // ... and not flagged no-buffering
         && header(X_ACCEL_BUFFERING)
-          .is_none_or(|enc| ! enc.eq_ignore_ascii_case("no"))
+          .is_none_or(|xab| ! xab.eq_ignore_ascii_case("no"))
 
         // ... and not flagged 'no-transform' (Cloudflare & haproxy honour this)
         && header(CACHE_CONTROL)

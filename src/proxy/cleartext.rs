@@ -68,7 +68,7 @@ impl CleartextHandler {
 
 impl CleartextHandler {
 
-    async fn redirect_to_tls(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+    fn redirect_to_tls(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
         counter!(METRIC_HTTP_REDIRECTS_TOTAL).increment(1);
 
         let Some(host_header) = session.get_header(header::HOST) else {
@@ -101,7 +101,7 @@ impl CleartextHandler {
             .expect("Failed to create HTTP->HTTPS redirect response")
     }
 
-    async fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
+    fn acme_challenge(&self, session: &mut ServerSession) -> Response<Vec<u8>> {
         counter!(METRIC_ACME_HTTP01_ENDPOINT_TOTAL).increment(1);
 
         let Some(host_header) = session.get_header(header::HOST) else {
@@ -148,9 +148,9 @@ impl ServeHttp for CleartextHandler {
             && pq.path().starts_with(ACME_HTTP01_PREFIX)
         {
             info!("Received ACME challenge request: {pq}");
-            self.acme_challenge(session).await
+            self.acme_challenge(session)
         } else {
-            self.redirect_to_tls(session).await
+            self.redirect_to_tls(session)
         }
     }
 }

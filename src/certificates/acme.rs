@@ -15,7 +15,6 @@ use instant_acme::{
 };
 use itertools::Itertools;
 use metrics::{counter, gauge};
-use phf_macros::phf_map;
 use time::{Duration, OffsetDateTime, UtcOffset};
 use tokio::{
     fs::{self, File, read_to_string},
@@ -25,7 +24,10 @@ use tracing::{debug, error, info, warn};
 use zone_update::{RecordType, async_impl::AsyncDnsProvider};
 
 use crate::{
-    RunContext, certificates::{HostCertificate, store::CertStore}, config::{AcmeChallenge, DnsProvider, TlsAcmeConfig, TlsConfig, Vhost}, metrics::{
+    RunContext,
+    certificates::{HostCertificate, store::CertStore},
+    config::{AcmeChallenge, AcmeProfile, DnsProvider, TlsAcmeConfig, TlsConfig, Vhost},
+    metrics::{
         METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, METRIC_ACME_RENEW_ERROR_TOTAL,
         METRIC_ACME_RENEW_SUCCESS_TOTAL,
     },
@@ -37,31 +39,38 @@ const FUZZY_RANGE: (i64, i64) = (30, 120);
 const ONE_SECOND: Duration = Duration::seconds(1);
 
 #[derive(Debug)]
-struct LeProfile {
+struct ProfileParams {
     name: &'static str,
     _validity_days: i64,
     exp_window_secs: i64,
 }
 
-// See https://letsencrypt.org/docs/profiles/
-// and https://letsencrypt.org/2025/12/02/from-90-to-45
-static LE_PROFILES: phf::Map<&'static str, LeProfile> = phf_map! {
-    "classic" => LeProfile {
-        name: "classic",
-        _validity_days: 90, // TODO: Will be reduced to 64-days in 2027 and 45 in 2028
-        exp_window_secs: 30 * DAYS_TO_SECS,
-    },
-    "shortlived" => LeProfile {
-        name: "shortlived",
-        _validity_days: 6,
-        exp_window_secs: 4 * DAYS_TO_SECS,
-    },
-    "tlsserver" => LeProfile {
-        name: "tlsserver",
-        _validity_days: 45,
-        exp_window_secs: 30 * DAYS_TO_SECS,
-    },
-};
+impl From<AcmeProfile> for ProfileParams {
+    fn from(pconf: AcmeProfile) -> Self {
+        // See https://letsencrypt.org/docs/profiles/
+        // and https://letsencrypt.org/2025/12/02/from-90-to-45
+        match pconf {
+            AcmeProfile::Classic =>
+                ProfileParams {
+                    name: "classic",
+                    _validity_days: 90, // TODO: Will be reduced to 64-days in 2027 and 45 in 2028
+                    exp_window_secs: 30 * DAYS_TO_SECS,
+                },
+            AcmeProfile::ShortLived =>
+                ProfileParams {
+                    name: "shortlived",
+                    _validity_days: 6,
+                    exp_window_secs: 4 * DAYS_TO_SECS,
+                },
+            AcmeProfile::TlsServer =>
+                ProfileParams {
+                    name: "tlsserver",
+                    _validity_days: 45,
+                    exp_window_secs: 30 * DAYS_TO_SECS,
+                },
+        }
+    }
+}
 
 
 #[derive(Debug)]
@@ -74,7 +83,7 @@ struct AcmeHost {
     keyfile: Utf8PathBuf,
     certfile: Utf8PathBuf,
     challenge: AcmeChallenge,
-    profile: &'static LeProfile,
+    profile: ProfileParams,
     renewal: RwLock<Renewal>,
 }
 
@@ -125,9 +134,6 @@ impl AcmeHost {
             .join(&contact)
             .with_added_extension("conf");
 
-        let profile = LE_PROFILES.get(aconf.profile.into())
-            .ok_or(anyhow!("No supported profile {:?}", aconf.profile))?;
-
         let renewal = RwLock::new(Renewal::new(OffsetDateTime::UNIX_EPOCH));
 
         let acme_host = Self {
@@ -139,7 +145,7 @@ impl AcmeHost {
             contact,
             contactfile,
             challenge: aconf.challenge.clone(),
-            profile,
+            profile: aconf.profile.into(),
             renewal,
         };
         Ok(acme_host)

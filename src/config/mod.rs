@@ -19,16 +19,17 @@ pub use cli::CliOptions;
 // deserialisers in hcl.rs, however YAGNE applies so we just re-export
 // the deserialised types.
 pub use hcl::{
-    Config,
     AcmeChallenge,
-    DnsProvider,
-    TlsConfig,
-    TlsAcmeConfig,
+    AcmeProfile,
     Backend,
-    Vhost,
     BackendType,
-    StaticBackend,
+    Config,
+    DnsProvider,
     ProxyBackend,
+    StaticBackend,
+    TlsAcmeConfig,
+    TlsConfig,
+    Vhost,
 };
 
 pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.hcl";

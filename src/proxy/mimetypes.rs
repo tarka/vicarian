@@ -1,5 +1,6 @@
 use http::{
-    HeaderMap, HeaderValue, header::{HeaderName, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE},
+    HeaderMap, HeaderValue,
+    header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE, HeaderName},
 };
 
 // Compressible mime-types; generated from mime-db:
@@ -8,6 +9,9 @@ use http::{
 //         | jq -r 'to_entries[] | select(.value.compressible == true) | .key' \
 //         | sort
 //
+// This could be a PHF-set, but with this few parameters hits are a
+// wash, misses aren't slow enough to make a differnce on a
+// network-bound app.
 const COMPRESSIBLE: &[&str] = &[
     "application/dart",
     "application/ecmascript",

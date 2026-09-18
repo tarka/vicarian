@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 1 -->Bug Fixes
 
-- *(build)* Remove reference to CONFIGURATION.md
+- *(build)* Remove reference to CONFIGURATION.md. This fixes tarball releases.
 
 ### Other
 

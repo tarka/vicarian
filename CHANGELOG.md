@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/tarka/vicarian/compare/v0.5.0...v0.5.1) - 2026-09-18
+
+### <!-- 1 -->Bug Fixes
+
+- *(build)* Remove reference to CONFIGURATION.md
+
+### Other
+
+- Intialise fastrand seed as it uses a constant otherwise.
+
 ## [0.5.0](https://github.com/tarka/vicarian/compare/v0.4.0...v0.5.0) - 2026-09-17
 
 ### <!-- 0 -->Features

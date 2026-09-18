@@ -224,6 +224,8 @@ pub struct ChallengeTokens {
 impl AcmeRuntime {
 
     pub fn new(certstore: Arc<CertStore>, context: Arc<RunContext>) -> Result<Self> {
+        fastrand::seed(std::process::id().into());
+
         let acme_hosts = context.config.vhosts.iter()
             .filter_map(|vhost| match &vhost.tls {
                 TlsConfig::Cert(_) => None, // Handled elsewhere

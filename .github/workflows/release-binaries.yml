@@ -20,7 +20,7 @@ defaults:
 
 jobs:
   upload-tarball:
-    name: ${{ matrix.shortname }}
+    name: ${{ matrix.shortname }}-${{ matrix.target }}
     if: github.repository_owner == 'tarka'
     runs-on: ${{ matrix.os }}
     permissions:
@@ -64,10 +64,10 @@ jobs:
           archive: $bin-$tag-${{ matrix.target }}
           leading-dir: true
           bin-leading-dir: bin
-          include: LICENSE,README.md,CONFIGURATION.md,etc
+          include: LICENSE,README.md,etc
 
   upload-debs:
-    name: ${{ matrix.shortname }}
+    name: ${{ matrix.shortname }}-${{ matrix.target }}
     if: github.repository_owner == 'tarka'
     runs-on: ${{ matrix.os }}
     permissions:

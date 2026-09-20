@@ -202,6 +202,10 @@ impl Renewal {
     }
 }
 
+enum RenewalType<'a> {
+    Cert(&'a AcmeHost),
+    RenewalInfo(&'a AcmeHost),
+}
 
 pub struct AcmeRuntime {
     context: Arc<RunContext>,

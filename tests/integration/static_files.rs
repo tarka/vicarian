@@ -1,27 +1,20 @@
 #![cfg(feature = "integration_tests")]
 
-#[path = "../utils/certs.rs"]
-mod certutils;
-#[path = "../utils/proxy.rs"]
-mod proxyutils;
-
 use http::header::AUTHORIZATION;
-use proxyutils::{ProxyBuilder, TLS_PORT};
 use reqwest::{Client, header::{VIA, CONTENT_TYPE, STRICT_TRANSPORT_SECURITY}};
-use serial_test::serial;
 
 use crate::certutils::TEST_CERTS;
+use crate::proxyutils::ProxyBuilder;
 
 #[tokio::test]
-#[serial]
 async fn test_static_file_serving() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -30,7 +23,7 @@ async fn test_static_file_serving() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/"))
+        .get(format!("https://www.example.com:{}/", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -44,15 +37,14 @@ async fn test_static_file_serving() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_file_with_explicit_path() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -61,7 +53,7 @@ async fn test_static_file_with_explicit_path() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/index.html"))
+        .get(format!("https://www.example.com:{}/index.html", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -72,15 +64,14 @@ async fn test_static_file_with_explicit_path() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_css_file() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -89,7 +80,7 @@ async fn test_static_css_file() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/css/style.css"))
+        .get(format!("https://www.example.com:{}/css/style.css", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -103,15 +94,14 @@ async fn test_static_css_file() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_js_file() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -120,7 +110,7 @@ async fn test_static_js_file() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/js/app.js"))
+        .get(format!("https://www.example.com:{}/js/app.js", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -134,15 +124,14 @@ async fn test_static_js_file() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_binary_file() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -151,7 +140,7 @@ async fn test_static_binary_file() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/assets/logo.png"))
+        .get(format!("https://www.example.com:{}/assets/logo.png", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -165,15 +154,14 @@ async fn test_static_binary_file() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_nested_path() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -182,7 +170,7 @@ async fn test_static_nested_path() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/subdir/page.html"))
+        .get(format!("https://www.example.com:{}/subdir/page.html", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -193,15 +181,14 @@ async fn test_static_nested_path() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_404() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -210,7 +197,7 @@ async fn test_static_404() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/nonexistent.txt"))
+        .get(format!("https://www.example.com:{}/nonexistent.txt", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -221,15 +208,14 @@ async fn test_static_404() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_auth_required() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static_auth")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     // Without auth: should return 401
@@ -239,7 +225,7 @@ async fn test_static_auth_required() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/"))
+        .get(format!("https://www.example.com:{}/", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -248,15 +234,14 @@ async fn test_static_auth_required() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_auth_valid() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static_auth")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     // With valid auth: should return 200
@@ -266,7 +251,7 @@ async fn test_static_auth_valid() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/"))
+        .get(format!("https://www.example.com:{}/", proxy.tls_port))
         .header(AUTHORIZATION, "Bearer my_auth_key")
         .send()
         .await
@@ -278,15 +263,14 @@ async fn test_static_auth_valid() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_auth_invalid() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static_auth")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     // With invalid auth: should return 401
@@ -296,7 +280,7 @@ async fn test_static_auth_invalid() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/"))
+        .get(format!("https://www.example.com:{}/", proxy.tls_port))
         .header(AUTHORIZATION, "Bearer wrong_key")
         .send()
         .await
@@ -306,15 +290,14 @@ async fn test_static_auth_invalid() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_compression_gzip() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -323,7 +306,7 @@ async fn test_static_compression_gzip() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/large.html"))
+        .get(format!("https://www.example.com:{}/large.html", proxy.tls_port))
         .header("Accept-Encoding", "gzip")
         .send()
         .await
@@ -339,15 +322,14 @@ async fn test_static_compression_gzip() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_compression_brotli() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -356,7 +338,7 @@ async fn test_static_compression_brotli() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/large.html"))
+        .get(format!("https://www.example.com:{}/large.html", proxy.tls_port))
         .header("Accept-Encoding", "br")
         .send()
         .await
@@ -369,15 +351,14 @@ async fn test_static_compression_brotli() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_no_compression_without_accept_encoding() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -386,7 +367,7 @@ async fn test_static_no_compression_without_accept_encoding() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/large.html"))
+        .get(format!("https://www.example.com:{}/large.html", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -397,15 +378,14 @@ async fn test_static_no_compression_without_accept_encoding() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_preserves_vicarian_headers() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -414,7 +394,7 @@ async fn test_static_preserves_vicarian_headers() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/"))
+        .get(format!("https://www.example.com:{}/", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -432,15 +412,14 @@ async fn test_static_preserves_vicarian_headers() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_directory_listing() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -449,7 +428,7 @@ async fn test_static_directory_listing() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/css/"))
+        .get(format!("https://www.example.com:{}/css/", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -460,15 +439,14 @@ async fn test_static_directory_listing() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_fallback_page() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -477,7 +455,7 @@ async fn test_static_fallback_page() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/some/unknown/path"))
+        .get(format!("https://www.example.com:{}/some/unknown/path", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -488,15 +466,14 @@ async fn test_static_fallback_page() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_context_path() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -505,7 +482,7 @@ async fn test_static_context_path() {
         .http2_prior_knowledge()
         .build()
         .unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/css/style.css"))
+        .get(format!("https://www.example.com:{}/css/style.css", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -516,15 +493,14 @@ async fn test_static_context_path() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_head_request() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let client = Client::builder()
@@ -534,7 +510,7 @@ async fn test_static_head_request() {
         .build()
         .unwrap();
 
-    let response = client.head(format!("https://www.example.com:{TLS_PORT}/index.html"))
+    let response = client.head(format!("https://www.example.com:{}/index.html", proxy.tls_port))
         .send()
         .await
         .unwrap();
@@ -545,15 +521,15 @@ async fn test_static_head_request() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_static_multiple_files_concurrent() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
         .run_with_static()
         .await
         .unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let tls_port = proxy.tls_port;
+    let example_com = format!("127.0.0.1:{tls_port}").parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let client = Client::builder()
@@ -574,7 +550,7 @@ async fn test_static_multiple_files_concurrent() {
     .map(|path| {
         let client = client.clone();
         tokio::spawn(async move {
-            client.get(format!("https://www.example.com:{TLS_PORT}{path}"))
+            client.get(format!("https://www.example.com:{tls_port}{path}"))
                 .send()
                 .await
         })

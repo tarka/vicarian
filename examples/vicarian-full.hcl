@@ -85,8 +85,8 @@ listen {
     addrs = [
         "[::]"            // Default; this listens to IPv4 & IPv6 from everywhere
     ]
-    insecure_port = 80    // Default
-    tls_port = 443        // Default
+    insecure_port = 80    // Default; can be overridden on the commandline with `--insecure-port`
+    tls_port = 443        // Default; can be overridden on the commandline with `--tls-port`
 }
 
 // Vhost configuration. At least one is required. The primary name is in the block,

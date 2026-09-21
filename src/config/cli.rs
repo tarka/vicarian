@@ -26,14 +26,14 @@ pub struct CliOptions {
     /// it here overrides any value or default.  This is only used for
     /// redirection to HTTPS and ACME/Letsencrypt certificate
     /// generation.
-    #[arg(long)]
+    #[arg(long, visible_alias = "http-port")]
     pub insecure_port: Option<u16>,
 
     /// HTTPS/TLS port override.
     ///
     /// This is usually specified in the configuration file; providing
     /// it here overrides any value or default.
-    #[arg(long)]
+    #[arg(long, visible_alias = "https-port")]
     pub tls_port: Option<u16>,
 }
 

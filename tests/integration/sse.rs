@@ -2,13 +2,12 @@ use std::time::{Duration, Instant};
 
 use http::header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE};
 use reqwest::Client;
-use serial_test::serial;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use wiremock::{Mock, ResponseTemplate, matchers::{method, path}};
 
 use crate::certutils::TEST_CERTS;
-use crate::proxyutils::{BACKEND_PORT, ProxyBuilder, TLS_PORT, mock_server};
+use crate::proxyutils::ProxyBuilder;
 
 const SSE_EVENTS: u32 = 3;
 const SSE_EVENT_DELAY: Duration = Duration::from_millis(500);
@@ -80,14 +79,14 @@ async fn read_sse_stream(response: reqwest::Response) -> (Duration, Duration, St
 }
 
 async fn sse_streaming_check(http2: bool) {
-    let listener = TcpListener::bind(format!("127.0.0.1:{BACKEND_PORT}")).await.unwrap();
-    tokio::spawn(sse_backend(listener));
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
 
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port)).await.unwrap();
+    tokio::spawn(sse_backend(listener));
+
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let mut builder = Client::builder()
@@ -100,7 +99,7 @@ async fn sse_streaming_check(http2: bool) {
     }
 
     let response = builder.build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/events"))
+        .get(format!("https://localhost:{}/events", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -135,21 +134,21 @@ async fn sse_streaming_check(http2: bool) {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_sse_streaming_not_buffered() {
     sse_streaming_check(false).await;
 }
 
 #[tokio::test]
-#[serial]
 async fn test_sse_streaming_http2() {
     sse_streaming_check(true).await;
 }
 
 #[tokio::test]
-#[serial]
 async fn test_sse_not_compressed() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = "data: event-0\n\n".repeat(100);
     Mock::given(method("GET"))
@@ -159,18 +158,14 @@ async fn test_sse_not_compressed() {
                       .insert_header("Cache-Control", "no-cache"))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/events"))
+        .get(format!("https://localhost:{}/events", proxy.tls_port))
         .header("Accept-Encoding", "gzip, br, zstd")
         .send().await.unwrap();
 
@@ -187,16 +182,15 @@ async fn test_sse_not_compressed() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_sse_client_disconnect() {
-    let listener = TcpListener::bind(format!("127.0.0.1:{BACKEND_PORT}")).await.unwrap();
-    tokio::spawn(sse_backend(listener));
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
 
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port)).await.unwrap();
+    tokio::spawn(sse_backend(listener));
+
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let client = Client::builder()
@@ -207,7 +201,7 @@ async fn test_sse_client_disconnect() {
 
     // Open a stream, read the first event, then disconnect abruptly.
     let response = client
-        .get(format!("https://localhost:{TLS_PORT}/events"))
+        .get(format!("https://localhost:{}/events", proxy.tls_port))
         .send().await.unwrap();
     assert_eq!(200, response.status().as_u16());
     let mut response = response;
@@ -218,7 +212,7 @@ async fn test_sse_client_disconnect() {
     // The proxy must survive the aborted stream and keep serving.
     tokio::time::sleep(Duration::from_millis(200)).await;
     let response = client
-        .get(format!("https://localhost:{TLS_PORT}/events"))
+        .get(format!("https://localhost:{}/events", proxy.tls_port))
         .send().await.unwrap();
     assert_eq!(200, response.status().as_u16());
     let (_first_at, _total, body) = read_sse_stream(response).await;

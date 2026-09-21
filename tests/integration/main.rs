@@ -1,39 +1,29 @@
 #![cfg(feature = "integration_tests")]
 
-#[path = "../utils/certs.rs"]
-mod certutils;
 #[path = "../utils/proxy.rs"]
 mod proxyutils;
+use proxyutils::certs as certutils;
 mod static_files;
 mod sse;
 mod websockets;
 
 use http::header::{AUTHORIZATION, HOST};
 use reqwest::{Client, redirect, header::{VIA, LOCATION, STRICT_TRANSPORT_SECURITY}};
-use serial_test::serial;
 use wiremock::{
     Mock, ResponseTemplate,
     matchers::{method, path},
 };
 
-use proxyutils::{
-    BACKEND_PORT, INSECURE_PORT, ProxyBuilder, TLS_PORT, mock_server,
-};
+use proxyutils::ProxyBuilder;
 
 use crate::certutils::TEST_CERTS;
 
 // NOTE: We use unwrap rather than result here as we can save the run
 // files on failure (see Proxy::drop()).
-//
-// Tests run serially currently as we use the same port across runs
-// for simplicity. Once we have more tests we may need to look into
-// parallelising. This is also configured for `nextest` under
-// $CRATE/.config/nextest.toml
 
 #[tokio::test]
-#[serial]
 async fn test_redirect_http() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
 
@@ -41,30 +31,29 @@ async fn test_redirect_http() {
     let ready = Client::builder()
         .redirect(redirect::Policy::none())
         .build().unwrap()
-        .get(format!("http://localhost:{INSECURE_PORT}/status"))
+        .get(format!("http://localhost:{}/status", proxy.insecure_port))
         .send().await.unwrap();
 
     assert_eq!(301, ready.status().as_u16());
     let loc = ready.headers().get("Location").unwrap()
         .to_str().unwrap().to_string();
-    let tls = format!("https://localhost:{TLS_PORT}/status");
+    let tls = format!("https://localhost:{}/status", proxy.tls_port);
     assert_eq!(tls, loc);
 }
 
 #[tokio::test]
-#[serial]
 async fn test_dns_override() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
     let ready = Client::builder()
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.example.com:{}/status", proxy.tls_port))
         .send().await.unwrap();
 
     // No backend, so fails
@@ -72,13 +61,11 @@ async fn test_dns_override() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_mocked_backend() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
@@ -91,7 +78,7 @@ async fn test_mocked_backend() {
     let response = Client::builder()
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/status"))
+        .get(format!("https://localhost:{}/status", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -99,15 +86,13 @@ async fn test_mocked_backend() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_mixed_case_host_header() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
@@ -121,7 +106,7 @@ async fn test_mixed_case_host_header() {
         .add_root_certificate(root_cert)
         .http1_only()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.example.com:{}/status", proxy.tls_port))
         .header(HOST, "WWW.EXAMPLE.COM")
         .send().await.unwrap();
 
@@ -130,16 +115,15 @@ async fn test_mixed_case_host_header() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_vhosts() {
-    let backend_server1 = mock_server(BACKEND_PORT).await.unwrap();
-    let backend_server2 = mock_server(BACKEND_PORT+1).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_vhosts")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let backend_server1 = proxy.mock_server().await.unwrap();
+    let backend_server2 = proxy.mock_server_2().await.unwrap();
+
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = &TEST_CERTS.caroot.reqcert;
 
     // www.example.com
@@ -154,7 +138,7 @@ async fn test_vhosts() {
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert.clone())
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/host"))
+        .get(format!("https://www.example.com:{}/host", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, www_response.status().as_u16());
@@ -172,7 +156,7 @@ async fn test_vhosts() {
         .resolve("test.example.com", example_com)
         .add_root_certificate(root_cert.clone())
         .build().unwrap()
-        .get(format!("https://test.example.com:{TLS_PORT}/host"))
+        .get(format!("https://test.example.com:{}/host", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, test_response.status().as_u16());
@@ -181,35 +165,32 @@ async fn test_vhosts() {
 
 
 #[tokio::test]
-#[serial]
 async fn test_invalid_cert() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("wrong.example.com", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://wrong.example.com:{TLS_PORT}/status"))
+        .get(format!("https://wrong.example.com:{}/status", proxy.tls_port))
         .send().await;
 
     assert!(response.is_err());
 }
 
 #[tokio::test]
-#[serial]
 async fn test_https_headers() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
@@ -222,7 +203,7 @@ async fn test_https_headers() {
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.example.com:{}/status", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -238,15 +219,13 @@ async fn test_https_headers() {
 
 
 #[tokio::test]
-#[serial]
 async fn test_http1() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
@@ -260,7 +239,7 @@ async fn test_http1() {
         .add_root_certificate(root_cert)
         .http1_only()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.example.com:{}/status", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -275,15 +254,13 @@ async fn test_http1() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_http2() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
@@ -297,7 +274,7 @@ async fn test_http2() {
         .add_root_certificate(root_cert)
         .http2_prior_knowledge()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.example.com:{}/status", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -312,15 +289,13 @@ async fn test_http2() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_wildcard() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_wildcard")
         .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
@@ -334,7 +309,7 @@ async fn test_wildcard() {
         .add_root_certificate(root_cert)
         .http2_prior_knowledge()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.example.com:{}/status", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -349,15 +324,13 @@ async fn test_wildcard() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_no_wildcard() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
-
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_wildcard")
         .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     Mock::given(method("GET"))
@@ -371,7 +344,7 @@ async fn test_no_wildcard() {
         .add_root_certificate(root_cert)
         .http2_prior_knowledge()
         .build().unwrap()
-        .get(format!("https://www.not-example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.not-example.com:{}/status", proxy.tls_port))
         .send().await;
 
     assert!(response.is_err());
@@ -379,13 +352,12 @@ async fn test_no_wildcard() {
 
 
 #[tokio::test]
-#[serial]
 async fn test_metrics() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_metrics")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -393,7 +365,7 @@ async fn test_metrics() {
         .add_root_certificate(root_cert)
         .http2_prior_knowledge()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -403,13 +375,12 @@ async fn test_metrics() {
 
 
 #[tokio::test]
-#[serial]
 async fn test_auth_valid() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_auth")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -417,7 +388,7 @@ async fn test_auth_valid() {
         .add_root_certificate(root_cert)
         .http2_prior_knowledge()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .header(AUTHORIZATION, "Bearer my_auth_key")
         .send().await.unwrap();
 
@@ -427,13 +398,12 @@ async fn test_auth_valid() {
 
 
 #[tokio::test]
-#[serial]
 async fn test_auth_invalid() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_auth")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -441,7 +411,7 @@ async fn test_auth_invalid() {
         .add_root_certificate(root_cert)
         .http2_prior_knowledge()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .header(AUTHORIZATION, "Bearer INVALID_KEY")
         .send().await.unwrap();
 
@@ -450,13 +420,12 @@ async fn test_auth_invalid() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_auth_missing_header() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_auth")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -464,7 +433,7 @@ async fn test_auth_missing_header() {
         .add_root_certificate(root_cert)
         .http2_prior_knowledge()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+        .get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .send().await.unwrap();
 
     // No Authorization header: should return 401
@@ -472,13 +441,12 @@ async fn test_auth_missing_header() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_auth_malformed_headers() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_auth")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let client = Client::builder()
@@ -488,38 +456,37 @@ async fn test_auth_malformed_headers() {
         .build().unwrap();
 
     // lowercase bearer prefix: expected to fail since the code checks exact match `Bearer {key}`
-    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+    let response = client.get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .header(AUTHORIZATION, "bearer my_auth_key")
         .send().await.unwrap();
     assert_eq!(401, response.status().as_u16());
 
     // Basic auth: should fail
-    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+    let response = client.get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .header(AUTHORIZATION, "Basic my_auth_key")
         .send().await.unwrap();
     assert_eq!(401, response.status().as_u16());
 
     // Just Bearer without key: should fail
-    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+    let response = client.get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .header(AUTHORIZATION, "Bearer")
         .send().await.unwrap();
     assert_eq!(401, response.status().as_u16());
 
     // Bearer with double spaces: should fail
-    let response = client.get(format!("https://www.example.com:{TLS_PORT}/metrics"))
+    let response = client.get(format!("https://www.example.com:{}/metrics", proxy.tls_port))
         .header(AUTHORIZATION, "Bearer  my_auth_key")
         .send().await.unwrap();
     assert_eq!(401, response.status().as_u16());
 }
 
 #[tokio::test]
-#[serial]
 async fn test_unknown_host_header() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -528,7 +495,7 @@ async fn test_unknown_host_header() {
         .danger_accept_invalid_certs(true)
         .http1_only()
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/status"))
+        .get(format!("https://www.example.com:{}/status", proxy.tls_port))
         .header(HOST, "unknown.example.com")
         .send().await.unwrap();
 
@@ -537,59 +504,56 @@ async fn test_unknown_host_header() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_unknown_backend_path() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
 
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/invalid-path"))
+        .get(format!("https://www.example.com:{}/invalid-path", proxy.tls_port))
         .send().await.unwrap();
 
     // The host is valid, but the backend is only configured for context "/" which should match anything.
-    // Since there is no mock server running on 19090 (BACKEND_PORT),
+    // Since there is no mock server running on backend port,
     // it should fail to connect to backend and return 502 Bad Gateway.
     assert_eq!(502, response.status().as_u16());
 }
 
 #[tokio::test]
-#[serial]
 async fn test_http_to_https_redirect_preserves_path_and_query() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
 
     let ready = Client::builder()
         .redirect(redirect::Policy::none())
         .build().unwrap()
-        .get(format!("http://localhost:{INSECURE_PORT}/foo/bar?baz=qux"))
+        .get(format!("http://localhost:{}/foo/bar?baz=qux", proxy.insecure_port))
         .send().await.unwrap();
 
     assert_eq!(301, ready.status().as_u16());
     let loc = ready.headers().get("Location").unwrap()
         .to_str().unwrap().to_string();
-    let expected_tls = format!("https://localhost:{TLS_PORT}/foo/bar?baz=qux");
+    let expected_tls = format!("https://localhost:{}/foo/bar?baz=qux", proxy.tls_port);
     assert_eq!(expected_tls, loc);
 }
 
 #[tokio::test]
-#[serial]
 async fn test_http01_not_found() {
-    let _proxy = ProxyBuilder::new().await
+    let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
 
     let response = Client::builder()
         .redirect(redirect::Policy::none())
         .build().unwrap()
-        .get(format!("http://localhost:{INSECURE_PORT}/.well-known/acme-challenge/nonexistent"))
+        .get(format!("http://localhost:{}/.well-known/acme-challenge/nonexistent", proxy.insecure_port))
         .header(HOST, "www.example.com")
         .send().await.unwrap();
 
@@ -599,9 +563,11 @@ async fn test_http01_not_found() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_context_path_rewriting() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("backend_context")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/some/path"))
@@ -609,18 +575,14 @@ async fn test_context_path_rewriting() {
                       .set_body_string("rewritten"))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("backend_context")
-        .run().await.unwrap();
-
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/api/some/path"))
+        .get(format!("https://www.example.com:{}/api/some/path", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -629,9 +591,11 @@ async fn test_context_path_rewriting() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_method_passthrough() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     Mock::given(method("POST"))
         .and(path("/status"))
@@ -651,18 +615,14 @@ async fn test_method_passthrough() {
                       .set_body_string("DELETE"))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", example_com)
         .add_root_certificate(root_cert.clone())
         .build().unwrap()
-        .post(format!("https://localhost:{TLS_PORT}/status"))
+        .post(format!("https://localhost:{}/status", proxy.tls_port))
         .body("test-body")
         .send().await.unwrap();
 
@@ -674,7 +634,7 @@ async fn test_method_passthrough() {
         .resolve("localhost", example_com)
         .add_root_certificate(root_cert.clone())
         .build().unwrap()
-        .put(format!("https://localhost:{TLS_PORT}/status"))
+        .put(format!("https://localhost:{}/status", proxy.tls_port))
         .body("put-body")
         .send().await.unwrap();
 
@@ -686,7 +646,7 @@ async fn test_method_passthrough() {
         .resolve("localhost", example_com)
         .add_root_certificate(root_cert.clone())
         .build().unwrap()
-        .delete(format!("https://localhost:{TLS_PORT}/status"))
+        .delete(format!("https://localhost:{}/status", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -695,9 +655,11 @@ async fn test_method_passthrough() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_location_header_rewriting() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("backend_context")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/some/path"))
@@ -705,11 +667,7 @@ async fn test_location_header_rewriting() {
                       .insert_header(LOCATION, "/new-path"))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("backend_context")
-        .run().await.unwrap();
-
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
@@ -717,7 +675,7 @@ async fn test_location_header_rewriting() {
         .resolve("www.example.com", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://www.example.com:{TLS_PORT}/api/some/path"))
+        .get(format!("https://www.example.com:{}/api/some/path", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(301, response.status().as_u16());
@@ -727,9 +685,11 @@ async fn test_location_header_rewriting() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_x_forwarded_headers() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/"))
@@ -745,18 +705,14 @@ async fn test_x_forwarded_headers() {
         })
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let example_com = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", example_com)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/"))
+        .get(format!("https://localhost:{}/", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -775,9 +731,11 @@ fn _large_body() -> &'static str {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_compression_gzip_accept_encoding() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -786,18 +744,14 @@ async fn test_compression_gzip_accept_encoding() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .header("Accept-Encoding", "gzip")
         .send().await.unwrap();
 
@@ -813,9 +767,11 @@ async fn test_compression_gzip_accept_encoding() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_compression_brotli_accept_encoding() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -824,18 +780,14 @@ async fn test_compression_brotli_accept_encoding() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .header("Accept-Encoding", "br")
         .send().await.unwrap();
 
@@ -851,9 +803,11 @@ async fn test_compression_brotli_accept_encoding() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_compression_prefers_best_encoding() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -862,18 +816,14 @@ async fn test_compression_prefers_best_encoding() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .header("Accept-Encoding", "gzip, br, zstd")
         .send().await.unwrap();
 
@@ -889,9 +839,11 @@ async fn test_compression_prefers_best_encoding() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_no_compression_without_accept_encoding() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -900,18 +852,14 @@ async fn test_no_compression_without_accept_encoding() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .send().await.unwrap();
 
     assert_eq!(200, response.status().as_u16());
@@ -920,9 +868,11 @@ async fn test_no_compression_without_accept_encoding() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_no_compression_empty_accept_encoding() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -931,18 +881,14 @@ async fn test_no_compression_empty_accept_encoding() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .header("Accept-Encoding", "")
         .send().await.unwrap();
 
@@ -952,9 +898,11 @@ async fn test_no_compression_empty_accept_encoding() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_compression_unsupported_encoding() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -963,18 +911,14 @@ async fn test_compression_unsupported_encoding() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .header("Accept-Encoding", "deflate")
         .send().await.unwrap();
 
@@ -984,9 +928,11 @@ async fn test_compression_unsupported_encoding() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_compression_small_body_not_compressed() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/small"))
@@ -994,18 +940,14 @@ async fn test_compression_small_body_not_compressed() {
                       .set_body_string("OK"))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/small"))
+        .get(format!("https://localhost:{}/small", proxy.tls_port))
         .header("Accept-Encoding", "gzip")
         .send().await.unwrap();
 
@@ -1015,9 +957,11 @@ async fn test_compression_small_body_not_compressed() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_compression_preserves_vicarian_headers() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -1026,18 +970,14 @@ async fn test_compression_preserves_vicarian_headers() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .header("Accept-Encoding", "gzip")
         .send().await.unwrap();
 
@@ -1056,9 +996,11 @@ async fn test_compression_preserves_vicarian_headers() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_compression_preserves_body_content() {
-    let backend_server = mock_server(BACKEND_PORT).await.unwrap();
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("localhost_simple")
+        .run().await.unwrap();
+    let backend_server = proxy.mock_server().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -1067,18 +1009,14 @@ async fn test_compression_preserves_body_content() {
                       .set_body_string(body.clone()))
         .mount(&backend_server).await;
 
-    let _proxy = ProxyBuilder::new().await
-        .with_simple_config("localhost_simple")
-        .run().await.unwrap();
-
-    let localhost = format!("127.0.0.1:{TLS_PORT}").parse().unwrap();
+    let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
     let response = Client::builder()
         .resolve("localhost", localhost)
         .add_root_certificate(root_cert)
         .build().unwrap()
-        .get(format!("https://localhost:{TLS_PORT}/compress"))
+        .get(format!("https://localhost:{}/compress", proxy.tls_port))
         .header("Accept-Encoding", "gzip")
         .send().await.unwrap();
 

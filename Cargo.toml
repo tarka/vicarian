@@ -66,6 +66,7 @@ nix = { version = "0.31.3", features = ["process", "signal", "term"] }
 pem = "4.0.0"
 rcgen = { version = "0.14.10", features = ["x509-parser"] }
 reqwest = { version = "0.13.5", default-features = false, features = ["http2", "rustls"] }
+sealed_test = "1.1.0"
 serial_test = "4.0.1"
 tempfile = "3.27.0"
 test-log = { version = "0.2.21", features = ["trace"] }

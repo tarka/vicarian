@@ -10,4 +10,5 @@ pub enum VicarianError {
 
     #[error(transparent)]
     RustlsError(#[from] rustls::Error),
+
 }

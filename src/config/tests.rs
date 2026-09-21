@@ -1,6 +1,7 @@
 use anyhow::bail;
 use http::Uri;
 use itertools::Itertools;
+use sealed_test::prelude::*;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4};
 
 use crate::config::{
@@ -33,13 +34,15 @@ fn test_tls_files_example_config() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[sealed_test(
+    files = ["examples/vicarian-dns01.hcl"],
+    env = [
+        ("PORKBUN_KEY", "PORKBUN_KEY"),
+        ("PORKBUN_SECRET", "PORKBUN_SECRET"),
+    ],
+)]
 fn test_dns01_example_config() -> Result<()> {
-    unsafe {
-        std::env::set_var("PORKBUN_KEY", "PORKBUN_KEY");
-        std::env::set_var("PORKBUN_SECRET", "PORKBUN_SECRET");
-    }
-    let config = hcl::Config::from_file("examples/vicarian-dns01.hcl".into())?;
+    let config = hcl::Config::from_file("vicarian-dns01.hcl".into())?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
@@ -84,15 +87,33 @@ fn test_http01_example_config() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[sealed_test(
+    files = ["examples/vicarian-wildcard-tls.hcl"],
+    env = [
+        ("DNS_KEY", "my-key"),
+        ("DNS_SECRET", "my-secret"),
+    ],
+)]
 fn test_wildcard_example_config() -> Result<()> {
-    unsafe {
-        std::env::set_var("DNS_KEY", "my-key");
-        std::env::set_var("DNS_SECRET", "my-secret");
-    }
-    let config = hcl::Config::from_file("examples/vicarian-wildcard-tls.hcl".into())?;
+    let config = hcl::Config::from_file("vicarian-wildcard-tls.hcl".into())?;
     // Vhost order is not deterministic (HashMap), so check for presence.
     assert!(config.vhosts.iter().any(|vh| vh.hostname == "files.example.com"));
+
+    Ok(())
+}
+
+#[sealed_test(
+    files = ["tests/data/config/localhost_env_ports.hcl"],
+    env = [
+        ("HTTP_PORT", "18080"),
+        ("HTTPS_PORT", "18443"),
+    ],
+)]
+fn test_env_ports() -> Result<()> {
+    let config = hcl::Config::from_file("localhost_env_ports.hcl".into())?;
+
+    assert_eq!(config.listen.insecure_port, 18080);
+    assert_eq!(config.listen.tls_port, 18443);
 
     Ok(())
 }
@@ -287,14 +308,16 @@ fn test_uri_with_scheme_no_authority() {
     assert!(result.is_err());
 }
 
-#[test]
+#[sealed_test(
+    files = ["examples/vicarian-full.hcl"],
+    env = [
+        ("PORKBUN_KEY", "PORKBUN_KEY"),
+        ("PORKBUN_SECRET", "PORKBUN_SECRET"),
+        ("my-secret-key", "my-secret-key"),
+    ],
+)]
 fn test_hcl_vicarian_full_example() -> Result<()> {
-    unsafe {
-        std::env::set_var("PORKBUN_KEY", "PORKBUN_KEY");
-        std::env::set_var("PORKBUN_SECRET", "PORKBUN_SECRET");
-        std::env::set_var("my-secret-key", "my-secret-key");
-    };
-    let config = hcl::Config::from_file("examples/vicarian-full.hcl".into())?;
+    let config = hcl::Config::from_file("vicarian-full.hcl".into())?;
 
     assert!(!config.dev_mode);
 

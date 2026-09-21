@@ -164,16 +164,16 @@ struct RawConfig {
 #[serde(default, deny_unknown_fields)]
 struct RawListen {
     addrs: Vec<String>,
-    insecure_port: u16,
-    tls_port: u16,
+    insecure_port: Value,
+    tls_port: Value,
 }
 
 impl Default for RawListen {
     fn default() -> Self {
         Self {
             addrs: vec!["[::]".to_string()],
-            insecure_port: 80,
-            tls_port: 443
+            insecure_port: Value::Number(80.into()),
+            tls_port: Value::Number(443.into()),
         }
     }
 }
@@ -185,13 +185,27 @@ pub struct Listen {
     pub tls_port: u16,
 }
 
+fn try_as_port(raw: Value) -> Result<u16> {
+    match raw {
+        Value::Number(n) =>
+            raw.as_u64()
+                .and_then(|u| u16::try_from(u).ok())
+                .ok_or_else(|| anyhow!("Invalid port range: {n}")),
+        Value::String(s) =>
+            s.trim()
+                .parse::<u16>()
+                .map_err(|_e| anyhow!("Invalid port string: {s}")),
+        _ => Err(anyhow!("Invalid value for port; expected number or string: {:?}", raw)),
+    }
+}
+
 impl TryFrom<RawListen> for Listen {
     type Error = anyhow::Error;
     fn try_from(raw: RawListen) -> Result<Self> {
         Ok(Listen {
             addrs: expand_listen_addrs(&raw.addrs)?,
-            insecure_port: raw.insecure_port,
-            tls_port: raw.tls_port,
+            insecure_port: try_as_port(raw.insecure_port)?,
+            tls_port: try_as_port(raw.tls_port)?,
         })
     }
 }

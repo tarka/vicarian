@@ -241,7 +241,12 @@ impl ProxyBuilder {
         let copied = self.dir.path().join(fname);
 
         // Backend URLs are baked into the config file, so rewrite them.
-        // The proxy's insecure_port and tls_port are passed as CLI positional args below.
+        // The proxy's insecure_port and tls_port are passed as CLI flags below.
+        //
+        // FIXME: This could be replaced with `url =
+        // env("MY_TEST_BACKEND")`, but would also require isolation
+        // of the environment between parallel tests (with sealed-test
+        // or similar?)
         let content = tokio::fs::read_to_string(config).await?;
         let content = content
             .replace("19090", &self.ports.backend_port.to_string())

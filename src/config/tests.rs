@@ -118,6 +118,80 @@ fn test_env_ports() -> Result<()> {
     Ok(())
 }
 
+#[sealed_test(
+    files = ["tests/data/config/localhost_env_ports.hcl"],
+    env = [
+        ("HTTP_PORT", "abc"),
+        ("HTTPS_PORT", "18443"),
+    ],
+)]
+fn test_env_port_non_numeric() -> Result<()> {
+    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    assert!(result.unwrap_err().to_string().contains("Invalid port string: abc"));
+
+    Ok(())
+}
+
+#[sealed_test(
+    files = ["tests/data/config/localhost_env_ports.hcl"],
+    env = [
+        ("HTTP_PORT", "-1"),
+        ("HTTPS_PORT", "18443"),
+    ],
+)]
+fn test_env_port_negative() -> Result<()> {
+    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    assert!(result.unwrap_err().to_string().contains("Invalid port string: -1"));
+
+    Ok(())
+}
+
+#[sealed_test(
+    files = ["tests/data/config/localhost_env_ports.hcl"],
+    env = [
+        ("HTTP_PORT", "18080"),
+        ("HTTPS_PORT", "70000"),
+    ],
+)]
+fn test_env_port_out_of_range() -> Result<()> {
+    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    assert!(result.unwrap_err().to_string().contains("Invalid port string: 70000"));
+
+    Ok(())
+}
+
+#[sealed_test(
+    files = ["tests/data/config/localhost_env_ports.hcl"],
+    env = [
+        ("HTTP_PORT", "99999999999999999999999999"),
+        ("HTTPS_PORT", "18443"),
+    ],
+)]
+fn test_env_port_oversized() -> Result<()> {
+    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid port string: 99999999999999999999999999"));
+
+    Ok(())
+}
+
+#[sealed_test(
+    files = ["tests/data/config/localhost_env_ports.hcl"],
+    env = [
+        ("HTTP_PORT", ""),
+        ("HTTPS_PORT", "18443"),
+    ],
+)]
+fn test_env_port_empty() -> Result<()> {
+    // Also covers a missing env var: env() substitutes an empty string.
+    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    assert!(result.unwrap_err().to_string().contains("Invalid port string"));
+
+    Ok(())
+}
+
 #[test]
 fn test_tls_example_interface() -> Result<()> {
     let config = hcl::Config::from_file("examples/vicarian-listen-interface.hcl".into())?;

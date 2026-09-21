@@ -1,6 +1,5 @@
 listen {
-    insecure_port = 18080
-    tls_port = 18443
+    // Set on the commandline
 }
 
 cert "localhost" {

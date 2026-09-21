@@ -36,9 +36,9 @@ const PORTS_PER_TEST: u16 = 4;
 
 static PROCESS_PORT_MUTEX: Mutex<()> = Mutex::new(());
 
-/// Checks if a port can be bound on IPv4 and IPv6 localhost and 0.0.0.0.
-/// Returns the bound listener on 127.0.0.1 if successful (kept open temporarily
-/// to prevent races while validating the rest of the port block).
+// Checks if a port can be bound on IPv4 and IPv6 localhost and 0.0.0.0.
+// Returns the bound listener on 127.0.0.1 if successful (kept open temporarily
+// to prevent races while validating the rest of the port block).
 fn try_bind_port(port: u16) -> Option<std::net::TcpListener> {
     // Attempt to bind IPv6 dual-stack (which covers both IPv6 and IPv4)
     // or fall back to IPv4 wildcard 0.0.0.0.
@@ -49,9 +49,9 @@ fn try_bind_port(port: u16) -> Option<std::net::TcpListener> {
     }
 }
 
-/// Allocate a block of 4 consecutive free ports for a test.
-/// Guaranteed not to clash with any existing system daemon, and synchronized
-/// across threads and processes using both an in-process mutex and an fslock file lock.
+// Allocate a block of 4 consecutive free ports for a test.
+// Guaranteed not to clash with any existing system daemon, and synchronized
+// across threads and processes using both an in-process mutex and an fslock file lock.
 pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
     let _process_guard = PROCESS_PORT_MUTEX.lock().unwrap();
 
@@ -240,11 +240,10 @@ impl ProxyBuilder {
         let fname = config.components().next_back().ok_or(anyhow!("No filename"))?;
         let copied = self.dir.path().join(fname);
 
-        // Rewrite default ports in test config to the assigned dynamic ports
+        // Backend URLs are baked into the config file, so rewrite them.
+        // The proxy's insecure_port and tls_port are passed as CLI positional args below.
         let content = tokio::fs::read_to_string(config).await?;
         let content = content
-            .replace("18080", &self.ports.insecure_port.to_string())
-            .replace("18443", &self.ports.tls_port.to_string())
             .replace("19090", &self.ports.backend_port.to_string())
             .replace("19091", &self.ports.backend_port_2.to_string());
         tokio::fs::write(&copied, content).await?;
@@ -252,6 +251,10 @@ impl ProxyBuilder {
         let mut child = Command::new(exe)
             .arg("-vv")
             .arg("-c").arg(&copied)
+            // Port flags override the listen ports from the config file,
+            // enabling parallel tests to each use their own unique port block.
+            .arg("--insecure-port").arg(self.ports.insecure_port.to_string())
+            .arg("--tls-port").arg(self.ports.tls_port.to_string())
             .stdout(stdout.into_std().await)
             .stderr(stderr.into_std().await)
             .spawn()?;

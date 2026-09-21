@@ -18,7 +18,11 @@ use super::*;
 
 #[test]
 fn test_tls_files_example_config() -> Result<()> {
-    let config = hcl::Config::from_file("examples/vicarian-tls-files.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("examples/vicarian-tls-files.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(8443, config.listen.tls_port);
@@ -42,7 +46,11 @@ fn test_tls_files_example_config() -> Result<()> {
     ],
 )]
 fn test_dns01_example_config() -> Result<()> {
-    let config = hcl::Config::from_file("vicarian-dns01.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("vicarian-dns01.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
@@ -69,7 +77,11 @@ fn test_dns01_example_config() -> Result<()> {
 
 #[test]
 fn test_http01_example_config() -> Result<()> {
-    let config = hcl::Config::from_file("examples/vicarian-http01.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("examples/vicarian-http01.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
     assert_eq!("www.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
@@ -95,7 +107,11 @@ fn test_http01_example_config() -> Result<()> {
     ],
 )]
 fn test_wildcard_example_config() -> Result<()> {
-    let config = hcl::Config::from_file("vicarian-wildcard-tls.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("vicarian-wildcard-tls.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
     // Vhost order is not deterministic (HashMap), so check for presence.
     assert!(config.vhosts.iter().any(|vh| vh.hostname == "files.example.com"));
 
@@ -110,7 +126,11 @@ fn test_wildcard_example_config() -> Result<()> {
     ],
 )]
 fn test_env_ports() -> Result<()> {
-    let config = hcl::Config::from_file("localhost_env_ports.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("localhost_env_ports.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
 
     assert_eq!(config.listen.insecure_port, 18080);
     assert_eq!(config.listen.tls_port, 18443);
@@ -126,7 +146,11 @@ fn test_env_ports() -> Result<()> {
     ],
 )]
 fn test_env_port_non_numeric() -> Result<()> {
-    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    let cli = CliOptions {
+        config: Some("localhost_env_ports.hcl".into()),
+        ..Default::default()
+    };
+    let result = hcl::Config::from_file(&cli);
     assert!(result.unwrap_err().to_string().contains("Invalid port string: abc"));
 
     Ok(())
@@ -140,7 +164,11 @@ fn test_env_port_non_numeric() -> Result<()> {
     ],
 )]
 fn test_env_port_negative() -> Result<()> {
-    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    let cli = CliOptions {
+        config: Some("localhost_env_ports.hcl".into()),
+        ..Default::default()
+    };
+    let result = hcl::Config::from_file(&cli);
     assert!(result.unwrap_err().to_string().contains("Invalid port string: -1"));
 
     Ok(())
@@ -154,7 +182,11 @@ fn test_env_port_negative() -> Result<()> {
     ],
 )]
 fn test_env_port_out_of_range() -> Result<()> {
-    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    let cli = CliOptions {
+        config: Some("localhost_env_ports.hcl".into()),
+        ..Default::default()
+    };
+    let result = hcl::Config::from_file(&cli);
     assert!(result.unwrap_err().to_string().contains("Invalid port string: 70000"));
 
     Ok(())
@@ -168,7 +200,11 @@ fn test_env_port_out_of_range() -> Result<()> {
     ],
 )]
 fn test_env_port_oversized() -> Result<()> {
-    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    let cli = CliOptions {
+        config: Some("localhost_env_ports.hcl".into()),
+        ..Default::default()
+    };
+    let result = hcl::Config::from_file(&cli);
     assert!(result
         .unwrap_err()
         .to_string()
@@ -186,7 +222,11 @@ fn test_env_port_oversized() -> Result<()> {
 )]
 fn test_env_port_empty() -> Result<()> {
     // Also covers a missing env var: env() substitutes an empty string.
-    let result = hcl::Config::from_file("localhost_env_ports.hcl".into());
+    let cli = CliOptions {
+        config: Some("localhost_env_ports.hcl".into()),
+        ..Default::default()
+    };
+    let result = hcl::Config::from_file(&cli);
     assert!(result.unwrap_err().to_string().contains("Invalid port string"));
 
     Ok(())
@@ -194,7 +234,11 @@ fn test_env_port_empty() -> Result<()> {
 
 #[test]
 fn test_tls_example_interface() -> Result<()> {
-    let config = hcl::Config::from_file("examples/vicarian-listen-interface.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("examples/vicarian-listen-interface.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
     assert_eq!("files.example.com", config.vhosts[0].hostname);
 
     assert_eq!(443, config.listen.tls_port);
@@ -212,7 +256,11 @@ fn test_tls_example_interface() -> Result<()> {
 
 #[test]
 fn test_no_optionals() -> Result<()> {
-    let config = hcl::Config::from_file("tests/data/config/no-optionals.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("tests/data/config/no-optionals.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
 
     assert_eq!("host01.example.com", config.vhosts[0].hostname);
     assert_eq!(443, config.listen.tls_port);
@@ -228,7 +276,11 @@ fn test_no_optionals() -> Result<()> {
 
 #[test]
 fn test_no_leading_slash() -> Result<()> {
-    let result = hcl::Config::from_file("tests/data/config/no-leading-slash.hcl".into());
+    let cli = CliOptions {
+        config: Some("tests/data/config/no-leading-slash.hcl".into()),
+        ..Default::default()
+    };
+    let result = hcl::Config::from_file(&cli);
     assert!(result.is_err());
 
     Ok(())
@@ -236,7 +288,11 @@ fn test_no_leading_slash() -> Result<()> {
 
 #[test]
 fn test_extract_files() -> Result<()> {
-    let config = hcl::Config::from_file("tests/data/config/no-optionals.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("tests/data/config/no-optionals.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
 
     let files = if let TlsConfig::Cert(tfc) = &config.vhosts[0].tls {
         tfc
@@ -391,7 +447,11 @@ fn test_uri_with_scheme_no_authority() {
     ],
 )]
 fn test_hcl_vicarian_full_example() -> Result<()> {
-    let config = hcl::Config::from_file("vicarian-full.hcl".into())?;
+    let cli = CliOptions {
+        config: Some("vicarian-full.hcl".into()),
+        ..Default::default()
+    };
+    let config = hcl::Config::from_file(&cli)?;
 
     assert!(!config.dev_mode);
 

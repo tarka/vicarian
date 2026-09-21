@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 
 use anyhow::{Context as AnyhowContext, Result, anyhow};
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use hcl::{
     Body, Value,
     eval::{Context, Evaluate, FuncArgs, FuncDef, ParamType}
@@ -16,7 +16,7 @@ use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
 use tracing::info;
 
-use crate::config::{strip_trailing_slashes, validate_path};
+use crate::config::{CliOptions, DEFAULT_CONFIG_FILE, strip_trailing_slashes, validate_path};
 
 use super::{
     deserialize_canonical,
@@ -43,7 +43,10 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn from_file(file: &Utf8Path) -> Result<Self> {
+    pub fn from_file(cli: &CliOptions) -> Result<Self> {
+        let file = cli.config.clone()
+            .unwrap_or(Utf8PathBuf::from(DEFAULT_CONFIG_FILE));
+
         info!("Loading config {file}");
         let file = std::fs::read_to_string(file)
             .context("Error loading config file {file}")?;
@@ -94,20 +97,23 @@ impl Config {
             vhosts,
             dev_mode: raw.dev_mode,
         }
-        .validate_and_sanitise()?;
+        .validate_and_sanitise(cli)?;
 
         Ok(config)
     }
 }
 
 impl ValidateSanitise for Config {
-    fn validate_and_sanitise(self) -> Result<Self> {
+    fn validate_and_sanitise(self, cli: &CliOptions) -> Result<Self> {
         let vhosts = self.vhosts.into_iter()
-            .map(ValidateSanitise::validate_and_sanitise)
+            .map(|vh| vh.validate_and_sanitise(cli))
             .collect::<Result<Vec<Vhost>>>()?;
+
+        let listen = self.listen.validate_and_sanitise(cli)?;
 
         Ok(Self {
             vhosts,
+            listen,
             ..self
         })
     }
@@ -206,6 +212,18 @@ impl TryFrom<RawListen> for Listen {
             addrs: expand_listen_addrs(&raw.addrs)?,
             insecure_port: try_as_port(raw.insecure_port)?,
             tls_port: try_as_port(raw.tls_port)?,
+        })
+    }
+}
+
+impl ValidateSanitise for Listen {
+    fn validate_and_sanitise(self, cli: &CliOptions) -> Result<Self> {
+        Ok(Self {
+            insecure_port: cli.insecure_port
+                .unwrap_or(self.insecure_port),
+            tls_port: cli.tls_port
+                .unwrap_or(self.tls_port),
+            ..self
         })
     }
 }
@@ -329,7 +347,7 @@ pub struct StaticBackend {
 }
 
 impl ValidateSanitise for Backend {
-    fn validate_and_sanitise(self) -> Result<Self> {
+    fn validate_and_sanitise(self, _cli: &CliOptions) -> Result<Self> {
         validate_path(&self.path)?;
 
         match self.backend_type {
@@ -364,9 +382,9 @@ impl ValidateSanitise for Backend {
 }
 
 impl ValidateSanitise for Vec<Backend> {
-    fn validate_and_sanitise(self) -> Result<Self> {
+    fn validate_and_sanitise(self, cli: &CliOptions) -> Result<Self> {
         let backends = self.into_iter()
-            .map(ValidateSanitise::validate_and_sanitise)
+            .map(|be| be.validate_and_sanitise(cli))
             .collect::<Result<Vec<Backend>>>()?;
 
         let dup_paths = backends.iter()
@@ -405,9 +423,9 @@ impl Vhost {
 }
 
 impl ValidateSanitise for Vhost {
-    fn validate_and_sanitise(self) -> Result<Self> {
+    fn validate_and_sanitise(self, cli: &CliOptions) -> Result<Self> {
         Ok(Self {
-            backends: self.backends.validate_and_sanitise()?,
+            backends: self.backends.validate_and_sanitise(cli)?,
             ..self
         })
     }

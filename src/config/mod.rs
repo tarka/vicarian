@@ -39,7 +39,7 @@ const SPECIAL_ADDRESS_INTERFACE: &str = "if";
 
 // pub for tests
 pub trait ValidateSanitise: Sized {
-    fn validate_and_sanitise(self) -> Result<Self>;
+    fn validate_and_sanitise(self, cli: &CliOptions) -> Result<Self>;
 }
 
 fn deserialize_canonical<'de, D>(deserializer: D) -> std::result::Result<Utf8PathBuf, D::Error>

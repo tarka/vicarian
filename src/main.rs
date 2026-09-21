@@ -8,7 +8,6 @@ use std::sync::Arc;
 use std::thread;
 
 use anyhow::Result;
-use camino::Utf8PathBuf;
 use nix::sys::resource::{Resource, getrlimit, setrlimit};
 use tokio::sync::watch;
 use tracing::info;
@@ -17,7 +16,7 @@ use tracing::level_filters::LevelFilter;
 use crate::metrics::Metrics;
 use crate::{
     certificates::CertificateRuntime,
-    config::{Config, DEFAULT_CONFIG_FILE},
+    config::Config,
 };
 
 fn init_logging(level: u8) -> Result<()> {
@@ -78,9 +77,7 @@ fn main() -> Result<()> {
 
     system_setup()?;
 
-    let config_file = cli.config
-        .unwrap_or(Utf8PathBuf::from(DEFAULT_CONFIG_FILE));
-    let config = Config::from_file(&config_file)?;
+    let config = Config::from_file(&cli)?;
 
     let context = Arc::new(RunContext::new(config));
 

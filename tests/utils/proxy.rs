@@ -4,6 +4,7 @@ use std::ops::Deref;
 use std::sync::{LazyLock, Mutex};
 use std::thread::panicking;
 use std::time::Duration;
+use std::net::TcpListener;
 
 use anyhow::{Result, bail};
 use camino::Utf8PathBuf;
@@ -11,15 +12,16 @@ use fslock::LockFile;
 use nix::{sys::signal::{Signal, kill}, unistd::Pid};
 use tempfile::{TempDir, tempdir_in};
 use tokio::{fs::{File, create_dir_all}};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener as TokioListener, TcpStream};
 use tokio::process::{Child, Command};
 use tracing::info;
 use wiremock::MockServer;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ProxyPorts {
     pub insecure_port: u16,
     pub tls_port: u16,
+    listeners: Vec<TcpListener>,
 }
 
 const PORT_RANGE_START: u16 = 20000;
@@ -31,13 +33,13 @@ static PROCESS_PORT_MUTEX: Mutex<()> = Mutex::new(());
 // Checks if a port can be bound on IPv4 and IPv6 localhost and 0.0.0.0.
 // Returns the bound listener on 127.0.0.1 if successful (kept open temporarily
 // to prevent races while validating the rest of the port block).
-fn try_bind_port(port: u16) -> Option<std::net::TcpListener> {
+fn try_bind_port(port: u16) -> Option<TcpListener> {
     // Attempt to bind IPv6 dual-stack (which covers both IPv6 and IPv4)
     // or fall back to IPv4 wildcard 0.0.0.0.
-    if let Ok(l) = std::net::TcpListener::bind(("[::]", port)) {
+    if let Ok(l) = TcpListener::bind(("[::]", port)) {
         Some(l)
     } else {
-        std::net::TcpListener::bind(("0.0.0.0", port)).ok()
+        TcpListener::bind(("0.0.0.0", port)).ok()
     }
 }
 
@@ -100,11 +102,15 @@ pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
             return Ok(ProxyPorts {
                 insecure_port: base,
                 tls_port: base + 1,
+                // Hold the listeners until the last minute to
+                // minimise the chance of the kernel reallocating the
+                // ports.
+                listeners: Vec::new(),
             });
         }
     }
 
-    bail!("Failed to allocate a block of free ports after searching range {PORT_RANGE_START}..{PORT_RANGE_END}");
+    bail!("Failed to allocate free ports in range {PORT_RANGE_START}..{PORT_RANGE_END}");
 }
 
 pub struct ProxyBuilder {
@@ -175,7 +181,7 @@ impl ProxyBuilder {
     }
 
 
-    pub async fn run(self) -> Result<Proxy> {
+    pub async fn run(mut self) -> Result<Proxy> {
         if self.config.is_none() {
             bail!("No config provided")
         }
@@ -194,7 +200,7 @@ impl ProxyBuilder {
         })
     }
 
-    async fn run_proxy(&self) -> Result<Child> {
+    async fn run_proxy(&mut self) -> Result<Child> {
         info!("Starting Test Proxy on ports HTTP:{} TLS:{}", self.ports.insecure_port, self.ports.tls_port);
         let exe = env!("CARGO_BIN_EXE_vicarian");
         let out_file = self.dir.path().join("stdout");
@@ -211,6 +217,9 @@ impl ProxyBuilder {
             })
             .collect();
         println!("ENV = {mockenv:?}");
+
+        // Close listeners
+        self.ports.listeners = Vec::new();
 
         let mut child = Command::new(exe)
             .arg("-vv")
@@ -262,7 +271,7 @@ impl Drop for Proxy {
 
 pub async fn mock_server() -> Result<MockServer> {
     let addr = "127.0.0.1:0";
-    let listener = TcpListener::bind(addr).await?;
+    let listener = TokioListener::bind(addr).await?;
     let server = MockServer::builder()
         .listener(listener.into_std()?).start().await;
     Ok(server)

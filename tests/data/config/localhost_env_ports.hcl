@@ -14,6 +14,6 @@ vhost "localhost" {
 
     backend "/" {
         type = "proxy"
-        url = "http://127.0.0.1:19090"
+        url = "http://127.0.0.1:19091"
     }
 }

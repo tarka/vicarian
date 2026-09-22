@@ -235,27 +235,16 @@ impl ProxyBuilder {
         let stdout = File::create(out_file).await?;
         let stderr = File::create(err_file).await?;
 
-        // Checked above
-        let config = self.config.as_ref().unwrap();
-        let fname = config.components().next_back().ok_or(anyhow!("No filename"))?;
-        let copied = self.dir.path().join(fname);
-
-        // Backend URLs are baked into the config file, so rewrite them.
-        // The proxy's insecure_port and tls_port are passed as CLI flags below.
-        //
-        // FIXME: This could be replaced with `url =
-        // env("MY_TEST_BACKEND")`, but would also require isolation
-        // of the environment between parallel tests (with sealed-test
-        // or similar?)
-        let content = tokio::fs::read_to_string(config).await?;
-        let content = content
-            .replace("19090", &self.ports.backend_port.to_string())
-            .replace("19091", &self.ports.backend_port_2.to_string());
-        tokio::fs::write(&copied, content).await?;
+        // Tests use env() in the HCL to extract backends
+        let envs = [
+            ("VICARIAN_TEST_BACKEND_URL_1", format!("http://127.0.0.1:{}", self.ports.backend_port)),
+            ("VICARIAN_TEST_BACKEND_URL_2", format!("http://127.0.0.1:{}", self.ports.backend_port_2)),
+        ];
 
         let mut child = Command::new(exe)
+            .envs(envs)
             .arg("-vv")
-            .arg("-c").arg(&copied)
+            .arg("-c").arg(self.config.as_ref().unwrap())
             // Port flags override the listen ports from the config file,
             // enabling parallel tests to each use their own unique port block.
             .arg("--insecure-port").arg(self.ports.insecure_port.to_string())

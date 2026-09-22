@@ -20,7 +20,7 @@ vhost "www.example.com" {
 
     backend "/" {
         type = "proxy"
-        url = "http://127.0.0.1:19090"
+        url = env("VICARIAN_TEST_BACKEND_URL_1")
     }
 }
 
@@ -29,6 +29,6 @@ vhost "test.example.com" {
 
     backend "/" {
         type = "proxy"
-        url = "http://127.0.0.1:19091"
+        url = env("VICARIAN_TEST_BACKEND_URL_2")
     }
 }

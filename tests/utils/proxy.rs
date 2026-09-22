@@ -24,7 +24,7 @@ pub struct ProxyPorts {
 
 const PORT_RANGE_START: u16 = 20000;
 const PORT_RANGE_END: u16 = 32000;
-const PORTS_PER_TEST: u16 = 4;
+const PORTS_PER_TEST: u16 = 2;
 
 static PROCESS_PORT_MUTEX: Mutex<()> = Mutex::new(());
 

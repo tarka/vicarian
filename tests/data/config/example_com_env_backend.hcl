@@ -13,6 +13,6 @@ vhost "www.example.com" {
 
     backend "/" {
         type = "proxy"
-        url = "http://localhost:8080"
+        url = env("VICARIAN_TEST_BACKEND_URL_1")
     }
 }

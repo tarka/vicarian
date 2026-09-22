@@ -20,8 +20,6 @@ use wiremock::MockServer;
 pub struct ProxyPorts {
     pub insecure_port: u16,
     pub tls_port: u16,
-    pub backend_port_1: u16,
-    pub backend_port_2: u16,
 }
 
 const PORT_RANGE_START: u16 = 20000;
@@ -102,8 +100,6 @@ pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
             return Ok(ProxyPorts {
                 insecure_port: base,
                 tls_port: base + 1,
-                backend_port_1: base + 2,
-                backend_port_2: base + 3,
             });
         }
     }
@@ -115,6 +111,7 @@ pub struct ProxyBuilder {
     pub dir: TempDir,
     pub config: Option<Utf8PathBuf>,
     pub ports: ProxyPorts,
+    pub mock_ports: Vec<u16>,
 }
 
 pub struct Proxy {
@@ -151,6 +148,7 @@ impl ProxyBuilder {
             dir,
             config: None,
             ports,
+            mock_ports: Vec::new()
         }
     }
 
@@ -159,6 +157,23 @@ impl ProxyBuilder {
         self.config = Some(Utf8PathBuf::from(path));
         self
     }
+
+    pub fn with_mock_ports(self, mock_ports: &[u16]) -> Self
+    {
+        Self {
+            mock_ports: mock_ports.into(),
+            ..self
+        }
+    }
+
+    pub fn with_mock_servers(self, mocks: &[&MockServer]) -> Self
+    {
+        let mock_ports = mocks.iter()
+            .map(|m| m.address().port())
+            .collect::<Vec<u16>>();
+        self.with_mock_ports(&mock_ports)
+    }
+
 
     pub async fn run(self) -> Result<Proxy> {
         if self.config.is_none() {
@@ -188,19 +203,23 @@ impl ProxyBuilder {
         let stderr = File::create(err_file).await?;
 
         // Tests use env() in the HCL to extract backends
-        let envs = [
-            ("VICARIAN_TEST_BACKEND_URL_1", format!("http://127.0.0.1:{}", self.ports.backend_port_1)),
-            ("VICARIAN_TEST_BACKEND_URL_2", format!("http://127.0.0.1:{}", self.ports.backend_port_2)),
-        ];
+        let mockenv: Vec<_> = self.mock_ports.iter()
+            .enumerate()
+            .map(|(c, p)| {
+                (format!("VICARIAN_TEST_BACKEND_URL_{}", c+1),
+                 format!("http://127.0.0.1:{p}"))
+            })
+            .collect();
+        println!("ENV = {mockenv:?}");
 
         let mut child = Command::new(exe)
-            .envs(envs)
             .arg("-vv")
             .arg("-c").arg(self.config.as_ref().unwrap())
             // Port flags override the listen ports from the config file,
             // enabling parallel tests to each use their own unique port block.
             .arg("--insecure-port").arg(self.ports.insecure_port.to_string())
             .arg("--tls-port").arg(self.ports.tls_port.to_string())
+            .envs(mockenv)
             .stdout(stdout.into_std().await)
             .stderr(stderr.into_std().await)
             .spawn()?;
@@ -230,14 +249,6 @@ impl Proxy {
             println!("Killed process {}", pid);
         }
     }
-
-    pub async fn mock_server_1(&self) -> Result<MockServer> {
-        mock_server(self.ports.backend_port_1).await
-    }
-
-    pub async fn mock_server_2(&self) -> Result<MockServer> {
-        mock_server(self.ports.backend_port_2).await
-    }
 }
 
 impl Drop for Proxy {
@@ -249,8 +260,8 @@ impl Drop for Proxy {
     }
 }
 
-pub async fn mock_server(port: u16) -> Result<MockServer> {
-    let addr = format!("127.0.0.1:{port}");
+pub async fn mock_server() -> Result<MockServer> {
+    let addr = "127.0.0.1:0";
     let listener = TcpListener::bind(addr).await?;
     let server = MockServer::builder()
         .listener(listener.into_std()?).start().await;
@@ -267,11 +278,11 @@ mod tests {
         let ports1 = allocate_proxy_ports().unwrap();
         let ports2 = allocate_proxy_ports().unwrap();
 
-        let set1: HashSet<u16> = [ports1.insecure_port, ports1.tls_port, ports1.backend_port_1, ports1.backend_port_2].into_iter().collect();
-        let set2: HashSet<u16> = [ports2.insecure_port, ports2.tls_port, ports2.backend_port_1, ports2.backend_port_2].into_iter().collect();
+        let set1: HashSet<u16> = [ports1.insecure_port, ports1.tls_port].into_iter().collect();
+        let set2: HashSet<u16> = [ports2.insecure_port, ports2.tls_port].into_iter().collect();
 
-        assert_eq!(set1.len(), 4, "Ports within ports1 must be distinct");
-        assert_eq!(set2.len(), 4, "Ports within ports2 must be distinct");
+        assert_eq!(set1.len(), 2, "Ports within ports1 must be distinct");
+        assert_eq!(set2.len(), 2, "Ports within ports2 must be distinct");
         assert!(set1.is_disjoint(&set2), "Allocated port blocks must not overlap");
     }
 
@@ -286,10 +297,8 @@ mod tests {
             let p = h.await.unwrap();
             assert!(all_ports.insert(p.insecure_port));
             assert!(all_ports.insert(p.tls_port));
-            assert!(all_ports.insert(p.backend_port_1));
-            assert!(all_ports.insert(p.backend_port_2));
         }
-        assert_eq!(all_ports.len(), 40);
+        assert_eq!(all_ports.len(), 20);
     }
 }
 

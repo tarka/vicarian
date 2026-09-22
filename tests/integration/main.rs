@@ -16,7 +16,7 @@ use wiremock::{
 
 use proxyutils::ProxyBuilder;
 
-use crate::certutils::TEST_CERTS;
+use crate::{certutils::TEST_CERTS, proxyutils::mock_server};
 
 // NOTE: We use unwrap rather than result here as we can save the run
 // files on failure (see Proxy::drop()).
@@ -62,10 +62,11 @@ async fn test_dns_override() {
 
 #[tokio::test]
 async fn test_mocked_backend() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
@@ -87,10 +88,11 @@ async fn test_mocked_backend() {
 
 #[tokio::test]
 async fn test_mixed_case_host_header() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_simple")
+        .with_simple_config("example_com_env_backend")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -116,12 +118,13 @@ async fn test_mixed_case_host_header() {
 
 #[tokio::test]
 async fn test_vhosts() {
+    let backend_server1 = mock_server().await.unwrap();
+    let backend_server2 = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_vhosts")
+        .with_mock_servers(&[&backend_server1, &backend_server2])
         .run().await.unwrap();
 
-    let backend_server1 = proxy.mock_server_1().await.unwrap();
-    let backend_server2 = proxy.mock_server_2().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = &TEST_CERTS.caroot.reqcert;
@@ -166,8 +169,10 @@ async fn test_vhosts() {
 
 #[tokio::test]
 async fn test_invalid_cert() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_simple")
+        .with_simple_config("example_com_env_backend")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
@@ -185,10 +190,11 @@ async fn test_invalid_cert() {
 
 #[tokio::test]
 async fn test_https_headers() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_simple")
+        .with_simple_config("example_com_env_backend")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -220,10 +226,11 @@ async fn test_https_headers() {
 
 #[tokio::test]
 async fn test_http1() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_simple")
+        .with_simple_config("example_com_env_backend")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -255,10 +262,11 @@ async fn test_http1() {
 
 #[tokio::test]
 async fn test_http2() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_simple")
+        .with_simple_config("example_com_env_backend")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -290,10 +298,11 @@ async fn test_http2() {
 
 #[tokio::test]
 async fn test_wildcard() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_wildcard")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -325,10 +334,11 @@ async fn test_wildcard() {
 
 #[tokio::test]
 async fn test_no_wildcard() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_wildcard")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -564,10 +574,11 @@ async fn test_http01_not_found() {
 
 #[tokio::test]
 async fn test_context_path_rewriting() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("backend_context")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/some/path"))
@@ -592,10 +603,11 @@ async fn test_context_path_rewriting() {
 
 #[tokio::test]
 async fn test_method_passthrough() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("POST"))
         .and(path("/status"))
@@ -656,10 +668,11 @@ async fn test_method_passthrough() {
 
 #[tokio::test]
 async fn test_location_header_rewriting() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("backend_context")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/some/path"))
@@ -686,10 +699,11 @@ async fn test_location_header_rewriting() {
 
 #[tokio::test]
 async fn test_x_forwarded_headers() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/"))
@@ -732,10 +746,11 @@ fn _large_body() -> &'static str {
 
 #[tokio::test]
 async fn test_compression_gzip_accept_encoding() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -768,10 +783,11 @@ async fn test_compression_gzip_accept_encoding() {
 
 #[tokio::test]
 async fn test_compression_brotli_accept_encoding() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -804,10 +820,11 @@ async fn test_compression_brotli_accept_encoding() {
 
 #[tokio::test]
 async fn test_compression_prefers_best_encoding() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -840,10 +857,11 @@ async fn test_compression_prefers_best_encoding() {
 
 #[tokio::test]
 async fn test_no_compression_without_accept_encoding() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -869,10 +887,11 @@ async fn test_no_compression_without_accept_encoding() {
 
 #[tokio::test]
 async fn test_no_compression_empty_accept_encoding() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -899,10 +918,11 @@ async fn test_no_compression_empty_accept_encoding() {
 
 #[tokio::test]
 async fn test_compression_unsupported_encoding() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -929,10 +949,11 @@ async fn test_compression_unsupported_encoding() {
 
 #[tokio::test]
 async fn test_compression_small_body_not_compressed() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/small"))
@@ -958,10 +979,11 @@ async fn test_compression_small_body_not_compressed() {
 
 #[tokio::test]
 async fn test_compression_preserves_vicarian_headers() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -997,10 +1019,11 @@ async fn test_compression_preserves_vicarian_headers() {
 
 #[tokio::test]
 async fn test_compression_preserves_body_content() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))

@@ -14,12 +14,14 @@ use crate::certutils::TEST_CERTS;
 
 #[tokio::test]
 async fn test_ws_backend() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_ports(&[port])
         .run().await.unwrap();
 
-    let addr = format!("127.0.0.1:{}", proxy.backend_port_1);
-    let listener = TcpListener::bind(addr).await.unwrap();
     let ws_server = wiremocket::MockServer::builder()
         .listener(listener)
         .build().await;

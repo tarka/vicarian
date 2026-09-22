@@ -7,7 +7,7 @@ use tokio::net::{TcpListener, TcpStream};
 use wiremock::{Mock, ResponseTemplate, matchers::{method, path}};
 
 use crate::certutils::TEST_CERTS;
-use crate::proxyutils::ProxyBuilder;
+use crate::proxyutils::{ProxyBuilder, mock_server};
 
 const SSE_EVENTS: u32 = 3;
 const SSE_EVENT_DELAY: Duration = Duration::from_millis(500);
@@ -79,12 +79,18 @@ async fn read_sse_stream(response: reqwest::Response) -> (Duration, Duration, St
 }
 
 async fn sse_streaming_check(http2: bool) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap()
+        .port();
+    tokio::spawn(sse_backend(listener));
+
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_ports(&[port])
         .run().await.unwrap();
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port_1)).await.unwrap();
-    tokio::spawn(sse_backend(listener));
+    // let listener = TcpListener::bind(format!("127.0.0.1:{}", backend_server.address().port())).await.unwrap();
+    // tokio::spawn(sse_backend(listener));
 
     let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -145,10 +151,11 @@ async fn test_sse_streaming_http2() {
 
 #[tokio::test]
 async fn test_sse_not_compressed() {
+    let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_servers(&[&backend_server])
         .run().await.unwrap();
-    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = "data: event-0\n\n".repeat(100);
     Mock::given(method("GET"))
@@ -183,12 +190,15 @@ async fn test_sse_not_compressed() {
 
 #[tokio::test]
 async fn test_sse_client_disconnect() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(sse_backend(listener));
+
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
+        .with_mock_ports(&[port])
         .run().await.unwrap();
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port_1)).await.unwrap();
-    tokio::spawn(sse_backend(listener));
 
     let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();

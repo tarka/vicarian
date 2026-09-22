@@ -108,7 +108,7 @@ pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
         }
     }
 
-    bail!("Failed to allocate a block of free ports after searching range {}..{}", PORT_RANGE_START, PORT_RANGE_END)
+    bail!("Failed to allocate a block of free ports after searching range {PORT_RANGE_START}..{PORT_RANGE_END}");
 }
 
 pub struct ProxyBuilder {
@@ -142,7 +142,11 @@ impl ProxyBuilder {
     pub async fn new() -> Self {
         create_dir_all("target/test_runs").await.unwrap();
         let dir = tempdir_in("target/test_runs").unwrap();
-        let ports = allocate_proxy_ports().expect("Failed to allocate test ports");
+
+        let ports = tokio::task::spawn_blocking(allocate_proxy_ports).await
+            .expect("Blocking task panicked")
+            .expect("Failed to allocate test ports");
+
         Self {
             dir,
             config: None,
@@ -221,7 +225,7 @@ impl ProxyBuilder {
 impl Proxy {
     fn child_cleanup(&self) {
         if let Some(id) = self.process.id() {
-            let pid = Pid::from_raw(id.try_into().unwrap());
+            let pid = Pid::from_raw(id as i32);
             let _ = kill(pid, Signal::SIGINT);
             println!("Killed process {}", pid);
         }

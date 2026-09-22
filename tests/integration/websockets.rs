@@ -18,7 +18,7 @@ async fn test_ws_backend() {
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
 
-    let addr = format!("127.0.0.1:{}", proxy.backend_port);
+    let addr = format!("127.0.0.1:{}", proxy.backend_port_1);
     let listener = TcpListener::bind(addr).await.unwrap();
     let ws_server = wiremocket::MockServer::builder()
         .listener(listener)

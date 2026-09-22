@@ -65,7 +65,7 @@ async fn test_mocked_backend() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
 
@@ -90,7 +90,7 @@ async fn test_mixed_case_host_header() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -120,7 +120,7 @@ async fn test_vhosts() {
         .with_simple_config("example_com_vhosts")
         .run().await.unwrap();
 
-    let backend_server1 = proxy.mock_server().await.unwrap();
+    let backend_server1 = proxy.mock_server_1().await.unwrap();
     let backend_server2 = proxy.mock_server_2().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
@@ -188,7 +188,7 @@ async fn test_https_headers() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -223,7 +223,7 @@ async fn test_http1() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -258,7 +258,7 @@ async fn test_http2() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -293,7 +293,7 @@ async fn test_wildcard() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_wildcard")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -328,7 +328,7 @@ async fn test_no_wildcard() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_wildcard")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
     let root_cert = TEST_CERTS.caroot.reqcert.clone();
@@ -567,7 +567,7 @@ async fn test_context_path_rewriting() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("backend_context")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/some/path"))
@@ -595,7 +595,7 @@ async fn test_method_passthrough() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("POST"))
         .and(path("/status"))
@@ -659,7 +659,7 @@ async fn test_location_header_rewriting() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("backend_context")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/some/path"))
@@ -689,7 +689,7 @@ async fn test_x_forwarded_headers() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/"))
@@ -735,7 +735,7 @@ async fn test_compression_gzip_accept_encoding() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -771,7 +771,7 @@ async fn test_compression_brotli_accept_encoding() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -807,7 +807,7 @@ async fn test_compression_prefers_best_encoding() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -843,7 +843,7 @@ async fn test_no_compression_without_accept_encoding() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -872,7 +872,7 @@ async fn test_no_compression_empty_accept_encoding() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -902,7 +902,7 @@ async fn test_compression_unsupported_encoding() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -932,7 +932,7 @@ async fn test_compression_small_body_not_compressed() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     Mock::given(method("GET"))
         .and(path("/small"))
@@ -961,7 +961,7 @@ async fn test_compression_preserves_vicarian_headers() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))
@@ -1000,7 +1000,7 @@ async fn test_compression_preserves_body_content() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = _large_body().repeat(100);
     Mock::given(method("GET"))

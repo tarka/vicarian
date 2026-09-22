@@ -10,7 +10,7 @@ use crate::proxyutils::ProxyBuilder;
 async fn test_static_file_serving() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -40,7 +40,7 @@ async fn test_static_file_serving() {
 async fn test_static_file_with_explicit_path() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -67,7 +67,7 @@ async fn test_static_file_with_explicit_path() {
 async fn test_static_css_file() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -97,7 +97,7 @@ async fn test_static_css_file() {
 async fn test_static_js_file() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -127,7 +127,7 @@ async fn test_static_js_file() {
 async fn test_static_binary_file() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -157,7 +157,7 @@ async fn test_static_binary_file() {
 async fn test_static_nested_path() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -184,7 +184,7 @@ async fn test_static_nested_path() {
 async fn test_static_404() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -211,7 +211,7 @@ async fn test_static_404() {
 async fn test_static_auth_required() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static_auth")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -237,7 +237,7 @@ async fn test_static_auth_required() {
 async fn test_static_auth_valid() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static_auth")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -266,7 +266,7 @@ async fn test_static_auth_valid() {
 async fn test_static_auth_invalid() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static_auth")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -293,7 +293,7 @@ async fn test_static_auth_invalid() {
 async fn test_static_compression_gzip() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -325,7 +325,7 @@ async fn test_static_compression_gzip() {
 async fn test_static_compression_brotli() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -354,7 +354,7 @@ async fn test_static_compression_brotli() {
 async fn test_static_no_compression_without_accept_encoding() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -381,7 +381,7 @@ async fn test_static_no_compression_without_accept_encoding() {
 async fn test_static_preserves_vicarian_headers() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -415,7 +415,7 @@ async fn test_static_preserves_vicarian_headers() {
 async fn test_static_directory_listing() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -442,7 +442,7 @@ async fn test_static_directory_listing() {
 async fn test_static_fallback_page() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -469,7 +469,7 @@ async fn test_static_fallback_page() {
 async fn test_static_context_path() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -496,7 +496,7 @@ async fn test_static_context_path() {
 async fn test_static_head_request() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 
@@ -524,7 +524,7 @@ async fn test_static_head_request() {
 async fn test_static_multiple_files_concurrent() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("example_com_static")
-        .run_with_static()
+        .run()
         .await
         .unwrap();
 

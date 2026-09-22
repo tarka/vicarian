@@ -83,7 +83,7 @@ async fn sse_streaming_check(http2: bool) {
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port)).await.unwrap();
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port_1)).await.unwrap();
     tokio::spawn(sse_backend(listener));
 
     let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
@@ -148,7 +148,7 @@ async fn test_sse_not_compressed() {
     let proxy = ProxyBuilder::new().await
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
-    let backend_server = proxy.mock_server().await.unwrap();
+    let backend_server = proxy.mock_server_1().await.unwrap();
 
     let body = "data: event-0\n\n".repeat(100);
     Mock::given(method("GET"))
@@ -187,7 +187,7 @@ async fn test_sse_client_disconnect() {
         .with_simple_config("localhost_simple")
         .run().await.unwrap();
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port)).await.unwrap();
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", proxy.backend_port_1)).await.unwrap();
     tokio::spawn(sse_backend(listener));
 
     let localhost = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();

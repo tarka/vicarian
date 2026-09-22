@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 pub mod certs;
 
 use std::ops::Deref;
@@ -7,26 +5,22 @@ use std::sync::{LazyLock, Mutex};
 use std::thread::panicking;
 use std::time::Duration;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, bail};
 use camino::Utf8PathBuf;
 use fslock::LockFile;
 use nix::{sys::signal::{Signal, kill}, unistd::Pid};
 use tempfile::{TempDir, tempdir_in};
-use tokio::{fs::{File, copy, create_dir_all}};
+use tokio::{fs::{File, create_dir_all}};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{Child, Command};
 use tracing::info;
 use wiremock::MockServer;
 
-pub const INSECURE_PORT: u16 = 18080;
-pub const TLS_PORT: u16 = 18443;
-pub const BACKEND_PORT: u16 = 19090;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProxyPorts {
     pub insecure_port: u16,
     pub tls_port: u16,
-    pub backend_port: u16,
+    pub backend_port_1: u16,
     pub backend_port_2: u16,
 }
 
@@ -104,20 +98,16 @@ pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
         if all_free {
             // Persist the state
             let _ = std::fs::write(&state_file_path, next_port.to_string());
-            // Drop the temporary listeners so Vicarian and mock servers can bind
-            drop(listeners);
-            let _ = file_lock.unlock();
 
             return Ok(ProxyPorts {
                 insecure_port: base,
                 tls_port: base + 1,
-                backend_port: base + 2,
+                backend_port_1: base + 2,
                 backend_port_2: base + 3,
             });
         }
     }
 
-    let _ = file_lock.unlock();
     bail!("Failed to allocate a block of free ports after searching range {}..{}", PORT_RANGE_START, PORT_RANGE_END)
 }
 
@@ -134,13 +124,6 @@ pub struct Proxy {
     pub ports: ProxyPorts,
 }
 
-pub struct StaticProxy {
-    pub dir: TempDir,
-    pub static_root: Utf8PathBuf,
-    pub process: Child,
-    pub ports: ProxyPorts,
-}
-
 impl Deref for ProxyBuilder {
     type Target = ProxyPorts;
     fn deref(&self) -> &Self::Target {
@@ -149,13 +132,6 @@ impl Deref for ProxyBuilder {
 }
 
 impl Deref for Proxy {
-    type Target = ProxyPorts;
-    fn deref(&self) -> &Self::Target {
-        &self.ports
-    }
-}
-
-impl Deref for StaticProxy {
     type Target = ProxyPorts;
     fn deref(&self) -> &Self::Target {
         &self.ports
@@ -199,34 +175,6 @@ impl ProxyBuilder {
         })
     }
 
-    pub async fn run_with_static(self) -> Result<StaticProxy> {
-        if self.config.is_none() {
-            bail!("No config provided")
-        }
-
-        let static_root = self.dir.path().join("public");
-        copy_dir_all("tests/data/static", &static_root).await?;
-
-        // Force creation of the test certs.
-        let _ = LazyLock::force(&certs::TEST_CERTS);
-
-        let process = self.run_proxy().await?;
-        Ok(StaticProxy {
-            dir: self.dir,
-            static_root: static_root.try_into().unwrap(),
-            process,
-            ports: self.ports,
-        })
-    }
-
-    pub async fn mock_server(&self) -> Result<MockServer> {
-        mock_server(self.ports.backend_port).await
-    }
-
-    pub async fn mock_server_2(&self) -> Result<MockServer> {
-        mock_server(self.ports.backend_port_2).await
-    }
-
     async fn run_proxy(&self) -> Result<Child> {
         info!("Starting Test Proxy on ports HTTP:{} TLS:{}", self.ports.insecure_port, self.ports.tls_port);
         let exe = env!("CARGO_BIN_EXE_vicarian");
@@ -237,7 +185,7 @@ impl ProxyBuilder {
 
         // Tests use env() in the HCL to extract backends
         let envs = [
-            ("VICARIAN_TEST_BACKEND_URL_1", format!("http://127.0.0.1:{}", self.ports.backend_port)),
+            ("VICARIAN_TEST_BACKEND_URL_1", format!("http://127.0.0.1:{}", self.ports.backend_port_1)),
             ("VICARIAN_TEST_BACKEND_URL_2", format!("http://127.0.0.1:{}", self.ports.backend_port_2)),
         ];
 
@@ -279,8 +227,8 @@ impl Proxy {
         }
     }
 
-    pub async fn mock_server(&self) -> Result<MockServer> {
-        mock_server(self.ports.backend_port).await
+    pub async fn mock_server_1(&self) -> Result<MockServer> {
+        mock_server(self.ports.backend_port_1).await
     }
 
     pub async fn mock_server_2(&self) -> Result<MockServer> {
@@ -295,40 +243,6 @@ impl Drop for Proxy {
         }
         self.child_cleanup();
     }
-}
-
-impl StaticProxy {
-    fn child_cleanup(&self) {
-        if let Some(id) = self.process.id() {
-            let pid = Pid::from_raw(id.try_into().unwrap());
-            let _ = kill(pid, Signal::SIGINT);
-            println!("Killed process {}", pid);
-        }
-    }
-}
-
-impl Drop for StaticProxy {
-    fn drop(&mut self) {
-        if panicking() {
-            self.dir.disable_cleanup(true);
-        }
-        self.child_cleanup();
-    }
-}
-
-async fn copy_dir_all(src: &str, dst: &std::path::Path) -> std::io::Result<()> {
-    tokio::fs::create_dir_all(dst).await?;
-    let mut entries = tokio::fs::read_dir(src).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        let entry_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-        if entry.file_type().await?.is_dir() {
-            Box::pin(copy_dir_all(entry_path.to_str().unwrap(), &dst_path)).await?;
-        } else {
-            tokio::fs::copy(&entry_path, &dst_path).await?;
-        }
-    }
-    Ok(())
 }
 
 pub async fn mock_server(port: u16) -> Result<MockServer> {
@@ -349,8 +263,8 @@ mod tests {
         let ports1 = allocate_proxy_ports().unwrap();
         let ports2 = allocate_proxy_ports().unwrap();
 
-        let set1: HashSet<u16> = [ports1.insecure_port, ports1.tls_port, ports1.backend_port, ports1.backend_port_2].into_iter().collect();
-        let set2: HashSet<u16> = [ports2.insecure_port, ports2.tls_port, ports2.backend_port, ports2.backend_port_2].into_iter().collect();
+        let set1: HashSet<u16> = [ports1.insecure_port, ports1.tls_port, ports1.backend_port_1, ports1.backend_port_2].into_iter().collect();
+        let set2: HashSet<u16> = [ports2.insecure_port, ports2.tls_port, ports2.backend_port_1, ports2.backend_port_2].into_iter().collect();
 
         assert_eq!(set1.len(), 4, "Ports within ports1 must be distinct");
         assert_eq!(set2.len(), 4, "Ports within ports2 must be distinct");
@@ -368,7 +282,7 @@ mod tests {
             let p = h.await.unwrap();
             assert!(all_ports.insert(p.insecure_port));
             assert!(all_ports.insert(p.tls_port));
-            assert!(all_ports.insert(p.backend_port));
+            assert!(all_ports.insert(p.backend_port_1));
             assert!(all_ports.insert(p.backend_port_2));
         }
         assert_eq!(all_ports.len(), 40);

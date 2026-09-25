@@ -216,7 +216,6 @@ impl ProxyBuilder {
                  format!("http://127.0.0.1:{p}"))
             })
             .collect();
-        println!("ENV = {mockenv:?}");
 
         // Close listeners
         self.ports.listeners = Vec::new();

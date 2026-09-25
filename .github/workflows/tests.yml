@@ -5,6 +5,8 @@ on: [push]
 jobs:
   linux:
     runs-on: ubuntu-latest
+    env:
+      RUST_LOG: "debug"
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable

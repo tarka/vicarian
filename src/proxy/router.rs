@@ -15,12 +15,6 @@ pub struct Router {
     backends: Vec<Arc<RouterBackend>>,
 }
 
-pub struct Match {
-    pub backend: Arc<RouterBackend>,
-    pub _rest: String,
-}
-
-
 impl Router {
 
     pub fn new(backends: Vec<RouterBackend>) -> Self {
@@ -37,16 +31,7 @@ impl Router {
         }
     }
 
-    fn to_match(&self, pos: usize, uri_path: &str) -> Match {
-        let backend = &self.backends[pos];
-        let rest = &uri_path[backend.backend.path.len()..];
-        Match {
-            backend: backend.clone(),
-            _rest: rest.to_string(),
-        }
-    }
-
-    pub fn lookup(&self, uri_path: &str) -> Option<Match> {
+    pub fn lookup(&self, uri_path: &str) -> Option<Arc<RouterBackend>> {
         debug!("Looking up {uri_path}");
         // From `binary_search_by()`:
         //
@@ -65,7 +50,7 @@ impl Router {
         match matched {
             Ok(pos) => {
                 debug!("Exact match: {}", self.backends[pos].backend.path);
-                Some(self.to_match(pos, uri_path))
+                Some(self.backends[pos].clone())
             }
 
             Err(pos) => {
@@ -82,7 +67,7 @@ impl Router {
                         // e.g. /api2 doesn't match /api.
                         if prefix == "/" || remainder.starts_with(['/', '?', '#']) {
                             debug!("Matched {prefix}");
-                            return Some(self.to_match(i, uri_path))
+                            return Some(self.backends[i].clone())
                         }
                     }
                 }

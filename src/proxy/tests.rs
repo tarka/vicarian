@@ -114,40 +114,31 @@ fn test_router() -> Result<()> {
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
 
     let matched = router.lookup("/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/base/path").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("base/path", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/service").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/service/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("/", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/service/some/path").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("/some/path", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/service/subservice").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/service/subservice/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend.backend));
-    assert_eq!("/", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/service/subservice/ss/path").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend.backend));
-    assert_eq!("/ss/path", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/other_service/some/path").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:4040"), *backend_url(&matched.backend.backend));
-    assert_eq!("/some/path", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:4040"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -164,28 +155,22 @@ fn test_router_overlapping_prefixes() -> Result<()> {
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
 
     let matched = router.lookup("/api/v2").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/v2/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("/", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/v2/deep").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("/deep", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/deep").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/deep", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -202,44 +187,34 @@ fn test_router_prefix_ambiguity() -> Result<()> {
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
 
     let matched = router.lookup("/api").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/deep").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/deep", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api2").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api2/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("/", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api2/deep").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("/deep", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api1").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api1/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend.backend));
-    assert_eq!("/", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api1/deep").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend.backend));
-    assert_eq!("/deep", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/other").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
-    assert_eq!("other", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -287,8 +262,7 @@ fn test_router_single_slash_context() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/anything").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("anything", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -299,8 +273,7 @@ fn test_router_none_context_is_root() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/anything").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("anything", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -325,24 +298,19 @@ fn test_router_three_level_overlap() -> Result<()> {
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
 
     let matched = router.lookup("/api/v2/deep/extra").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend.backend));
-    assert_eq!("/extra", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/v2").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/v3").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/v3", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/other").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
-    assert_eq!("other", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -354,8 +322,7 @@ fn test_router_query_string() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/service?foo=bar").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("?foo=bar", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -366,8 +333,7 @@ fn test_router_fragment() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/service#section").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("#section", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -378,8 +344,7 @@ fn test_router_path_traversal() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/service/../other").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/../other", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -412,8 +377,8 @@ fn test_router_empty_path() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
+
     Ok(())
 }
 
@@ -425,9 +390,9 @@ fn test_router_double_slash_prefix() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("//").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
     let matched = router.lookup("//service/foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -438,8 +403,7 @@ fn test_router_double_slash_in_path() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/service//foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("//foo", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -451,8 +415,7 @@ fn test_router_multiple_trailing_slashes() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/service/foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/foo", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -464,10 +427,9 @@ fn test_router_case_sensitivity() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/Service/foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/foo", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     let matched = router.lookup("/service/foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -478,8 +440,7 @@ fn test_router_url_encoded_path() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/service/path%2Fwith%2Fslashes").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/path%2Fwith%2Fslashes", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -491,10 +452,9 @@ fn test_router_context_with_dot() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/api.v2/foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/foo", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     let matched = router.lookup("/api/v2/foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -506,9 +466,9 @@ fn test_router_context_dot_and_dotdot() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/.").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     let matched = router.lookup("/..").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -520,10 +480,9 @@ fn test_router_context_whitespace() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/service /foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/foo", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     let matched = router.lookup("/service/foo").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -534,8 +493,7 @@ fn test_router_params_empty_match() -> Result<()> {
     ].validate_and_sanitise(&CliOptions::default())?;
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
     let matched = router.lookup("/exact").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
     Ok(())
 }
 
@@ -548,24 +506,19 @@ fn test_router_prefix_no_match_fallback_to_root() -> Result<()> {
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
 
     let matched = router.lookup("/api").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api/deep").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("/deep", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api2").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
-    assert_eq!("api2", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/api2/deep").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
-    assert_eq!("api2/deep", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
 
     let matched = router.lookup("/other").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
-    assert_eq!("other", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -580,8 +533,7 @@ fn test_router_query_string_with_overlapping_prefix() -> Result<()> {
 
     // "/api?version=2" should match /api, not /api/v2
     let matched = router.lookup("/api?version=2").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
-    assert_eq!("?version=2", matched._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -616,12 +568,12 @@ fn test_router_very_long_path() -> Result<()> {
     let long_suffix = "/a".repeat(5000);
     let long_path = format!("/svc{long_suffix}");
     let matched = router.lookup(&long_path).unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&matched.backend));
 
     // Unmatched long path falls to root
     let unmatched_long = format!("/other{long_suffix}");
     let matched = router.lookup(&unmatched_long).unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -636,17 +588,17 @@ fn test_router_many_backends() -> Result<()> {
     let router = Router::new(backends);
 
     let m = router.lookup("/svc000/x").unwrap();
-    assert_eq!(1000, backend_url(&m.backend.backend).port_u16().unwrap());
+    assert_eq!(1000, backend_url(&m.backend).port_u16().unwrap());
 
     let m = router.lookup("/svc050").unwrap();
-    assert_eq!(1050, backend_url(&m.backend.backend).port_u16().unwrap());
+    assert_eq!(1050, backend_url(&m.backend).port_u16().unwrap());
 
     let m = router.lookup("/svc099/deep/path").unwrap();
-    assert_eq!(1099, backend_url(&m.backend.backend).port_u16().unwrap());
+    assert_eq!(1099, backend_url(&m.backend).port_u16().unwrap());
 
     // Non-matching falls to root
     let m = router.lookup("/svc100").unwrap();
-    assert_eq!(9999, backend_url(&m.backend.backend).port_u16().unwrap());
+    assert_eq!(9999, backend_url(&m.backend).port_u16().unwrap());
 
     Ok(())
 }
@@ -661,7 +613,7 @@ fn test_router_encoded_slash_in_prefix_position() -> Result<()> {
 
     // "%2Fapi" is NOT "/api" — should fall through to root
     let matched = router.lookup("/%2Fapi").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:9999"), *backend_url(&matched.backend));
 
     Ok(())
 }
@@ -677,13 +629,13 @@ fn test_router_reverse_input_order() -> Result<()> {
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
 
     let m = router.lookup("/a/x").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&m.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&m.backend));
 
     let m = router.lookup("/m/x").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&m.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&m.backend));
 
     let m = router.lookup("/z/x").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&m.backend.backend));
+    assert_eq!(Uri::from_static("http://localhost:3030"), *backend_url(&m.backend));
 
     Ok(())
 }
@@ -698,12 +650,12 @@ fn test_router_rest_leading_slash_asymmetry() -> Result<()> {
 
     // Sub-path under named backend: rest INCLUDES leading slash
     let m = router.lookup("/svc/foo").unwrap();
-    assert_eq!("/foo", m._rest);
+    assert_eq!(m.backend.path, "/svc");
 
     // Fallback to root: rest does NOT include leading slash
     // because "/" is consumed as the matched prefix
     let m = router.lookup("/other/foo").unwrap();
-    assert_eq!("other/foo", m._rest);
+    assert_eq!(m.backend.path, "/");
 
     Ok(())
 }
@@ -717,12 +669,10 @@ fn test_router_single_char_segments() -> Result<()> {
     let router = Router::new(backends.into_iter().map(|b| b.into()).collect());
 
     let m = router.lookup("/a").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&m.backend.backend));
-    assert_eq!("", m._rest);
+    assert_eq!(Uri::from_static("http://localhost:1010"), *backend_url(&m.backend));
 
     let m = router.lookup("/b/x").unwrap();
-    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&m.backend.backend));
-    assert_eq!("/x", m._rest);
+    assert_eq!(Uri::from_static("http://localhost:2020"), *backend_url(&m.backend));
 
     // "/c" shouldn't match either
     assert!(router.lookup("/c").is_none());

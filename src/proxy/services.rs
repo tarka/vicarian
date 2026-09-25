@@ -172,7 +172,6 @@ impl ProxyHttp for Vicarian {
                 .or_err(E404, "Hostname not found in backends")?;
             router.lookup(components.path)
                 .or_err(E404, "Path not found in host backends")?
-                .backend
         };
 
         if let Some(key) = &routed.backend.auth_key {

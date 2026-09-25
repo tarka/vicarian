@@ -40,14 +40,14 @@ pingora-core = { version = "0.9.0", features = ["rustls"] }
 pingora-http = "0.9.0"
 pingora-proxy = "0.9.0"
 pingora-rustls = "0.9.0"
-psl = "2.1.235"
+psl = "2.1.238"
 rustls = "0.23.45"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.2", features = ["inline"] }
 serde_json = "1.0.151"
 static-web-server = { version = "3.0.0-beta.1", default-features = false, features = ["compression", "directory-listing", "fallback-page"] }
 strum_macros = "0.28.0"
-thiserror = "2.0.20"
+thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["local-offset"] }
 tokio = { version = "1.53.1", features = ["macros", "rt", "sync", "fs"] }
 tracing = "0.1.44"

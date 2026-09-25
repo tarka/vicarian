@@ -537,9 +537,9 @@ impl AcmeRuntime {
                 }
             }
             AcmeChallenge::Http01 => {
+                let pin = self.challenges.pin();
                 for hostname in acme_host.hostnames() {
                     info!("Removing HTTP-01 challenge: {}", hostname);
-                    let pin = self.challenges.pin();
                     let opt = pin.remove(hostname);
                     if opt.is_none() {
                         warn!("Challenge for {} not found", acme_host.fqdn);

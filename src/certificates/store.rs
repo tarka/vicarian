@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use papaya::HashMap as Papaya;
 use tracing::info;
 use unicase::UniCase;
@@ -57,18 +57,21 @@ impl CertStore {
 
     }
 
-    pub fn by_file(&self, file: &Utf8PathBuf) -> Option<HostCertificate> {
+    pub fn by_file(&self, file: &Utf8Path) -> Option<HostCertificate> {
         let pmap = self.by_file.pin();
         pmap.get(file)
             .cloned()
     }
 
     pub fn upsert(&self, newcert: HostCertificate) -> Result<()> {
-        for hostname in newcert.hostnames().iter() {
-            let host = UniCase::new(hostname.clone());
+        {
+            let pinned = self.by_host.pin();
+            for hostname in newcert.hostnames() {
+                let host = UniCase::new(hostname.clone());
 
-            info!("Updating/inserting certificate for {host}");
-            self.by_host.pin().update_or_insert(host, |_old| newcert.clone(), newcert.clone());
+                info!("Updating/inserting certificate for {host}");
+                pinned.update_or_insert(host, |_old| newcert.clone(), newcert.clone());
+            }
         }
 
         let keyfile = newcert.keyfile().to_path_buf();
@@ -88,11 +91,14 @@ impl CertStore {
     }
 
     pub fn update(&self, newcert: HostCertificate) -> Result<()> {
-        for hostname in newcert.hostnames().iter() {
-            info!("Updating certificate for {hostname}");
-            let host = UniCase::new(hostname.clone());
-            self.by_host.pin().update(host, |_old| newcert.clone())
-                .ok_or(anyhow!("Matching host for {} not found in cert store", hostname))?;
+        {
+            let pinned = self.by_host.pin();
+            for hostname in newcert.hostnames() {
+                info!("Updating certificate for {hostname}");
+                let host = UniCase::new(hostname.clone());
+                pinned.update(host, |_old| newcert.clone())
+                    .ok_or(anyhow!("Matching host for {} not found in cert store", hostname))?;
+            }
         }
 
         let keyfile = newcert.keyfile().to_path_buf();

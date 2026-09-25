@@ -198,7 +198,7 @@ async fn test_by_file() {
     let store = CertStore::new(context).unwrap();
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
     store.upsert(cert.clone()).unwrap();
-    let found = store.by_file(&"target/certs/snakeoil-1.key".into()).unwrap();
+    let found = store.by_file(cert.keyfile()).unwrap();
 
     assert_eq!(found, cert);
 }

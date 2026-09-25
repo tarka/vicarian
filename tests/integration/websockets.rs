@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use futures::SinkExt;
+use futures::{SinkExt, StreamExt};
 use rustls::ClientConfig;
 use serde_json::json;
 use tokio_tungstenite::{Connector, connect_async_tls_with_config, tungstenite::Message};
 
 use crate::proxyutils::ProxyBuilder;
 use tokio::net::TcpListener;
-use wiremocket::{Mock, prelude::ValidJsonMatcher};
+use wiremocket::{Mock, prelude::ValidJsonMatcher, responder::echo_response};
 
 use crate::certutils::TEST_CERTS;
 
@@ -29,7 +29,9 @@ async fn test_ws_backend() {
 
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
-    let mock = Mock::given(ValidJsonMatcher).expect(1..);
+    let mock = Mock::given(ValidJsonMatcher)
+        .set_responder(echo_response())
+        .expect(1..);
     ws_server.register(mock).await;
 
     let config = ClientConfig::builder()
@@ -41,13 +43,18 @@ async fn test_ws_backend() {
 
     let (mut stream, _response) = connect_async_tls_with_config(proxy_uri, None, false, Some(connector)).await.unwrap();
 
-    let msg = json!({"message": "heartbeat"});
+    let msg = json!({"message": "heartbeat"}).to_string();
 
-    stream.send(Message::text(msg.to_string())).await.unwrap();
+
+    stream.send(Message::text(&msg)).await.unwrap();
+
+    let reply = stream.next().await.unwrap().unwrap();
+    assert_eq!(reply, Message::text(&msg));
 
     stream.send(Message::Close(None)).await.unwrap();
 
-    std::mem::drop(stream);
+    // Drain closing stream before verify
+    while stream.next().await.is_some() {}
 
     ws_server.verify().await;
 }

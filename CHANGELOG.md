@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tarka/vicarian/compare/v0.5.1...v0.6.0) - 2026-09-25
+
+### <!-- 0 -->Features
+
+- *(config)* Allow override of HTTP/HTTPS ports from commandline.
+- *(config)* Allow setting of numeric values via env()
+
+### <!-- 3 -->Documentation
+
+- *(website)* Remove link to old CONFIGURATION.md
+
+### <!-- 6 -->Testing
+
+- Add more websocket testing.
+- Improvements to websocket test.
+- Enable logging in flaky websocket test.
+- Enable debug on tests.
+- Hold listeners open until the proxy is ready to start to ensure the port it not reused.
+- Update the reserved port count for tests.
+- Change the mock servers to allocate random ports and then supply them to the config.
+- Allocate ports in blocking thread and minor test cleanups.
+- Cleanup integration tests; remove a lot of old code and duplication.
+- Inject integration test backends with env() to avoid search/replace on test config.
+- Add note about possible use of env() for backend configuration.
+- Tests and fixes for commandline port override
+- Parallelise integration tests with dynamically allocated ports.
+- Add test for invalid env() values
+
+### Other
+
+- Dependency update
+- Remove now-redundant nesting of router matches.
+- Minor simplifications and optimisations.
+- Dependency update.
+- Add aliases for CLI ports and add note about overrides in the full example config.
+
 ## [0.5.1](https://github.com/tarka/vicarian/compare/v0.5.0...v0.5.1) - 2026-09-18
 
 ### <!-- 1 -->Bug Fixes

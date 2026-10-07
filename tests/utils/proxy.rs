@@ -217,7 +217,7 @@ impl ProxyBuilder {
             })
             .collect();
 
-        // Close listeners
+        // Close assigned listening ports
         self.ports.listeners = Vec::new();
 
         let mut child = Command::new(exe)

@@ -90,9 +90,9 @@ struct AcmeHost {
 impl AcmeHost {
 
     fn new(vhost: &Vhost, aconf: &TlsAcmeConfig) -> Result<Self> {
-        let domain_psl = psl::domain(vhost.hostname.as_bytes())
-            .ok_or(anyhow!("Failed to find base domain for {}", vhost.hostname))?;
-        let domain = String::from_utf8(domain_psl.as_bytes().to_vec())?;
+        let domain = psl::domain_str(&vhost.hostname)
+            .ok_or(anyhow!("Failed to find base domain for {}", vhost.hostname))?
+            .to_string();
         let is_wildcard = matches!(aconf.challenge, AcmeChallenge::Dns01(DnsProvider {wildcard: true, dns_provider: _}));
 
         let (cert_hostname, cert_fname) = if is_wildcard {

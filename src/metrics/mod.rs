@@ -104,7 +104,7 @@ impl Metrics {
                 }
 
                 _ = quit_rx.changed() => {
-                    info!("Quitting ACME runtime");
+                    info!("Quitting Metrics runtime");
                     break;
                 },
             };

@@ -19,13 +19,13 @@
 //
 // Unlike most other HTTP proxies we declare our TLS configuration
 // up-front and then reference it in the vhost blocks. This allows
-// Acme DNS-01 configuration to re-used across hosts (the expected
+// Acme DNS-01 configuration to re-used across vhosts (the expected
 // use-case for Vicarian).
 
 // A definition of an ACME DNS-01 provider; there can be multiple of these
 // and be reused in multiple vhosts.
 acme "le-porkbun" {
-    acme_provider = "letsencrypt"    // Default
+    acme_provider = "letsencrypt"    // Default (and currently only)
     // Optional; 'classic' (default), 'tlsserver', or 'shortlived'.
     // See https://letsencrypt.org/docs/profiles/
     profile = "shortlived"
@@ -60,7 +60,8 @@ acme "le-http01" {
 cert "snakeoil" {
     keyfile = "/etc/ssl/certs/ssl-cert-snakeoil.pem"
     certfile = "/etc/ssl/private/ssl-cert-snakeoil.key"
-    reload = true // Optional; defaults to true
+    // Automatic reload of static certificates on update. Optional; defaults to true.
+    reload = true
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -154,6 +155,7 @@ vhost "vicarian.org" {
 }
 
 vhost "localhost" {
+    // Static certificates; automatically reloaded on change.
     tls = "snakeoil"
 
     backend "/" {

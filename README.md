@@ -14,7 +14,7 @@ Vicarian aims to have sensible defaults without additional configuration.
 [![GitHub CI](https://github.com/tarka/vicarian/actions/workflows/tests.yml/badge.svg)](https://github.com/tarka/vicarian/actions)
 [![License](https://img.shields.io/crates/l/vicarian)](https://github.com/tarka/vicarian/blob/master/README.md#License)
 
-This software should be consider beta; the core feature-set is largely complete,
+This software can be consider beta; the core feature-set is largely complete,
 and most development should be for more niche features.
 
 Only Linux is currently supported (x86_64 and Arm64). Testing for other

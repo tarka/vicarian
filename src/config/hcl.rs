@@ -327,6 +327,7 @@ pub struct Backend {
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum BackendType {
     Proxy(ProxyBackend),
+    #[cfg(feature = "static-files")]
     Static(StaticBackend),
     Metrics,
 }
@@ -340,6 +341,7 @@ pub struct ProxyBackend {
     pub trust: bool,
 }
 
+#[cfg(feature = "static-files")]
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StaticBackend {
@@ -363,6 +365,7 @@ impl ValidateSanitise for Backend {
                 let _authority = uri.authority()
                     .ok_or(anyhow!("No hostname in URI {uri}"))?;
             }
+            #[cfg(feature = "static-files")]
             BackendType::Static(ref _b) => {
                 // We don't require that root exists up-front, so
                 // nothing to do here

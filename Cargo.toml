@@ -45,7 +45,7 @@ rustls = "0.23.45"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_default_utils = { version = "0.3.2", features = ["inline"] }
 serde_json = "1.0.151"
-static-web-server = { version = "3.0.0-beta.1", default-features = false, features = ["compression", "directory-listing", "fallback-page"] }
+static-web-server = { version = "3.0.0-beta.1", default-features = false, features = ["compression", "directory-listing", "fallback-page"], optional = true }
 strum_macros = "0.28.0"
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["local-offset"] }
@@ -59,6 +59,8 @@ zone-update = { version = "0.12.2", features = ["async"] }
 [features]
 default = ["integration_tests"]
 integration_tests = []
+static-files = ["static-web-server"]
+
 
 [dev-dependencies]
 fslock = "0.2.1"

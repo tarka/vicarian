@@ -1,17 +1,23 @@
+#[cfg(feature = "static-files")]
 use anyhow::bail;
 use http::Uri;
+#[cfg(feature = "static-files")]
 use itertools::Itertools;
 use sealed_test::prelude::*;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4};
 
 use crate::config::{
-    ProxyBackend, StaticBackend,
     hcl::{
         AcmeProfile,
         AcmeProvider,
         TlsAcmeConfig,
         TlsFilesConfig,
     },
+};
+#[cfg(feature = "static-files")]
+use crate::config::{
+    ProxyBackend,
+    StaticBackend,
 };
 
 use super::*;
@@ -438,6 +444,7 @@ fn test_uri_with_scheme_no_authority() {
     assert!(result.is_err());
 }
 
+#[cfg(feature = "static-files")]
 #[sealed_test(
     files = ["examples/vicarian-full.hcl"],
     env = [

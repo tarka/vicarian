@@ -1,4 +1,4 @@
-#![cfg(feature = "integration_tests")]
+#![cfg(all(feature = "integration_tests", feature = "static-files"))]
 
 use http::header::AUTHORIZATION;
 use reqwest::{Client, header::{VIA, CONTENT_TYPE, STRICT_TRANSPORT_SECURITY}};

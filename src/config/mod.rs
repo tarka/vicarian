@@ -26,11 +26,13 @@ pub use hcl::{
     Config,
     DnsProvider,
     ProxyBackend,
-    StaticBackend,
     TlsAcmeConfig,
     TlsConfig,
     Vhost,
 };
+#[cfg(feature = "static-files")]
+pub use hcl::StaticBackend;
+
 
 pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.hcl";
 

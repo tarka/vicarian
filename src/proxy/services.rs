@@ -30,9 +30,10 @@ use crate::{
         BackendHandler, E401, E404, E500, ProxyHandler,
         mimetypes::is_compressible,
         router::{Router, RouterBackend},
-        r#static::StaticHandler,
     },
 };
+#[cfg(feature = "static-files")]
+use crate::proxy::r#static::StaticHandler;
 
 struct RequestComponents<'a> {
     host: &'a str,
@@ -107,6 +108,7 @@ fn to_module_handler(backend: &Backend) -> Box<dyn BackendHandler> {
             Box::new(ProxyHandler::new(backend))
         }
 
+        #[cfg(feature = "static-files")]
         BackendType::Static(ref bconf) => {
             Box::new(StaticHandler::new(bconf))
         }

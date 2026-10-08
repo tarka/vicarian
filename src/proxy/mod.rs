@@ -2,6 +2,7 @@ mod cleartext;
 mod mimetypes;
 mod router;
 mod services;
+#[cfg(feature = "static-files")]
 mod r#static;
 #[cfg(test)]
 mod tests;

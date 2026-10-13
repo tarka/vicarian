@@ -5,7 +5,7 @@ version = "0.6.0"
 edition = "2024"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
-homepage = "https://github.com/tarka/vicarian"
+homepage = "https://vicarian.org/"
 repository = "https://github.com/tarka/vicarian"
 readme = "README.md"
 

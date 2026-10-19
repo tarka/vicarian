@@ -271,7 +271,7 @@ impl ProxyHttp for Vicarian {
         Ok(())
     }
 
-    async fn upstream_response_filter(&self, _session: &mut Session,
+    async fn upstream_response_filter(&self, session: &mut Session,
                                       upstream_response: &mut ResponseHeader,
                                       ctx: &mut Self::CTX)
                                       -> pingora_core::Result<()>
@@ -279,6 +279,11 @@ impl ProxyHttp for Vicarian {
         let routed = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .routed;
+
+        info!("Access: {} {} -> {}",
+              session.req_header().method,
+              session.req_header().uri.path(),
+              upstream_response.status.as_u16());
 
         let upstream = backend_to_proxy(&routed.backend)
             .or_err_with(E500, || format!("Unexpected backend: {:?}", routed.backend))?;

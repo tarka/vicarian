@@ -30,6 +30,7 @@ acme "le-porkbun" {
     // See https://letsencrypt.org/docs/profiles/
     profile = "shortlived"
     contact = "admin@haltcondition.net"  // Required
+    directory = "/var/lib/vicarian/acme" // Cert cache (default)
     challenge {
         type = "dns-01"
         wildcard = true   // Default is false

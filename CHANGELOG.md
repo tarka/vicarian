@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/tarka/vicarian/compare/v0.6.0...v0.6.1) - 2026-10-22
+
+### <!-- 3 -->Documentation
+
+- Add cert directory configuration directive to full example.
+- Minor updates.
+
+### <!-- 8 -->Security
+
+- Update dependencies to pull in webpki updates for known-bad eMudhra certs.
+
+### Other
+
+- Use website for homepage in Cargo.toml
+
 ## [0.6.0](https://github.com/tarka/vicarian/compare/v0.5.1...v0.6.0) - 2026-10-07
 
 ### <!-- 0 -->Features

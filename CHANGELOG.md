@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2](https://github.com/tarka/vicarian/compare/v0.7.1...v0.7.2) - 2026-10-24
+
+### <!-- 1 -->Improvements
+
+- Also log errors if provided.
+
+### <!-- 2 -->Bug Fixes
+
+- Fix static file logging override format.
+
+### <!-- 7 -->Testing
+
+- Add tests for logging setup.
+
 ## [0.7.1](https://github.com/tarka/vicarian/compare/v0.7.0...v0.7.1) - 2026-10-24
 
 ### <!-- 1 -->Improvements

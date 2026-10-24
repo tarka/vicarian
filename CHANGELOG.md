@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3](https://github.com/tarka/vicarian/compare/v0.7.2...v0.7.3) - 2026-10-24
+
+### <!-- 2 -->Bug Fixes
+
+- Don't fallback to root with static pages.
+
 ## [0.7.2](https://github.com/tarka/vicarian/compare/v0.7.1...v0.7.2) - 2026-10-24
 
 ### <!-- 1 -->Improvements

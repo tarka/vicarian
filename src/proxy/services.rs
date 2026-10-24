@@ -1,16 +1,13 @@
-use std::{collections::HashMap, iter, sync::Arc};
+use std::{collections::HashMap, fmt::Display, iter, net::IpAddr, sync::Arc};
 
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use http::{
-    HeaderValue, Uri,
-    header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
-    uri::{Authority, Scheme},
+    HeaderValue, Uri, header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA}, uri::{Authority, Scheme},
 };
 use metrics::counter;
 use pingora_core::{
-    ErrorType, OkOrErr, OrErr, modules::http::compression::ResponseCompression, prelude::HttpPeer,
-    upstreams::peer::Peer,
+    ErrorType, OkOrErr, OrErr, modules::http::compression::ResponseCompression, prelude::HttpPeer, protocols::l4::socket::SocketAddr, upstreams::peer::Peer,
 };
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
@@ -271,7 +268,7 @@ impl ProxyHttp for Vicarian {
         Ok(())
     }
 
-    async fn upstream_response_filter(&self, session: &mut Session,
+    async fn upstream_response_filter(&self, _session: &mut Session,
                                       upstream_response: &mut ResponseHeader,
                                       ctx: &mut Self::CTX)
                                       -> pingora_core::Result<()>
@@ -279,11 +276,6 @@ impl ProxyHttp for Vicarian {
         let routed = ctx.clone()
             .or_err(E500, "Request context not initialised; shouldn't happen?")?
             .routed;
-
-        info!("Access: {} {} -> {}",
-              session.req_header().method,
-              session.req_header().uri.path(),
-              upstream_response.status.as_u16());
 
         let upstream = backend_to_proxy(&routed.backend)
             .or_err_with(E500, || format!("Unexpected backend: {:?}", routed.backend))?;
@@ -330,4 +322,31 @@ impl ProxyHttp for Vicarian {
         Ok(())
     }
 
+    async fn logging(&self, session: &mut Session, _e: Option<&pingora_core::Error>, _ctx: &mut Self::CTX)
+    where
+        Self::CTX: Send + Sync,
+    {
+        let ip = session.client_addr()
+            .and_then(SocketAddr::as_inet)
+            .map(|s| s.ip());
+        let cip = ClientIp(ip);
+        info!("Access: {} -> {} {} -> {}",
+              cip,
+              session.req_header().method,
+              session.req_header().uri.path(),
+              session.response_written()
+                  .map(|rw| rw.status.as_u16())
+                  .unwrap_or(0));
+    }
+}
+
+struct ClientIp(Option<IpAddr>);
+
+impl Display for ClientIp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some(ip) => write!(f, "{ip}"),
+            None => write!(f, "No-IP"),
+        }
+    }
 }

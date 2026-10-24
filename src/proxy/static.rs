@@ -8,9 +8,7 @@ use http_body_util::BodyExt;
 use pingora_core::OrErr;
 use pingora_http::ResponseHeader;
 use pingora_proxy::Session;
-use static_web_server::handler::{
-    RequestHandler as SWSHandler, RequestHandlerOpts as SWSHandlerOpts,
-};
+use static_web_server::handler as sws;
 
 use crate::{
     config::StaticBackend,
@@ -21,7 +19,7 @@ use crate::{
 // TODO: Should be own top-level module (like metrics)?
 
 pub struct StaticHandler {
-    sws_handler: SWSHandler,
+    sws_handler: sws::RequestHandler,
 }
 
 impl StaticHandler {
@@ -30,17 +28,18 @@ impl StaticHandler {
             .join("index.html");
         let fallback_page = std::fs::read(&static_root)
             .unwrap_or_else(|_| Vec::new());
-        let opts = Arc::new(SWSHandlerOpts {
+        let opts = Arc::new(sws::RequestHandlerOpts {
             root_dir: backend.root.clone()
                 .into_std_path_buf(),
             compression: true,
             dir_listing: true,
             page_fallback: fallback_page,
             redirect_trailing_slash: true,
+            log_remote_address: true,
             ..Default::default()
         });
         Self {
-            sws_handler: SWSHandler {
+            sws_handler: sws::RequestHandler {
                 opts,
             },
         }

@@ -12,6 +12,7 @@ use nix::sys::resource::{Resource, getrlimit, setrlimit};
 use tokio::sync::watch;
 use tracing::info;
 use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
 
 use crate::metrics::Metrics;
 use crate::{
@@ -27,8 +28,10 @@ fn init_logging(level: u8) -> Result<()> {
         _ => LevelFilter::WARN,
     };
 
+    // Disable logging in static-web-server as we unify this in pingora.
+    let filter = EnvFilter::new(format!("{log_level}, static_web_server::log_addr=warn"));
     tracing_subscriber::fmt()
-        .with_max_level(log_level)
+        .with_env_filter(filter)
         .init();
 
     info!("Logging initialised");

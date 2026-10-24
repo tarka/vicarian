@@ -118,6 +118,7 @@ pub struct ProxyBuilder {
     pub config: Option<Utf8PathBuf>,
     pub ports: ProxyPorts,
     pub mock_ports: Vec<u16>,
+    verbose: u8,
 }
 
 pub struct Proxy {
@@ -154,7 +155,8 @@ impl ProxyBuilder {
             dir,
             config: None,
             ports,
-            mock_ports: Vec::new()
+            mock_ports: Vec::new(),
+            verbose: 2,
         }
     }
 
@@ -178,6 +180,13 @@ impl ProxyBuilder {
             .map(|m| m.address().port())
             .collect::<Vec<u16>>();
         self.with_mock_ports(&mock_ports)
+    }
+
+    /// Set the number of `-v` flags passed to the proxy process
+    /// (1=INFO, 2=DEBUG (default), 3=TRACE).
+    pub fn with_verbose(mut self, verbose: u8) -> Self {
+        self.verbose = verbose;
+        self
     }
 
 
@@ -221,7 +230,7 @@ impl ProxyBuilder {
         self.ports.listeners = Vec::new();
 
         let mut child = Command::new(exe)
-            .arg("-vv")
+            .args(std::iter::repeat("-v").take(self.verbose as usize))
             .arg("-c").arg(self.config.as_ref().unwrap())
             // Port flags override the listen ports from the config file,
             // enabling parallel tests to each use their own unique port block.

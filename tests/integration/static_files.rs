@@ -1,10 +1,12 @@
 #![cfg(feature = "integration_tests")]
 
+use std::time::Duration;
+
 use http::header::AUTHORIZATION;
 use reqwest::{Client, header::{VIA, CONTENT_TYPE, STRICT_TRANSPORT_SECURITY}};
 
 use crate::certutils::TEST_CERTS;
-use crate::proxyutils::ProxyBuilder;
+use crate::proxyutils::{Proxy, ProxyBuilder};
 
 #[tokio::test]
 async fn test_static_file_serving() {
@@ -561,4 +563,79 @@ async fn test_static_multiple_files_concurrent() {
         let response = handle.await.unwrap().unwrap();
         assert_eq!(200, response.status().as_u16());
     }
+}
+
+/// Read the proxy process's captured stdout and stderr.
+fn proxy_output(proxy: &Proxy) -> String {
+    let dir = proxy.dir.path();
+    let stdout = std::fs::read_to_string(dir.join("stdout")).unwrap_or_default();
+    let stderr = std::fs::read_to_string(dir.join("stderr")).unwrap_or_default();
+    format!("{stdout}\n{stderr}")
+}
+
+// Serves a static file and returns the proxy's captured log output.
+async fn serve_and_collect_logs(proxy: &Proxy) -> String {
+    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
+    let root_cert = TEST_CERTS.caroot.reqcert.clone();
+
+    let response = Client::builder()
+        .resolve("www.example.com", example_com)
+        .add_root_certificate(root_cert)
+        .http2_prior_knowledge()
+        .build()
+        .unwrap()
+        .get(format!("https://www.example.com:{}/index.html", proxy.tls_port))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert!(body.contains("Welcome to the static server"));
+
+    // Give the proxy a moment to flush log output to the captured files.
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    proxy_output(proxy)
+}
+
+#[tokio::test]
+async fn test_static_request_log_filtered_at_info() {
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_static")
+        .with_verbose(1) // -v => INFO
+        .run()
+        .await
+        .unwrap();
+
+    let logs = serve_and_collect_logs(&proxy).await;
+
+    // Sanity check: vicarian's own INFO access log for the request is
+    // present, so the absence of SWS logs is not because logging is off.
+    assert!(logs.contains("access:"), "expected vicarian INFO access log in: {logs}");
+
+    // static-web-server logs each request at INFO under the target
+    // `static_web_server::log_addr`, which is capped at WARN.
+    assert!(!logs.contains("static_web_server::log_addr"),
+            "static_web_server::log_addr must not be logged at INFO level:\n{logs}");
+}
+
+#[tokio::test]
+async fn test_static_request_log_filtered_at_debug() {
+    // The harness default is -vv (DEBUG). The `static_web_server::log_addr=warn`
+    // cap must also hold here: SWS logs each request at INFO, which would
+    // otherwise appear at DEBUG level.
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_static")
+        .run()
+        .await
+        .unwrap();
+
+    let logs = serve_and_collect_logs(&proxy).await;
+
+    // Sanity check: DEBUG logging is active.
+    let request_log = format!("Request: https://www.example.com:{}/index.html", proxy.tls_port);
+    assert!(logs.contains(&request_log),
+            "expected vicarian DEBUG request log {request_log:?} in: {logs}");
+
+    assert!(!logs.contains("static_web_server::log_addr"),
+            "static_web_server::log_addr must stay capped at WARN even at DEBUG level:\n{logs}");
 }

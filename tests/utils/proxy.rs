@@ -309,4 +309,3 @@ mod tests {
         assert_eq!(all_ports.len(), 20);
     }
 }
-

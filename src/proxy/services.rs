@@ -1,13 +1,16 @@
 use std::{collections::HashMap, fmt::Display, iter, net::IpAddr, sync::Arc};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use async_trait::async_trait;
 use http::{
-    HeaderValue, Uri, header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA}, uri::{Authority, Scheme},
+    HeaderValue, Uri,
+    header::{self, AUTHORIZATION, LOCATION, REFRESH, STRICT_TRANSPORT_SECURITY, VIA},
+    uri::{Authority, Scheme},
 };
 use metrics::counter;
 use pingora_core::{
-    ErrorType, OkOrErr, OrErr, modules::http::compression::ResponseCompression, prelude::HttpPeer, protocols::l4::socket::SocketAddr, upstreams::peer::Peer,
+    ErrorType, OkOrErr, OrErr, modules::http::compression::ResponseCompression, prelude::HttpPeer,
+    protocols::l4::socket::SocketAddr, upstreams::peer::Peer,
 };
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
@@ -322,7 +325,7 @@ impl ProxyHttp for Vicarian {
         Ok(())
     }
 
-    async fn logging(&self, session: &mut Session, _e: Option<&pingora_core::Error>, _ctx: &mut Self::CTX)
+    async fn logging(&self, session: &mut Session, err: Option<&pingora_core::Error>, _ctx: &mut Self::CTX)
     where
         Self::CTX: Send + Sync,
     {
@@ -330,13 +333,25 @@ impl ProxyHttp for Vicarian {
             .and_then(SocketAddr::as_inet)
             .map(|s| s.ip());
         let cip = ClientIp(ip);
-        info!("Access: {} -> {} {} -> {}",
+        info!("access: {} -> {} {} -> {}",
               cip,
               session.req_header().method,
               session.req_header().uri.path(),
               session.response_written()
                   .map(|rw| rw.status.as_u16())
                   .unwrap_or(0));
+
+        if let Some(e) = err {
+            info!("error: {}, {}, {}, {}",
+                  e.etype.as_str(),
+                  e.esource.as_str(),
+                  e.cause.as_ref().map(|c| c.to_string())
+                      .unwrap_or_else(|| "<No Cause>".to_string()),
+                  e.context.as_ref().map(|s| s.as_str())
+                      .unwrap_or("<NoCtx>"),
+            );
+        }
+
     }
 }
 
@@ -346,7 +361,7 @@ impl Display for ClientIp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
             Some(ip) => write!(f, "{ip}"),
-            None => write!(f, "No-IP"),
+            None => write!(f, "<NoIP>"),
         }
     }
 }

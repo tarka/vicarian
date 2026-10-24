@@ -29,7 +29,7 @@ fn init_logging(level: u8) -> Result<()> {
     };
 
     // Disable logging in static-web-server as we unify this in pingora.
-    let filter = EnvFilter::new(format!("{log_level}, static_web_server::log_addr=warn"));
+    let filter = EnvFilter::new(format!("{log_level},static_web_server::log_addr=warn"));
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .init();

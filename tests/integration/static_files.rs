@@ -204,9 +204,7 @@ async fn test_static_404() {
         .await
         .unwrap();
 
-    assert_eq!(200, response.status().as_u16());
-    let body = response.text().await.unwrap();
-    assert!(body.contains("Welcome to the static server"));
+    assert_eq!(404, response.status().as_u16());
 }
 
 #[tokio::test]
@@ -438,33 +436,6 @@ async fn test_static_directory_listing() {
     assert_eq!(200, response.status().as_u16());
     let body = response.text().await.unwrap();
     assert!(body.contains("style.css"));
-}
-
-#[tokio::test]
-async fn test_static_fallback_page() {
-    let proxy = ProxyBuilder::new().await
-        .with_simple_config("example_com_static")
-        .run()
-        .await
-        .unwrap();
-
-    let example_com = format!("127.0.0.1:{}", proxy.tls_port).parse().unwrap();
-    let root_cert = TEST_CERTS.caroot.reqcert.clone();
-
-    let response = Client::builder()
-        .resolve("www.example.com", example_com)
-        .add_root_certificate(root_cert)
-        .http2_prior_knowledge()
-        .build()
-        .unwrap()
-        .get(format!("https://www.example.com:{}/some/unknown/path", proxy.tls_port))
-        .send()
-        .await
-        .unwrap();
-
-    assert_eq!(200, response.status().as_u16());
-    let body = response.text().await.unwrap();
-    assert!(body.contains("Welcome to the static server"));
 }
 
 #[tokio::test]

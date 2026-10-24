@@ -24,16 +24,11 @@ pub struct StaticHandler {
 
 impl StaticHandler {
     pub fn new(backend: &StaticBackend) -> Self {
-        let static_root = backend.root.clone()
-            .join("index.html");
-        let fallback_page = std::fs::read(&static_root)
-            .unwrap_or_else(|_| Vec::new());
         let opts = Arc::new(sws::RequestHandlerOpts {
             root_dir: backend.root.clone()
                 .into_std_path_buf(),
             compression: true,
             dir_listing: true,
-            page_fallback: fallback_page,
             redirect_trailing_slash: true,
             log_remote_address: true,
             ..Default::default()

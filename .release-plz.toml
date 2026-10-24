@@ -24,5 +24,4 @@ commit_parsers = [
   { message = "^sec", group = "<!-- 9 -->Security" },
   { message = "^revert", group = "<!-- 10 -->Revert" },
   { message = "^.*", group = "other" },
-
 ]

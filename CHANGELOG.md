@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/tarka/vicarian/compare/v0.7.0...v0.7.1) - 2026-10-24
+
+### <!-- 1 -->Improvements
+
+- Unify logging under Pingora and log client IP address.
+
+### <!-- 8 -->Miscellaneous Tasks
+
+- Minor release-plz changelog tweaks.
+
 ## [0.7.0](https://github.com/tarka/vicarian/compare/v0.6.1...v0.7.0) - 2026-10-23
 
 ### <!-- 0 -->Features

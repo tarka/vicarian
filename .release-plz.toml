@@ -12,17 +12,17 @@ commit_parsers = [
   { message = "^perf", group = "<!-- 5 -->Performance" },
   { message = "^style", group = "<!-- 6 -->Styling" },
   { message = "^test", group = "<!-- 7 -->Testing" },
-  { message = "^chore|^ci", group = "<!-- 8 -->Miscellaneous Tasks" },
-  { body = ".*security", group = "<!-- 9 -->Security" },
-  { message = "^sec", group = "<!-- 9 -->Security" },
-  { message = "^revert", group = "<!-- 10 -->Revert" },
-  { message = "^.*", group = "other" },
 
-  { message = "^refactor\\(clippy\\)", skip = true },
   { message = "^chore\\(release\\):", skip = true },
   { message = "^chore: release", skip = true },
   { message = "^chore\\(deps.*\\)", skip = true },
   { message = "^chore\\(pr\\)", skip = true },
   { message = "^chore\\(pull\\)", skip = true },
-  { message = "^chore\\(npm\\).*yarn\\.lock", skip = true },
+  { message = "^chore|^ci|^maint", group = "<!-- 8 -->Miscellaneous Tasks" },
+
+  { body = ".*security", group = "<!-- 9 -->Security" },
+  { message = "^sec", group = "<!-- 9 -->Security" },
+  { message = "^revert", group = "<!-- 10 -->Revert" },
+  { message = "^.*", group = "other" },
+
 ]

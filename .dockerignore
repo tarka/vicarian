@@ -1,0 +1,7 @@
+# Only the build inputs are needed; keep the build context small.
+*
+!Cargo.toml
+!Cargo.lock
+!src/
+!examples/
+!scripts/

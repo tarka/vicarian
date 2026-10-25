@@ -66,7 +66,7 @@ fn system_setup() -> Result<()> {
     info!("Increasing NOFILE to {hard}");
     setrlimit(Resource::RLIMIT_NOFILE, hard, hard)?;
 
-    rustls::crypto::aws_lc_rs::default_provider().install_default()
+    rustls::crypto::ring::default_provider().install_default()
         .expect("Failed to install Rustls crypto provider");
 
     Ok(())

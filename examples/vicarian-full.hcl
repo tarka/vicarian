@@ -42,7 +42,15 @@ acme "le-porkbun" {
 
             // env() fetches data from environment variables.
             key = env("PORKBUN_KEY")
-            secret = env("PORKBUN_SECRET")
+            // secret() reads secrets from a file with a format of:
+            //
+            //     MY_SECRET = MY_SECRET_VALUE
+            //
+            // By default `/etc/vicarian/secrets` is read; a different
+            // file can be specified with:
+            //
+            //     secret = secret("SECRET_NAME", "/etc/vicarian/other_secrets")
+            secret = secret("MY_SECRET", "secrets-example-file")
         }
     }
 }

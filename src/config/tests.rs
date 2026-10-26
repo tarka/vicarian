@@ -439,10 +439,12 @@ fn test_uri_with_scheme_no_authority() {
 }
 
 #[sealed_test(
-    files = ["examples/vicarian-full.hcl"],
+    files = [
+        "examples/vicarian-full.hcl",
+        "examples/secrets-example-file",
+    ],
     env = [
         ("PORKBUN_KEY", "PORKBUN_KEY"),
-        ("PORKBUN_SECRET", "PORKBUN_SECRET"),
         ("my-secret-key", "my-secret-key"),
     ],
 )]
@@ -488,7 +490,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
         }),
     }) if contact == "admin@haltcondition.net"
                      && key == "PORKBUN_KEY"
-                     && secret == "PORKBUN_SECRET"));
+                     && secret == "MY_SECRET_VALUE"));
 
     // `acme "le-http01"` — http-01, defaults for provider and profile.
     let vh_vicarian = config.vhosts.iter()
@@ -603,26 +605,24 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
 // secrets
 // -------------------------------------------------------------------
 
-async fn write_secret_file(dir: &tempfile::TempDir, name: &str, contents: &str) -> Utf8PathBuf {
+fn write_secret_file(dir: &tempfile::TempDir, name: &str, contents: &str) -> Utf8PathBuf {
     let path = dir.path().join(name);
-    tokio::fs::write(&path, contents)
-        .await
+    std::fs::write(&path, contents)
         .expect("failed to write secret file");
     Utf8PathBuf::from_path_buf(path).expect("tempdir path is valid UTF-8")
 }
 
-#[tokio::test]
-async fn test_secret_found() -> Result<()> {
+#[test]
+fn test_secret_found() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let file = write_secret_file(
         &dir,
         "secrets.txt",
         "MY_PROVIDER_KEY=pk1_d1hvj29L0Og+vdpSisTpWYBCfyDCl7fGp0UMOSdFxrI\n\
          MY_PROVIDER_SECRET=sk1_DMWjszfASDFNvK+I8hjJgLJIR2TpwSqLWMqbKY8Yts0\n",
-    )
-    .await;
+    );
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY").await?;
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY")?;
     assert_eq!(
         secret.as_str(),
         "pk1_d1hvj29L0Og+vdpSisTpWYBCfyDCl7fGp0UMOSdFxrI"
@@ -630,12 +630,12 @@ async fn test_secret_found() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_not_found() -> Result<()> {
+#[test]
+fn test_secret_not_found() -> Result<()> {
     let dir = tempfile::tempdir()?;
-    let file = write_secret_file(&dir, "secrets.txt", "OTHER_KEY=abc\n").await;
+    let file = write_secret_file(&dir, "secrets.txt", "OTHER_KEY=abc\n");
 
-    let err = match secrets::read_secret(&file, "MY_PROVIDER_KEY").await {
+    let err = match secrets::read_secret(&file, "MY_PROVIDER_KEY") {
         Ok(_) => panic!("expected an error for a missing key"),
         Err(e) => e,
     };
@@ -650,105 +650,104 @@ async fn test_secret_not_found() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_missing_file() -> Result<()> {
+#[test]
+fn test_secret_missing_file() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let file = Utf8PathBuf::from_path_buf(dir.path().join("does-not-exist.txt")).unwrap();
 
-    let result = secrets::read_secret(&file, "MY_PROVIDER_KEY").await;
+    let result = secrets::read_secret(&file, "MY_PROVIDER_KEY");
     assert!(result.is_err(), "missing file should be an error");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_crlf_line_endings() -> Result<()> {
+#[test]
+fn test_secret_crlf_line_endings() -> Result<()> {
     let dir = tempfile::tempdir()?;
-    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=pk1_abc\r\nOTHER=x\r\n")
-        .await;
+    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=pk1_abc\r\nOTHER=x\r\n");
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY").await?;
+
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY")?;
     assert_eq!(secret.as_str(), "pk1_abc");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_whitespace_around_equals() -> Result<()> {
+#[test]
+fn test_secret_whitespace_around_equals() -> Result<()> {
     let dir = tempfile::tempdir()?;
-    let file = write_secret_file(&dir, "secrets.txt", "  MY_PROVIDER_SECRET = sk1_abc  \n").await;
+    let file = write_secret_file(&dir, "secrets.txt", "  MY_PROVIDER_SECRET = sk1_abc  \n");
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_SECRET").await?;
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_SECRET")?;
     assert_eq!(secret.as_str(), "sk1_abc");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_value_internal_spaces_preserved() -> Result<()> {
+#[test]
+fn test_secret_value_internal_spaces_preserved() -> Result<()> {
     let dir = tempfile::tempdir()?;
-    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=abc def ghi\n").await;
+    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=abc def ghi\n");
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY").await?;
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY")?;
     assert_eq!(secret.as_str(), "abc def ghi");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_value_containing_equals() -> Result<()> {
+#[test]
+fn test_secret_value_containing_equals() -> Result<()> {
     let dir = tempfile::tempdir()?;
-    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=abc=def\n").await;
+    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=abc=def\n");
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY").await?;
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY")?;
     assert_eq!(secret.as_str(), "abc=def");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_duplicate_key_first_wins() -> Result<()> {
+#[test]
+fn test_secret_duplicate_key_first_wins() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let file = write_secret_file(
         &dir,
         "secrets.txt",
         "MY_PROVIDER_KEY=first\nMY_PROVIDER_KEY=second\n",
-    )
-    .await;
+    );
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY").await?;
+
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY")?;
     assert_eq!(secret.as_str(), "first");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_empty_value() -> Result<()> {
+#[test]
+fn test_secret_empty_value() -> Result<()> {
     let dir = tempfile::tempdir()?;
-    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=\n").await;
+    let file = write_secret_file(&dir, "secrets.txt", "MY_PROVIDER_KEY=\n");
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY").await?;
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY")?;
     assert_eq!(secret.as_str(), "");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_ignores_lines_without_equals() -> Result<()> {
+#[test]
+fn test_secret_ignores_lines_without_equals() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let file = write_secret_file(
         &dir,
         "secrets.txt",
         "# comment\n\nMY_PROVIDER_KEY=pk1_abc\nnot a key=value line is fine\njust some text\n",
-    )
-    .await;
+    );
 
-    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY").await?;
+    let secret = secrets::read_secret(&file, "MY_PROVIDER_KEY")?;
     assert_eq!(secret.as_str(), "pk1_abc");
     Ok(())
 }
 
-#[tokio::test]
-async fn test_secret_non_utf8_value_is_error() -> Result<()> {
+#[test]
+fn test_secret_non_utf8_value_is_error() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("secrets.txt");
-    tokio::fs::write(&path, b"MY_PROVIDER_KEY=\xff\xfe\n").await?;
+    std::fs::write(&path, b"MY_PROVIDER_KEY=\xff\xfe\n")?;
     let file = Utf8PathBuf::from_path_buf(path).unwrap();
 
-    let result = secrets::read_secret(&file, "MY_PROVIDER_KEY").await;
+    let result = secrets::read_secret(&file, "MY_PROVIDER_KEY");
     assert!(result.is_err(), "non-UTF-8 secret value should be an error");
     Ok(())
 }

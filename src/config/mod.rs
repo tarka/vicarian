@@ -1,5 +1,6 @@
 mod cli;
 mod hcl;
+mod secrets;
 
 #[cfg(test)]
 mod tests;
@@ -33,6 +34,7 @@ pub use hcl::{
 };
 
 pub const DEFAULT_CONFIG_FILE: &str = "/etc/vicarian/vicarian.hcl";
+pub const DEFAULT_SECRETS_FILE: &str = "/etc/vicarian/secrets";
 
 const SPECIAL_ADDRESS_DELIMITER: char = '#';
 const SPECIAL_ADDRESS_INTERFACE: &str = "if";

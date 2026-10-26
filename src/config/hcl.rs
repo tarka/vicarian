@@ -10,13 +10,12 @@ use hcl::{
 };
 use http::Uri;
 use itertools::Itertools;
-//use pingora_core::OkOrErr;
 use serde::Deserialize;
 use serde_default_utils::{default_bool, serde_inline_default};
 use strum_macros::IntoStaticStr;
 use tracing::info;
 
-use crate::config::{CliOptions, DEFAULT_CONFIG_FILE, strip_trailing_slashes, validate_path};
+use crate::config::{CliOptions, DEFAULT_CONFIG_FILE, DEFAULT_SECRETS_FILE, secrets::read_secret, strip_trailing_slashes, validate_path};
 
 use super::{
     deserialize_canonical,
@@ -125,6 +124,7 @@ fn build_eval_context() -> Context<'static> {
     let mut decfn = |(name, func)| ctx.declare_func(name, func);
 
     decfn(env_fn());
+    decfn(secret_fn());
 
     ctx
 }
@@ -143,6 +143,26 @@ fn env_fn() -> (&'static str, FuncDef) {
     ("env", env_func)
 }
 
+fn secret_fn() -> (&'static str, FuncDef) {
+    let secret_func = FuncDef::builder()
+        .param(ParamType::String)
+        .variadic_param(ParamType::String)
+        .build(|args: FuncArgs| {
+            let keyname = args[0].as_str()
+                .ok_or_else(|| "string() keyname argument must be a string".to_string())?;
+
+            let filename = args.get(1)
+                .and_then(Value::as_str)
+                .unwrap_or(DEFAULT_SECRETS_FILE);
+
+            let value = read_secret(filename.into(), keyname)
+                .map_err(|e| e.to_string())?;
+
+            Ok(Value::from(value.as_str()))
+        });
+
+    ("secret", secret_func)
+}
 
 // Rather than use struggle with serde/config mapping we use an
 // intermediate struct that better matches the HCL schema and

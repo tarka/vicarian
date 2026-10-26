@@ -1,5 +1,6 @@
 mod cli;
 mod hcl;
+mod secrets;
 
 #[cfg(test)]
 mod tests;

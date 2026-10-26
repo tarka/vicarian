@@ -4919,6 +4919,7 @@ dependencies = [
  "wiremock",
  "wiremocket",
  "x509-parser 0.18.1",
+ "zeroize",
  "zone-update",
 ]
 

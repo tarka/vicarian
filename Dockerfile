@@ -41,12 +41,20 @@ ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 CMD ["-v"]
 
 # Usage:
-#   docker build -t vicarian .
-#   docker run -d --name vicarian \
-#     -p 80:80 -p 443:443 \
-#     -v /path/to/vicarian/etc/dir.hcl:/etc/vicarian/:ro \
-#     -v vicarian-state:/var/lib/vicarian \
-#     vicarian
 #
-# DNS-01 provider credentials are passed as environment variables, e.g.:
+#     docker build -t vicarian .
+#
+#     docker run -d --name vicarian \
+#       -p 80:80 -p 443:443 \
+#       -v /path/to/etc/vicarian:/etc/vicarian/:ro \
+#       -v vicarian-state:/var/lib/vicarian \
+#       vicarian
+#
+# DNS-01 provider credentials can be passed as environment variables, e.g.:
+#
 #   docker run -e REG_CLOUDFLARE_API_TOKEN=... ...
+#
+# Alternatively the file /path/to/etc/vicarian/secrets can be created with the format:
+#
+#     MY_SECRET_NAME = MY_SECRET_VALUE
+#

@@ -48,8 +48,8 @@ platforms is welcome.
 - **Separated secrets**: ACME DNS requires DNS-provider secrets to be
   configured. These can be placed in a separate secure file using systemd
   [EnvironmentFile](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
-  and environment injection via [HCL function calls](https://github.com/hashicorp/hcl/blob/main/hclsyntax/spec.md); see
-  [vicarian-full.hcl](examples/vicarian-full.hcl) for an example.
+  and environment injection via [HCL function calls](https://github.com/hashicorp/hcl/blob/main/hclsyntax/spec.md), 
+  or via a dedicated `secret()` HCL function; see [vicarian-full.hcl](examples/vicarian-full.hcl) for an example.
 - **Wildcards**: Wildcard ACME certificate generation.
 - **Prometheus Metrics**: Built-in support for exporting Prometheus metrics.
   See [METRICS.md](METRICS.md) for configuration and visualization details.
@@ -67,7 +67,7 @@ platforms is welcome.
 The following may be implemented at some point depending on interest and
 resources.
 
-- TLS-ALPN-01 ACME support.
+- TLS-ALPN-01 ACME support, DNS-PERSIST-01 when available.
 - Other ACME providers (e.g. ZeroSSL)
 - HTTP3/Quic support.
 - [h2c](https://httpwg.org/specs/rfc7540.html#versioning) backend support

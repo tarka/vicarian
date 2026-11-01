@@ -79,7 +79,7 @@ impl CertificateRuntime  {
             certwatcher.watch().await
         });
 
-        try_join_all(vec![acme_handle, watcher_handle]).await?;
+        try_join_all([acme_handle, watcher_handle]).await?;
 
         Ok(())
     }

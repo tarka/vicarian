@@ -1,11 +1,9 @@
 use std::{
-    fs::create_dir_all,
-    iter,
-    net::SocketAddr,
-    sync::{Arc, RwLock},
+    collections::HashMap, fs::create_dir_all, iter, net::SocketAddr, sync::{Arc, RwLock},
 };
 
 use anyhow::{Context, Error, Result, anyhow, bail};
+use arc_swap::ArcSwap;
 use camino::Utf8PathBuf;
 use dnsclient::{UpstreamServer, r#async::DNSClient};
 use futures_lite::{StreamExt, stream};
@@ -207,7 +205,7 @@ pub struct AcmeRuntime {
     context: Arc<RunContext>,
     certstore: Arc<CertStore>,
     acme_hosts: Vec<AcmeHost>,
-    challenges: papaya::HashMap<String, ChallengeTokens>,
+    challenges: ArcSwap<HashMap<String, ChallengeTokens>>,
 }
 
 struct PemCertificate {
@@ -241,7 +239,7 @@ impl AcmeRuntime {
             context,
             certstore,
             acme_hosts,
-            challenges: papaya::HashMap::new(),
+            challenges: ArcSwap::from_pointee(HashMap::new()),
         })
     }
 
@@ -512,9 +510,11 @@ impl AcmeRuntime {
                 };
 
                 info!("Storing HTTP-01 challenge: {} -> {:?}", fqdn, tokens);
-                let pin = self.challenges.pin();
-                pin.insert(fqdn, tokens);
-
+                self.challenges.rcu(|curr| {
+                    let mut updated = (**curr).clone();
+                    updated.insert(fqdn.clone(), tokens.clone());
+                    updated
+                });
             }
         }
         Ok(())
@@ -537,22 +537,24 @@ impl AcmeRuntime {
                 }
             }
             AcmeChallenge::Http01 => {
-                let pin = self.challenges.pin();
-                for hostname in acme_host.hostnames() {
-                    info!("Removing HTTP-01 challenge: {}", hostname);
-                    let opt = pin.remove(hostname);
-                    if opt.is_none() {
-                        warn!("Challenge for {} not found", acme_host.fqdn);
+                self.challenges.rcu(|curr| {
+                    let mut updated = (**curr).clone();
+                    for hostname in acme_host.hostnames() {
+                        info!("Removing HTTP-01 challenge: {}", hostname);
+                        let opt = updated.remove(hostname);
+                        if opt.is_none() {
+                            warn!("Challenge for {} not found", acme_host.fqdn);
+                        }
                     }
-                }
+                    updated
+                });
 
             }
         }
     }
 
     pub fn challenge_tokens(&self, fqdn: &str) -> Option<ChallengeTokens> {
-        let pin = self.challenges.pin();
-        pin.get(fqdn).cloned()
+        self.challenges.load().get(fqdn).cloned()
     }
 
 

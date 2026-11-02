@@ -84,16 +84,14 @@ impl CertStore {
         });
     }
 
-    pub fn upsert(&self, newcert: HostCertificate) -> Result<()> {
+    pub fn upsert(&self, newcert: HostCertificate) {
         let new_by_host = to_host_map(&newcert);
         let new_by_file = to_file_map(&newcert);
 
         self.rcu(new_by_host, new_by_file);
-
-        Ok(())
     }
 
-    pub fn upsert_all(&self, newcerts: Vec<HostCertificate>) -> Result<()> {
+    pub fn upsert_all(&self, newcerts: Vec<HostCertificate>) {
         let new_by_host = newcerts.iter()
             .flat_map(to_host_map)
             .collect();
@@ -102,8 +100,6 @@ impl CertStore {
             .collect();
 
         self.rcu(new_by_host, new_by_file);
-
-        Ok(())
     }
 
     pub fn watchlist(&self) -> Vec<Utf8PathBuf> {

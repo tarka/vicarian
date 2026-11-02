@@ -271,7 +271,7 @@ impl AcmeRuntime {
         // Initial load of existing certs. NOTE: This is slightly hacky
         // as we're possibly loading expired certs only to immediately
         // replace them, but it simplifies pending() etc.
-        self.certstore.upsert_all(existing)?;
+        self.certstore.upsert_all(existing);
 
         self.renew_all_pending().await?;
 
@@ -383,7 +383,7 @@ impl AcmeRuntime {
 
         info!("Loading new certificate");
         let hc = HostCertificate::new(acme_host.keyfile.clone(), acme_host.certfile.clone(), false).await?;
-        self.certstore.upsert(hc.clone())?;
+        self.certstore.upsert(hc.clone());
 
         Ok(hc)
     }

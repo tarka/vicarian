@@ -66,7 +66,7 @@ impl CertificateRuntime  {
 
     pub async fn run_indefinitely(&self) -> Result<()> {
         let certs = self.load_local_certs().await?;
-        self.certstore.upsert_all(certs)?;
+        self.certstore.upsert_all(certs);
 
         let mut certwatcher = CertWatcher::new(self.certstore.clone(), self.context.clone());
 

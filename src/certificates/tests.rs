@@ -127,7 +127,7 @@ async fn test_cert_watcher_file_updates() -> Result<()> {
     let hc = HostCertificate::new(key_path.clone(), cert_path.clone(), true).await?;
     let original_host = hc.hostnames()[0].clone();
     let store = Arc::new(CertStore::new(context.clone())?);
-    store.upsert_all(vec![hc])?;
+    store.upsert_all(vec![hc]);
 
     let original_cert = store.by_host(&original_host).unwrap();
     //let original_expiry = original_cert.cert()[0].not_after().to_string();
@@ -171,7 +171,7 @@ async fn test_by_host() {
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context).unwrap();
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
-    store.upsert(cert.clone()).unwrap();
+    store.upsert(cert.clone());
     let found = store.by_host(&cert.hostnames()[0]).unwrap();
 
     assert_eq!(found, cert);
@@ -182,7 +182,7 @@ async fn test_by_host_is_case_insensitive() {
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context).unwrap();
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
-    store.upsert(cert.clone()).unwrap();
+    store.upsert(cert.clone());
 
     let mixed_case_host = cert.hostnames()[0].to_ascii_uppercase();
     let found = store
@@ -197,7 +197,7 @@ async fn test_by_file() {
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context).unwrap();
     let cert = TEST_HOST_CERTS.snakeoil_1.clone();
-    store.upsert(cert.clone()).unwrap();
+    store.upsert(cert.clone());
     let found = store.by_file(cert.keyfile()).unwrap();
 
     assert_eq!(found, cert);
@@ -210,8 +210,8 @@ async fn test_watchlist() -> Result<()> {
 
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context)?;
-    store.upsert(hc1)?;
-    store.upsert(hc2)?;
+    store.upsert(hc1);
+    store.upsert(hc2);
     let watchlist = store.watchlist();
 
     assert_eq!(watchlist.len(), 2);
@@ -233,7 +233,7 @@ async fn test_file_update_success() -> Result<()> {
 
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context)?;
-    store.upsert(cert.clone())?;
+    store.upsert(cert.clone());
     let original_host = cert.hostnames()[0].clone();
 
     // The original cert is snakeoil
@@ -246,7 +246,7 @@ async fn test_file_update_success() -> Result<()> {
     fs::copy(cert.certfile(), &cert_path)?;
     let newcert = HostCertificate::new_from(&first_cert).await?;
 
-    store.upsert(newcert)?;
+    store.upsert(newcert);
 
     let updated_cert_from_file = HostCertificate::new(
         Utf8PathBuf::from_path_buf(key_path).unwrap(),
@@ -290,7 +290,7 @@ async fn test_wildcard() -> Result<()> {
 
     let context = Arc::new(RunContext::new(Config::default()));
     let store = CertStore::new(context)?;
-    store.upsert(wildcard.clone())?;
+    store.upsert(wildcard.clone());
 
     {
         let by_host = store.by_host("otherhost.example.com");

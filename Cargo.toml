@@ -15,6 +15,7 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.104"
+arc-swap = "1.9.3"
 async-trait = "0.1.92"
 bytes = "1.12.1"
 camino = { version = "1.2.6", features = ["serde1"] }

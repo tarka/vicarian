@@ -117,7 +117,7 @@ impl CertWatcher {
             // for now.
             match HostCertificate::new_from(&old).await {
                 Ok(hc) => {
-                    self.certstore.update(hc)?;
+                    self.certstore.upsert(hc)?;
                 }
                 Err(err) => {
                     if err.is::<VicarianError>() {

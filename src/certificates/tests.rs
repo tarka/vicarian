@@ -246,7 +246,7 @@ async fn test_file_update_success() -> Result<()> {
     fs::copy(cert.certfile(), &cert_path)?;
     let newcert = HostCertificate::new_from(&first_cert).await?;
 
-    store.update(newcert)?;
+    store.upsert(newcert)?;
 
     let updated_cert_from_file = HostCertificate::new(
         Utf8PathBuf::from_path_buf(key_path).unwrap(),

@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use arc_swap::ArcSwap;
 use camino::{Utf8Path, Utf8PathBuf};
-use papaya::HashMap as Papaya;
 use tracing::info;
 use unicase::UniCase;
 
@@ -11,12 +11,15 @@ use crate::{
     certificates::HostCertificate,
 };
 
+#[derive(Clone, Debug)]
+pub struct CertStoreData {
+    by_host: HashMap<UniCase<String>, HostCertificate>,
+    by_file: HashMap<Utf8PathBuf, HostCertificate>,
+}
 
 #[derive(Debug)]
 pub struct CertStore {
-    _context: Arc<RunContext>,
-    by_host: Papaya<UniCase<String>, HostCertificate>,
-    by_file: Papaya<Utf8PathBuf, HostCertificate>,
+    data: ArcSwap<CertStoreData>,
 }
 
 impl CertStore {
@@ -25,17 +28,18 @@ impl CertStore {
         info!("Loading host certificates");
 
         let certstore = Self {
-            _context,
-            by_host: Papaya::new(),
-            by_file: Papaya::new(),
+            data: ArcSwap::from_pointee(CertStoreData {
+                by_host: HashMap::new(),
+                by_file: HashMap::new(),
+            }),
         };
         Ok(certstore)
     }
 
     pub fn by_host(&self, host: &str) -> Option<HostCertificate> {
-        let pmap = self.by_host.pin();
         let host = UniCase::new(host.to_string());
-        pmap.get(&host)
+        let data = self.data.load();
+        data.by_host.get(&host)
             .cloned()
     }
 
@@ -50,27 +54,26 @@ impl CertStore {
     }
 
     pub fn by_file(&self, file: &Utf8Path) -> Option<HostCertificate> {
-        let pmap = self.by_file.pin();
-        pmap.get(file)
+        let data = self.data.load();
+        data.by_file.get(file)
             .cloned()
     }
 
     pub fn upsert(&self, newcert: HostCertificate) -> Result<()> {
-        {
-            let pinned = self.by_host.pin();
-            for hostname in newcert.hostnames() {
-                let host = UniCase::new(hostname.clone());
+        self.data.rcu(|curr| {
+            let new_by_host = newcert.hostnames().iter()
+                .map(|h| (UniCase::new(h.clone()), newcert.clone()))
+                .collect::<Vec<_>>();
+            let new_by_file = [
+                (newcert.keyfile().to_path_buf(), newcert.clone()),
+                (newcert.certfile().to_path_buf(), newcert.clone()),
+            ];
 
-                info!("Updating/inserting certificate for {host}");
-                pinned.update_or_insert(host, |_old| newcert.clone(), newcert.clone());
-            }
-        }
-
-        let keyfile = newcert.keyfile().to_path_buf();
-        let certfile = newcert.certfile().to_path_buf();
-        let by_file = self.by_file.pin();
-        by_file.update_or_insert(keyfile, |_old| newcert.clone(), newcert.clone());
-        by_file.update_or_insert(certfile, |_old| newcert.clone(), newcert.clone());
+            let mut updated = (**curr).clone();
+            updated.by_host.extend(new_by_host.clone());
+            updated.by_file.extend(new_by_file.clone());
+            updated
+        });
 
         Ok(())
     }
@@ -82,31 +85,9 @@ impl CertStore {
         Ok(())
     }
 
-    pub fn update(&self, newcert: HostCertificate) -> Result<()> {
-        {
-            let pinned = self.by_host.pin();
-            for hostname in newcert.hostnames() {
-                info!("Updating certificate for {hostname}");
-                let host = UniCase::new(hostname.clone());
-                pinned.update(host, |_old| newcert.clone())
-                    .ok_or(anyhow!("Matching host for {} not found in cert store", hostname))?;
-            }
-        }
-
-        let keyfile = newcert.keyfile().to_path_buf();
-        let certfile = newcert.certfile().to_path_buf();
-        let by_file = self.by_file.pin();
-        by_file.update(keyfile, |_old| newcert.clone())
-            .ok_or(anyhow!("File {} not found in cert store", newcert.keyfile()))?;
-        by_file.update(certfile, |_old| newcert.clone())
-            .ok_or(anyhow!("File {} not found in cert store", newcert.certfile()))?;
-
-        Ok(())
-    }
-
     pub fn watchlist(&self) -> Vec<Utf8PathBuf> {
-        let by_host = self.by_host.pin();
-        by_host.values()
+        self.data.load().by_host
+            .values()
             .filter(|h| h.watch())
             .flat_map(|h| [
                 h.keyfile().to_path_buf(),

@@ -22,6 +22,22 @@ pub struct CertStore {
     data: ArcSwap<CertStoreData>,
 }
 
+type HostMapping = Vec<(UniCase<String>, HostCertificate)>;
+type FileMapping = Vec<(Utf8PathBuf, HostCertificate)>;
+
+fn to_host_map(newcert: &HostCertificate) -> HostMapping {
+    newcert.hostnames().iter()
+        .map(|h| (UniCase::new(h.clone()), newcert.clone()))
+        .collect()
+}
+
+fn to_file_map(newcert: &HostCertificate) -> FileMapping {
+    vec![
+        (newcert.keyfile().to_path_buf(), newcert.clone()),
+        (newcert.certfile().to_path_buf(), newcert.clone()),
+    ]
+}
+
 impl CertStore {
 
     pub fn new(_context: Arc<RunContext>) -> Result<Self> {
@@ -38,8 +54,8 @@ impl CertStore {
 
     pub fn by_host(&self, host: &str) -> Option<HostCertificate> {
         let host = UniCase::new(host.to_string());
-        let data = self.data.load();
-        data.by_host.get(&host)
+        self.data.load().by_host
+            .get(&host)
             .cloned()
     }
 
@@ -59,29 +75,34 @@ impl CertStore {
             .cloned()
     }
 
-    pub fn upsert(&self, newcert: HostCertificate) -> Result<()> {
+    fn rcu(&self, by_host: HostMapping, by_file: FileMapping) {
         self.data.rcu(|curr| {
-            let new_by_host = newcert.hostnames().iter()
-                .map(|h| (UniCase::new(h.clone()), newcert.clone()))
-                .collect::<Vec<_>>();
-            let new_by_file = [
-                (newcert.keyfile().to_path_buf(), newcert.clone()),
-                (newcert.certfile().to_path_buf(), newcert.clone()),
-            ];
-
             let mut updated = (**curr).clone();
-            updated.by_host.extend(new_by_host.clone());
-            updated.by_file.extend(new_by_file.clone());
+            updated.by_host.extend(by_host.clone());
+            updated.by_file.extend(by_file.clone());
             updated
         });
+    }
+
+    pub fn upsert(&self, newcert: HostCertificate) -> Result<()> {
+        let new_by_host = to_host_map(&newcert);
+        let new_by_file = to_file_map(&newcert);
+
+        self.rcu(new_by_host, new_by_file);
 
         Ok(())
     }
 
     pub fn upsert_all(&self, newcerts: Vec<HostCertificate>) -> Result<()> {
-        for hc in newcerts {
-            self.upsert(hc)?;
-        }
+        let new_by_host = newcerts.iter()
+            .flat_map(to_host_map)
+            .collect();
+        let new_by_file = newcerts.iter()
+            .flat_map(to_file_map)
+            .collect();
+
+        self.rcu(new_by_host, new_by_file);
+
         Ok(())
     }
 

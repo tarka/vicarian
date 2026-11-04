@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -6,12 +6,12 @@ use bytes::Bytes;
 use http::header;
 use metrics::{counter, describe_counter, describe_gauge, gauge};
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use pingora_core::{server::ShutdownWatch, services::background::BackgroundService};
 use pingora_http::ResponseHeader;
 use pingora_proxy::Session;
 use tracing::{debug, info};
-use std::sync::OnceLock;
 
-use crate::{RunContext, proxy::BackendHandler};
+use crate::proxy::BackendHandler;
 
 const UPKEEP_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -46,34 +46,34 @@ const METRICS_LIST: &[MetricType] = &[
     MetricType::Gauge(METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, "Unix timestamp of the next ACME certificate renewal"),
 ];
 
-static METRICS: OnceLock<Metrics> = OnceLock::new();
-
 #[derive(Debug)]
 pub struct Metrics {
-    pub handle: PrometheusHandle,
-    context: Arc<RunContext>,
+    pub handler: PrometheusHandle,
+}
+
+#[async_trait]
+impl BackgroundService for Metrics {
+
+    async fn start(&self, shutdown: ShutdownWatch) {
+        self.run(shutdown).await
+    }
+
+
 }
 
 impl Metrics {
-    pub fn install_global(context: Arc<RunContext>) -> Result<&'static Self> {
-        let handle = PrometheusBuilder::new()
+    pub fn new() -> Result<Self> {
+        let handler = PrometheusBuilder::new()
             .with_recommended_naming(true)
             .install_recorder()?;
 
-        let metrics = METRICS.get_or_init(|| Self {
-            handle,
-            context,
-        });
+        let metrics = Self {
+            handler,
+        };
 
         metrics.describe_metrics();
 
         Ok(metrics)
-    }
-
-    pub fn get() -> &'static Metrics {
-        METRICS.get()
-            // Almost certainly a startup-order bug, so panic
-            .expect("Attempt to retreive metrics before setup")
     }
 
     fn describe_metrics(&self) {
@@ -91,19 +91,18 @@ impl Metrics {
         }
     }
 
-    pub async fn run(&self) {
-        debug!("Starting Metrics runtime");
+    async fn run(&self, mut shutdown: ShutdownWatch) {
+        info!("Starting Metrics runtime");
 
-        let mut quit_rx = self.context.quit_rx.clone();
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(UPKEEP_TIMEOUT) => {
                     debug!("Running metrics upkeep task");
-                    let handle = self.handle.clone(); // Uses inner-arc pattern
+                    let handle = self.handler.clone(); // Uses inner-arc pattern
                     tokio::task::spawn_blocking(move || handle.run_upkeep());
                 }
 
-                _ = quit_rx.changed() => {
+                _ = shutdown.changed() => {
                     info!("Quitting Metrics runtime");
                     break;
                 },
@@ -112,23 +111,13 @@ impl Metrics {
     }
 }
 
-pub struct MetricsHandler;
-
-impl MetricsHandler {
-    // Just for consistency
-    pub fn new() -> Self {
-        Self
-    }
-}
-
 #[async_trait]
-impl BackendHandler for MetricsHandler {
+impl BackendHandler for Metrics {
     async fn handle(&self, session: &mut Session) -> Result<bool> {
         counter!(METRIC_METRICS_SCRAPE_TOTAL).increment(1);
         debug!("Replying to metrics endpoint");
 
-        let metrics = Metrics::get();
-        let scraped = metrics.handle.render();
+        let scraped = self.handler.render();
         let body = Bytes::copy_from_slice(scraped.as_bytes());
 
         let mut header = ResponseHeader::build(200, Some(body.len()))?;

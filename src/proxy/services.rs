@@ -23,7 +23,7 @@ use crate::{
     config::{Backend, BackendType, ProxyBackend, Vhost},
     metrics::{
         METRIC_AUTH_INVALID_TOTAL, METRIC_AUTH_VALID_TOTAL, METRIC_TLS_REQUESTS_TOTAL,
-        MetricsHandler,
+        Metrics,
     },
     proxy::{
         YEAR_IN_SECS,
@@ -112,7 +112,11 @@ fn to_module_handler(backend: &Backend) -> Box<dyn BackendHandler> {
         }
 
         BackendType::Metrics => {
-            Box::new(MetricsHandler::new())
+            // Avoid propogating Result through the stack; this only
+            // occurs on startup anyway.
+            let metrics = Metrics::new()
+                .expect("Failed to create metrics backend");
+            Box::new(metrics)
         }
     }
 }

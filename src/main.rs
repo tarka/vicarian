@@ -14,7 +14,6 @@ use tracing::info;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
-use crate::metrics::Metrics;
 use crate::{
     certificates::CertificateRuntime,
     config::Config,
@@ -87,7 +86,6 @@ fn main() -> Result<()> {
     // Runtime start
 
     let cert_runtime = Arc::new(CertificateRuntime::new(context.clone())?);
-    let metrics = Metrics::install_global(context.clone())?;
 
     // Pingora starts its own tokio runtimes, so we create one here to
     // handle certificate and support tasks.
@@ -101,9 +99,10 @@ fn main() -> Result<()> {
                 .enable_io()
                 .build()?;
 
-            trt.spawn(async move {
-                metrics.run().await
-            });
+            // FIXME:
+            // trt.spawn(async move {
+            //     metrics.run().await
+            // });
 
             trt.block_on(
                 crt.run_indefinitely()

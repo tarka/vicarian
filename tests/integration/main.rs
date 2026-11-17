@@ -573,6 +573,48 @@ async fn test_http01_not_found() {
 }
 
 #[tokio::test]
+async fn test_http01_missing_host_header() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let mut stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{}", proxy.insecure_port))
+        .await
+        .unwrap();
+    stream
+        .write_all(b"GET /.well-known/acme-challenge/some-token HTTP/1.1\r\n\r\n")
+        .await
+        .unwrap();
+
+    let mut buf = vec![0u8; 1024];
+    let n = stream.read(&mut buf).await.unwrap();
+    let response = String::from_utf8_lossy(&buf[..n]);
+
+    assert!(response.starts_with("HTTP/1.1 400 Bad Request"));
+    assert!(response.contains("Missing Host header"));
+}
+
+#[tokio::test]
+async fn test_http01_empty_token() {
+    let proxy = ProxyBuilder::new().await
+        .with_simple_config("example_com_simple")
+        .run().await.unwrap();
+
+    let response = Client::builder()
+        .redirect(redirect::Policy::none())
+        .build().unwrap()
+        .get(format!("http://localhost:{}/.well-known/acme-challenge/", proxy.insecure_port))
+        .header(HOST, "www.example.com")
+        .send().await.unwrap();
+
+    assert_eq!(404, response.status().as_u16());
+    let body = response.text().await.unwrap();
+    assert!(body.contains("ACME token not found"));
+}
+
+#[tokio::test]
 async fn test_context_path_rewriting() {
     let backend_server = mock_server().await.unwrap();
     let proxy = ProxyBuilder::new().await

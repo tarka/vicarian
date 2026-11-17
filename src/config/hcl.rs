@@ -312,6 +312,8 @@ pub struct TlsAcmeConfig {
     pub contact: String,
     #[serde(default)]
     pub profile: AcmeProfile,
+    #[serde(with = "http_serde::option::uri", default)]
+    pub provider_url: Option<Uri>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

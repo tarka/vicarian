@@ -68,6 +68,7 @@ fn test_dns01_example_config() -> Result<()> {
                 })
             }),
             profile: AcmeProfile::Classic,
+            provider_url: None,
         }) if key == "PORKBUN_KEY" && secret == "PORKBUN_SECRET"));
 
     assert!(config.vhosts[0].backend_by_path("/").is_ok());
@@ -92,6 +93,7 @@ fn test_http01_example_config() -> Result<()> {
             directory: _,
             challenge: AcmeChallenge::Http01,
             profile: AcmeProfile::ShortLived,
+            provider_url: None,
         })));
 
     assert!(config.vhosts[0].backend_by_path("/copyparty").is_ok());
@@ -479,6 +481,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     assert!(matches!(vh_haltcondition.tls, TlsConfig::Acme(TlsAcmeConfig {
         acme_provider: AcmeProvider::LetsEncrypt,
         profile: AcmeProfile::ShortLived,
+        provider_url: None,
         ref contact,
         directory: _,
         challenge: AcmeChallenge::Dns01(DnsProvider {
@@ -500,6 +503,7 @@ fn test_hcl_vicarian_full_example() -> Result<()> {
     assert!(matches!(vh_vicarian.tls, TlsConfig::Acme(TlsAcmeConfig {
         acme_provider: AcmeProvider::LetsEncrypt,
         profile: AcmeProfile::Classic,
+        provider_url: None,
         contact: _,
         directory: _,
         challenge: AcmeChallenge::Http01,

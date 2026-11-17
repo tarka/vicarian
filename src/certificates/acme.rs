@@ -22,10 +22,7 @@ use tracing::{debug, error, info, warn};
 use zone_update::{RecordType, async_impl::AsyncDnsProvider};
 
 use crate::{
-    RunContext,
-    certificates::{HostCertificate, store::CertStore},
-    config::{AcmeChallenge, AcmeProfile, DnsProvider, TlsAcmeConfig, TlsConfig, Vhost},
-    metrics::{
+    RunContext, certificates::{HostCertificate, store::CertStore}, config::{AcmeChallenge, AcmeProfile, Config, DnsProvider, TlsAcmeConfig, TlsConfig, Vhost}, metrics::{
         METRIC_ACME_NEXT_RENEWAL_TIMESTAMP_SECS, METRIC_ACME_RENEW_ERROR_TOTAL,
         METRIC_ACME_RENEW_SUCCESS_TOTAL,
     },
@@ -83,11 +80,12 @@ struct AcmeHost {
     challenge: AcmeChallenge,
     profile: ProfileParams,
     renewal: RwLock<Renewal>,
+    acme_url: String,
 }
 
 impl AcmeHost {
 
-    fn new(vhost: &Vhost, aconf: &TlsAcmeConfig) -> Result<Self> {
+    fn new(config: &Config, vhost: &Vhost, aconf: &TlsAcmeConfig) -> Result<Self> {
         let domain = psl::domain_str(&vhost.hostname)
             .ok_or(anyhow!("Failed to find base domain for {}", vhost.hostname))?
             .to_string();
@@ -134,6 +132,17 @@ impl AcmeHost {
 
         let renewal = RwLock::new(Renewal::new(OffsetDateTime::UNIX_EPOCH));
 
+
+        let acme_url = if let Some(ref url) = aconf.provider_url {
+            url.to_string()
+        } else if config.dev_mode {
+            info!("Using staging ACME server");
+            LetsEncrypt::Staging.url().to_owned()
+        } else {
+            LetsEncrypt::Production.url().to_owned()
+        };
+
+
         let acme_host = Self {
             fqdn: cert_hostname,
             aliases: vhost.aliases.clone(),
@@ -144,6 +153,7 @@ impl AcmeHost {
             contactfile,
             challenge: aconf.challenge.clone(),
             profile: aconf.profile.into(),
+            acme_url,
             renewal,
         };
         Ok(acme_host)
@@ -229,7 +239,7 @@ impl AcmeRuntime {
                 TlsConfig::Cert(_) => None, // Handled elsewhere
                 TlsConfig::Acme(aconf) => Some((vhost, aconf)),
             })
-            .map(|(vhost, aconf)| AcmeHost::new(vhost, aconf))
+            .map(|(vhost, aconf)| AcmeHost::new(&context.config, vhost, aconf))
             // Filter out duplicate wildcard hosts
             .unique_by(|ahost| ahost.as_ref().ok()
                        .map(|ahost| ahost.fqdn.clone()))
@@ -446,13 +456,6 @@ impl AcmeRuntime {
     }
 
     async fn fetch_account(&self, acme_host: &AcmeHost) -> Result<Account> {
-        let acme_url = if self.context.config.dev_mode {
-            info!("Using staging ACME server");
-            LetsEncrypt::Staging.url().to_owned()
-        } else {
-            LetsEncrypt::Production.url().to_owned()
-        };
-
         let account = if acme_host.contactfile.exists() {
             let creds_str = read_to_string(&acme_host.contactfile).await?;
             let creds: AccountCredentials = serde_json::from_str(&creds_str)?;
@@ -472,7 +475,7 @@ impl AcmeRuntime {
                         terms_of_service_agreed: true,
                         only_return_existing: false,
                     },
-                    acme_url,
+                    acme_host.acme_url.clone(),
                     None,
                 )
                 .await?;

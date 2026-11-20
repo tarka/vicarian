@@ -43,10 +43,12 @@ fn try_bind_port(port: u16) -> Option<TcpListener> {
     }
 }
 
-// Allocate a block of 4 consecutive free ports for a test.
+// Allocate a block of `count` consecutive free ports.
 // Guaranteed not to clash with any existing system daemon, and synchronized
 // across threads and processes using both an in-process mutex and an fslock file lock.
-pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
+// Callers can use this for auxiliary test servers (e.g. Pebble) as well as
+// the proxy itself.
+pub fn allocate_port_block(count: u16) -> Result<Vec<u16>> {
     let _process_guard = PROCESS_PORT_MUTEX.lock().unwrap();
 
     let lock_dir = std::path::Path::new("target/test_runs");
@@ -73,19 +75,19 @@ pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
     let max_attempts = (PORT_RANGE_END - PORT_RANGE_START) as usize;
 
     while attempts < max_attempts {
-        if next_port + PORTS_PER_TEST > PORT_RANGE_END {
+        if next_port + count > PORT_RANGE_END {
             next_port = PORT_RANGE_START;
         }
 
         let base = next_port;
-        next_port += PORTS_PER_TEST;
-        attempts += PORTS_PER_TEST as usize;
+        next_port += count;
+        attempts += count as usize;
 
-        // Try to bind all 4 ports in the block
-        let mut listeners = Vec::with_capacity(PORTS_PER_TEST as usize);
+        // Try to bind all `count` ports in the block
+        let mut listeners = Vec::with_capacity(count as usize);
         let mut all_free = true;
 
-        for offset in 0..PORTS_PER_TEST {
+        for offset in 0..count {
             match try_bind_port(base + offset) {
                 Some(l) => listeners.push(l),
                 None => {
@@ -99,18 +101,22 @@ pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
             // Persist the state
             let _ = std::fs::write(&state_file_path, next_port.to_string());
 
-            return Ok(ProxyPorts {
-                insecure_port: base,
-                tls_port: base + 1,
-                // Hold the listeners until the last minute to
-                // minimise the chance of the kernel reallocating the
-                // ports.
-                listeners: Vec::new(),
-            });
+            // Drop the temporary listeners so the processes can bind them.
+            drop(listeners);
+            return Ok((base..(base + count)).collect());
         }
     }
 
     bail!("Failed to allocate free ports in range {PORT_RANGE_START}..{PORT_RANGE_END}");
+}
+
+pub fn allocate_proxy_ports() -> Result<ProxyPorts> {
+    let ports = allocate_port_block(PORTS_PER_TEST)?;
+    Ok(ProxyPorts {
+        insecure_port: ports[0],
+        tls_port: ports[1],
+        listeners: Vec::new(),
+    })
 }
 
 pub struct ProxyBuilder {
@@ -118,6 +124,7 @@ pub struct ProxyBuilder {
     pub config: Option<Utf8PathBuf>,
     pub ports: ProxyPorts,
     pub mock_ports: Vec<u16>,
+    pub envs: Vec<(String, String)>,
     verbose: u8,
 }
 
@@ -156,6 +163,7 @@ impl ProxyBuilder {
             config: None,
             ports,
             mock_ports: Vec::new(),
+            envs: Vec::new(),
             verbose: 2,
         }
     }
@@ -163,6 +171,34 @@ impl ProxyBuilder {
     pub fn with_simple_config(mut self, confname: &str) -> Self {
         let path = format!("tests/data/config/{confname}.hcl");
         self.config = Some(Utf8PathBuf::from(path));
+        self
+    }
+
+    /// Use an explicit config file path (useful for generated configs).
+    pub fn with_config_path(mut self, path: impl Into<Utf8PathBuf>) -> Self {
+        self.config = Some(path.into());
+        self
+    }
+
+    /// Write `contents` into the test's temporary directory and use it as the
+    /// config file. This is handy for ACME tests which need dynamic ports and
+    /// directory paths embedded in the config.
+    pub fn with_config_contents(self, contents: &str) -> Result<Self> {
+        let path = self.dir.path().join("generated.hcl");
+        std::fs::write(&path, contents)?;
+        let path = Utf8PathBuf::from_path_buf(path)
+            .map_err(|p| anyhow::anyhow!("Non-UTF8 config path: {}", p.display()))?;
+        Ok(self.with_config_path(path))
+    }
+
+    /// Add extra environment variables for the spawned proxy process.
+    pub fn with_envs<I, K, V>(mut self, envs: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.envs.extend(envs.into_iter().map(|(k, v)| (k.into(), v.into())));
         self
     }
 
@@ -218,13 +254,14 @@ impl ProxyBuilder {
         let stderr = File::create(err_file).await?;
 
         // Tests use env() in the HCL to extract backends
-        let mockenv: Vec<_> = self.mock_ports.iter()
+        let mut child_env: Vec<(String, String)> = self.mock_ports.iter()
             .enumerate()
             .map(|(c, p)| {
                 (format!("VICARIAN_TEST_BACKEND_URL_{}", c+1),
                  format!("http://127.0.0.1:{p}"))
             })
             .collect();
+        child_env.extend(self.envs.iter().cloned());
 
         // Close assigned listening ports
         self.ports.listeners = Vec::new();
@@ -236,7 +273,7 @@ impl ProxyBuilder {
             // enabling parallel tests to each use their own unique port block.
             .arg("--insecure-port").arg(self.ports.insecure_port.to_string())
             .arg("--tls-port").arg(self.ports.tls_port.to_string())
-            .envs(mockenv)
+            .envs(child_env)
             .stdout(stdout.into_std().await)
             .stderr(stderr.into_std().await)
             .spawn()?;

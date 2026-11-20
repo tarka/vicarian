@@ -2,7 +2,10 @@
 
 #[path = "../utils/proxy.rs"]
 mod proxyutils;
+#[path = "../utils/pebble.rs"]
+mod utils_pebble;
 use proxyutils::certs as certutils;
+mod acme;
 mod static_files;
 mod sse;
 mod websockets;
